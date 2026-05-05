@@ -330,35 +330,40 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // ── /login ────────────────────────────────────────────────────────────────
-  if (req.method === "GET" && (req.url === "/login" || req.url === "/login/")) {
+  // ── Page routes (strip query string before matching) ────────────────────
+  const urlPath = req.url.split("?")[0].replace(/\/+$/, "") || "/";
+
+  if (req.method === "GET" && urlPath === "/login") {
     serveStatic(res, path.join(WEB_DIR, "login.html"));
     return;
   }
 
-  // ── /tool ─────────────────────────────────────────────────────────────────
-  if (req.method === "GET" && (req.url === "/tool" || req.url === "/tool/")) {
+  if (req.method === "GET" && urlPath === "/tool") {
     serveStatic(res, path.join(WEB_DIR, "tool.html"));
     return;
   }
 
-  // ── /dashboard ────────────────────────────────────────────────────────────
-  if (req.method === "GET" && (req.url === "/dashboard" || req.url === "/dashboard/")) {
+  if (req.method === "GET" && urlPath === "/dashboard") {
     serveStatic(res, path.join(WEB_DIR, "dashboard.html"));
     return;
   }
 
-  // ── /admin ────────────────────────────────────────────────────────────────
-  if (req.method === "GET" && (req.url === "/admin" || req.url === "/admin/")) {
+  if (req.method === "GET" && urlPath === "/dp") {
     serveStatic(res, path.join(WEB_DIR, "admin.html"));
+    return;
+  }
+
+  // /admin → 404 (obscure the panel URL)
+  if (req.method === "GET" && urlPath === "/admin") {
+    res.writeHead(404, { "Content-Type": "text/plain" });
+    res.end("Not found");
     return;
   }
 
   // ── Static files ──────────────────────────────────────────────────────────
   if (req.method === "GET") {
-    let urlPath = req.url.split("?")[0];
-    if (urlPath === "/" || urlPath === "") urlPath = "/index.html";
-    const filePath = path.join(WEB_DIR, urlPath);
+    let staticPath = urlPath === "/" ? "/index.html" : urlPath;
+    const filePath = path.join(WEB_DIR, staticPath);
     if (!filePath.startsWith(WEB_DIR + path.sep) && filePath !== WEB_DIR) {
       res.writeHead(403, { "Content-Type": "text/plain" });
       res.end("Forbidden");

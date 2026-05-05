@@ -4,12 +4,12 @@
 (async () => {
   try {
     const res = await fetch("/api/me");
-    if (!res.ok) { location.href = "/login?next=/admin"; return; }
+    if (!res.ok) { location.href = "/login?next=/dp"; return; }
     const me = await res.json();
     if (me.role !== "admin") { location.href = "/dashboard"; return; }
     loadAdminData();
   } catch {
-    location.href = "/login?next=/admin";
+    location.href = "/login?next=/dp";
   }
 })();
 

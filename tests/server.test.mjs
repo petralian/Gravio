@@ -106,12 +106,17 @@ describe("GET /login", () => {
   });
 });
 
-describe("GET /admin", () => {
-  it("returns 200 with admin HTML (auth guard is client-side)", async () => {
-    const res = await httpGet(`http://localhost:${TEST_PORT}/admin`);
+describe("GET /dp", () => {
+  it("returns 200 with admin HTML at /dp (auth guard is client-side)", async () => {
+    const res = await httpGet(`http://localhost:${TEST_PORT}/dp`);
     assert.strictEqual(res.status, 200);
     assert.ok(res.headers["content-type"]?.includes("text/html"));
     assert.ok(res.body.includes("admin.js"));
+  });
+
+  it("returns 404 for the old /admin URL", async () => {
+    const res = await httpGet(`http://localhost:${TEST_PORT}/admin`);
+    assert.strictEqual(res.status, 404);
   });
 });
 

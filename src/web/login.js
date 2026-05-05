@@ -43,7 +43,7 @@ function redirectAfterAuth(role) {
   if (next && next.startsWith("/")) {
     location.href = next;
   } else if (role === "admin") {
-    location.href = "/admin";
+    location.href = "/dp";
   } else {
     location.href = "/dashboard";
   }
