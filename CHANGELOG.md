@@ -6,6 +6,13 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+- Marketing copy now requires registration before cloud scoring and replaces misleading global `agentscored` install examples with real project commands.
+- Public "Try the tool" CTAs replaced with registration-first messaging ("3 free scans") and onboarding links.
+- CLI publish now requires `--api-key` and prints explicit login/dashboard guidance when missing or unauthorized.
+- `/tool` and `POST /api/evaluate` now require authentication; unauthenticated users are redirected to login or receive 401.
+- Free-plan cloud publish limit enforced at 3 scans for non-admin users.
+
 ## [0.4.0] — 2026-05-05
 
 ### Added (Phase 4 — User Auth, Persistence, Admin Panel, Fly.io)

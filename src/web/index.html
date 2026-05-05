@@ -31,7 +31,7 @@
         <a href="/onboarding">Onboarding</a>
         <a href="/login" class="m-btn m-btn-outline m-btn-sm">Customer login</a>
         <a href="mailto:hello@gravio.dev" class="m-btn m-btn-outline m-btn-sm">Book demo</a>
-        <a href="/tool" class="m-btn m-btn-neon m-btn-sm">Try the tool →</a>
+        <a href="/login" class="m-btn m-btn-neon m-btn-sm">Start free (3 scans)</a>
       </nav>
     </div>
   </header>
@@ -53,7 +53,7 @@
           only your browser can decrypt.
         </p>
         <div class="m-cta-row">
-          <a href="/onboarding" class="m-btn m-btn-neon m-btn-lg">Get started free</a>
+          <a href="/login" class="m-btn m-btn-neon m-btn-lg">Register and get 3 free scans</a>
           <a href="/login" class="m-btn m-btn-outline m-btn-lg">Customer login</a>
           <a href="#how" class="m-btn m-btn-ghost m-btn-lg">See how it works →</a>
         </div>
@@ -67,10 +67,10 @@
             <span class="dot dot-yellow"></span>
             <span class="dot dot-green"></span>
           </div>
-          <span class="m-terminal-title">agentscored scan</span>
+          <span class="m-terminal-title">gravio local scan</span>
         </div>
         <div class="m-terminal-body">
-<pre class="m-terminal-pre"><span class="t-prompt">$</span> <span class="t-cmd">agentscored scan</span>
+<pre class="m-terminal-pre"><span class="t-prompt">$</span> <span class="t-cmd">npm run scorecard:scan</span>
 
   <span class="t-comment">Gravio v1.0                     2026-05-05</span>
   <span class="t-comment">────────────────────────────────────────</span>
@@ -122,8 +122,8 @@
         <div class="m-step-card">
           <p class="m-step-num">01</p>
           <div class="m-step-icon">⬇</div>
-          <h3>Install the daemon</h3>
-          <p>One command: <code>npm install -g agentscored</code>. Drop it in any project or run globally. Zero config required.</p>
+          <h3>Create account + install</h3>
+          <p>Sign in first, then run local scan commands in your project. Registration is required for cloud scoring and dashboard features.</p>
         </div>
         <div class="m-step-connector" aria-hidden="true"></div>
         <div class="m-step-card">
@@ -137,7 +137,7 @@
           <p class="m-step-num">03</p>
           <div class="m-step-icon">🔐</div>
           <h3>Read your results</h3>
-          <p>Results are encrypted with your passphrase before upload. Your dashboard decrypts them client-side. We never see your data.</p>
+          <p>Every account gets 3 encrypted cloud scans free. Your dashboard decrypts client-side. We never see your plaintext data.</p>
         </div>
       </div>
     </section>
@@ -193,7 +193,7 @@
       <div class="m-section-header">
         <p class="m-eyebrow">PRICING</p>
         <h2 class="m-section-h2">Start free. Scale when you need it.</h2>
-        <p class="m-section-sub">The daemon is always free for local use. Upgrade for cloud sync, history, and team features.</p>
+        <p class="m-section-sub">Register once, run local scans anytime, and unlock 3 free encrypted cloud scans.</p>
       </div>
       <div class="m-pricing-grid">
 
@@ -202,17 +202,17 @@
           <div class="m-plan-price">
             <span class="m-plan-amount">$0</span>
           </div>
-          <p class="m-plan-desc">Local scanning, no cloud dependency. Perfect for solo developers getting started.</p>
+          <p class="m-plan-desc">Perfect for solo developers. Includes local scanning plus 3 encrypted cloud scans after registration.</p>
           <ul class="m-plan-features">
             <li><span class="t-pass">✓</span> Daemon CLI (macOS / Win / Linux)</li>
             <li><span class="t-pass">✓</span> Local JSON scorecard output</li>
             <li><span class="t-pass">✓</span> 14 workflow checks</li>
             <li><span class="t-pass">✓</span> Secret exposure detection</li>
-            <li><span class="t-pass">✓</span> 3 projects</li>
-            <li class="m-plan-no"><span>—</span> Encrypted cloud dashboard</li>
+            <li><span class="t-pass">✓</span> 3 encrypted cloud scans</li>
+            <li><span class="t-pass">✓</span> Encrypted cloud dashboard</li>
             <li class="m-plan-no"><span>—</span> Score trend history</li>
           </ul>
-          <a href="mailto:hello@gravio.dev" class="m-btn m-btn-outline m-btn-full">Download free</a>
+          <a href="/login" class="m-btn m-btn-outline m-btn-full">Register free</a>
         </div>
 
         <div class="m-plan-card m-plan-featured">
@@ -260,11 +260,11 @@
       <div class="m-install-inner">
         <div class="m-install-copy">
           <p class="m-eyebrow">ZERO CONFIG</p>
-          <h2 class="m-section-h2">Up and running<br/>in 30 seconds.</h2>
-          <p class="m-section-sub">One install command. Works in any project. The daemon handles the rest.</p>
+          <h2 class="m-section-h2">Register first,<br/>then run in 30 seconds.</h2>
+          <p class="m-section-sub">Local scan is instant. Cloud scoring and dashboard require login + API key.</p>
           <div class="m-install-feats">
             <div class="m-install-feat"><span class="t-pass">✓</span> macOS · Windows · Linux</div>
-            <div class="m-install-feat"><span class="t-pass">✓</span> No runtime dependencies</div>
+            <div class="m-install-feat"><span class="t-pass">✓</span> Beginner-friendly onboarding</div>
             <div class="m-install-feat"><span class="t-pass">✓</span> Signed binaries · Reproducible builds</div>
             <div class="m-install-feat"><span class="t-pass">✓</span> Works in any git-tracked project</div>
           </div>
@@ -279,17 +279,17 @@
             <span class="m-terminal-title">Terminal</span>
           </div>
           <div class="m-terminal-body">
-<pre class="m-terminal-pre"><span class="t-comment"># Install globally</span>
-<span class="t-prompt">$</span> <span class="t-cmd">npm install -g agentscored</span>
+<pre class="m-terminal-pre"><span class="t-comment"># Register and get API key</span>
+<span class="t-comment"># Visit: https://gravio-platform.fly.dev/login</span>
 
 <span class="t-comment"># One-time scan → writes agent-quality/runs/latest.json</span>
-<span class="t-prompt">$</span> <span class="t-cmd">agentscored scan</span>
+<span class="t-prompt">$</span> <span class="t-cmd">npm run scorecard:scan</span>
 
 <span class="t-comment"># Watch mode — rescans on file change</span>
-<span class="t-prompt">$</span> <span class="t-cmd">agentscored watch</span>
+<span class="t-prompt">$</span> <span class="t-cmd">npm run scorecard:scan:watch</span>
 
 <span class="t-comment"># Publish encrypted results to your dashboard</span>
-<span class="t-prompt">$</span> <span class="t-cmd">agentscored publish --project my-saas</span><span class="t-cursor">█</span></pre>
+<span class="t-prompt">$</span> <span class="t-cmd">node scripts/scanner-daemon.mjs --once --publish --project my-saas --api-key gv_xxx --server https://gravio-platform.fly.dev</span><span class="t-cursor">█</span></pre>
           </div>
         </div>
       </div>
@@ -315,12 +315,11 @@
     <section class="m-cta-final m-container">
       <p class="m-eyebrow">EARLY ACCESS</p>
       <h2 class="m-cta-h2">Ready to see your agent quality score?</h2>
-      <p>Get running in under 30 seconds. Free forever on local mode.</p>
+      <p>Register now and get 3 encrypted cloud scans free.</p>
       <div class="m-cta-row">
         <a href="/onboarding" class="m-btn m-btn-outline m-btn-lg">Guided onboarding</a>
-        <a href="/login" class="m-btn m-btn-neon m-btn-lg">Customer login</a>
+        <a href="/login" class="m-btn m-btn-neon m-btn-lg">Register free</a>
         <a href="mailto:hello@gravio.dev" class="m-btn m-btn-neon m-btn-lg">Get early access</a>
-        <a href="/tool" class="m-btn m-btn-ghost m-btn-lg">Try the scoring tool →</a>
       </div>
     </section>
 

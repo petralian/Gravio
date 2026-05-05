@@ -121,8 +121,15 @@ describe("GET /dp", () => {
 });
 
 describe("GET /tool", () => {
-  it("returns 200 with tool HTML", async () => {
+  it("redirects to login when unauthenticated", async () => {
     const res = await httpGet(`http://localhost:${TEST_PORT}/tool`);
+    assert.strictEqual(res.status, 302);
+    assert.strictEqual(res.headers.location, "/login?next=/tool");
+  });
+
+  it("returns 200 with tool HTML when authenticated", async () => {
+    const cookie = await registerAndGetCookie(`tool-${Date.now()}@gravio.test`, "password123");
+    const res = await httpGet(`http://localhost:${TEST_PORT}/tool`, { Cookie: cookie });
     assert.strictEqual(res.status, 200);
     assert.ok(res.headers["content-type"]?.includes("text/html"), "Expected HTML content-type");
     assert.ok(res.body.includes("Scoring Tool"), "Expected Scoring Tool text");
@@ -158,8 +165,15 @@ describe("GET /health", () => {
 });
 
 describe("POST /api/evaluate", () => {
+  let cookie;
+
+  it("setup: authenticate user", async () => {
+    cookie = await registerAndGetCookie(`eval-${Date.now()}@gravio.test`, "password123");
+    assert.ok(cookie);
+  });
+
   it("returns 200 with score for valid run", async () => {
-    const res = await httpPost(`http://localhost:${TEST_PORT}/api/evaluate`, { run: VALID_RUN });
+    const res = await httpPost(`http://localhost:${TEST_PORT}/api/evaluate`, { run: VALID_RUN }, { Cookie: cookie });
     assert.strictEqual(res.status, 200);
     const data = JSON.parse(res.body);
     assert.ok(typeof data.score === "number", "score must be a number");
@@ -167,8 +181,13 @@ describe("POST /api/evaluate", () => {
     assert.ok(Array.isArray(data.gates), "gates must be array");
   });
 
+  it("returns 401 when not authenticated", async () => {
+    const res = await httpPost(`http://localhost:${TEST_PORT}/api/evaluate`, { run: VALID_RUN });
+    assert.strictEqual(res.status, 401);
+  });
+
   it("returns 400 for missing run field", async () => {
-    const res = await httpPost(`http://localhost:${TEST_PORT}/api/evaluate`, { notRun: true });
+    const res = await httpPost(`http://localhost:${TEST_PORT}/api/evaluate`, { notRun: true }, { Cookie: cookie });
     assert.strictEqual(res.status, 400);
   });
 
@@ -326,6 +345,28 @@ describe("POST /api/publish + GET /api/runs/:projectId (authenticated)", () => {
       { Cookie: cookie },
     );
     assert.strictEqual(res.status, 400);
+  });
+
+  it("enforces free plan limit at 3 cloud scans", async () => {
+    const limitCookie = await registerAndGetCookie(`limit-${Date.now()}@gravio.test`, "password123");
+    const keyRes = await httpPost(`http://localhost:${TEST_PORT}/api/keys`, { label: "limit" }, { Cookie: limitCookie });
+    const limitKey = JSON.parse(keyRes.body).key;
+
+    for (const pid of ["limit-proj-1", "limit-proj-2", "limit-proj-3"]) {
+      const okRes = await httpPost(
+        `http://localhost:${TEST_PORT}/api/publish`,
+        { projectId: pid, ciphertext },
+        { Authorization: `Bearer ${limitKey}` },
+      );
+      assert.strictEqual(okRes.status, 200);
+    }
+
+    const blocked = await httpPost(
+      `http://localhost:${TEST_PORT}/api/publish`,
+      { projectId: "limit-proj-4", ciphertext },
+      { Authorization: `Bearer ${limitKey}` },
+    );
+    assert.strictEqual(blocked.status, 403);
   });
 });
 

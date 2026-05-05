@@ -8,10 +8,10 @@
  *   node scripts/scanner-daemon.mjs --target ../some-project --output agent-quality/runs/latest.json
  *
  * Phase 2 — Publish encrypted results to cloud:
- *   node scripts/scanner-daemon.mjs --once --publish --project my-saas
- *   node scripts/scanner-daemon.mjs --once --publish --project my-saas --passphrase "my secret"
- *   node scripts/scanner-daemon.mjs --once --publish --project my-saas --key <64-char-hex>
- *   node scripts/scanner-daemon.mjs --once --publish --project my-saas --passphrase "x" --salt <hex>
+ *   node scripts/scanner-daemon.mjs --once --publish --project my-saas --api-key gv_xxx
+ *   node scripts/scanner-daemon.mjs --once --publish --project my-saas --api-key gv_xxx --passphrase "my secret"
+ *   node scripts/scanner-daemon.mjs --once --publish --project my-saas --api-key gv_xxx --key <64-char-hex>
+ *   node scripts/scanner-daemon.mjs --once --publish --project my-saas --api-key gv_xxx --passphrase "x" --salt <hex>
  */
 import path from "node:path";
 import http from "node:http";
@@ -33,6 +33,7 @@ function parseArgs(argv) {
     publish: false,
     project: null,
     server: "http://localhost:3000",
+    apiKey: null,
     key: null,
     passphrase: null,
     salt: null,
@@ -76,6 +77,11 @@ function parseArgs(argv) {
       i += 1;
       continue;
     }
+    if (token === "--api-key" && argv[i + 1]) {
+      args.apiKey = argv[i + 1];
+      i += 1;
+      continue;
+    }
     if (token === "--key" && argv[i + 1]) {
       args.key = argv[i + 1];
       i += 1;
@@ -100,7 +106,7 @@ function parseArgs(argv) {
  * POST a JSON payload to a URL, returns the parsed response body.
  * Supports http:// and https:// URLs.
  */
-function httpPost(url, payload) {
+function httpPost(url, payload, headers = {}) {
   return new Promise((resolve, reject) => {
     const data = JSON.stringify(payload);
     const parsed = new URL(url);
@@ -114,6 +120,7 @@ function httpPost(url, payload) {
         headers: {
           "Content-Type": "application/json",
           "Content-Length": Buffer.byteLength(data),
+          ...headers,
         },
       },
       (res) => {
@@ -170,6 +177,15 @@ if (args.publish && !args.project) {
   process.exit(1);
 }
 
+if (args.publish && !args.apiKey) {
+  console.error("error: --publish requires --api-key <gv_...>");
+  console.error("\nNext steps:");
+  console.error("  1) Sign in: https://gravio-platform.fly.dev/login");
+  console.error("  2) Create API key in dashboard");
+  console.error("  3) Re-run with: --api-key <your_key>\n");
+  process.exit(1);
+}
+
 if (args.once) {
   const { run, scan } = runScannerOnce({
     targetDir: args.target,
@@ -191,12 +207,21 @@ if (args.once) {
     const publishUrl = new URL("/api/publish", args.server).toString();
 
     try {
-      const result = await httpPost(publishUrl, { projectId: args.project, ciphertext });
+      const result = await httpPost(
+        publishUrl,
+        { projectId: args.project, ciphertext },
+        { Authorization: `Bearer ${args.apiKey}` },
+      );
       if (result.status === 200 && result.data?.ok) {
         console.log(`\n  ✓ Published successfully`);
         console.log(`  Project: ${args.project}`);
         console.log(`  Retrieve: ${args.server}/api/runs/${encodeURIComponent(args.project)}`);
         console.log(`  Dashboard: ${args.server}/dashboard?project=${encodeURIComponent(args.project)}\n`);
+      } else if (result.status === 401 || result.status === 403) {
+        console.error(`  ✗ Publish blocked (HTTP ${result.status}): ${result.data?.error ?? "Authentication required"}`);
+        console.error("\n  Sign in and create a valid API key:");
+        console.error("  https://gravio-platform.fly.dev/login\n");
+        process.exit(1);
       } else {
         console.error(`  ✗ Publish failed (HTTP ${result.status}): ${result.data?.error ?? JSON.stringify(result.data)}`);
         process.exit(1);

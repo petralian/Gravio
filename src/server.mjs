@@ -225,7 +225,19 @@ const server = http.createServer(async (req, res) => {
         res.end(JSON.stringify({ error: "ciphertext is required and must be a non-empty string" }));
         return;
       }
-      stmts.upsertRun.run(projectId, user.uid ?? user.id, ciphertext);
+
+      const uid = user.uid ?? user.id;
+      const existing = stmts.getRun.get(projectId, uid);
+      const runCount = stmts.listRunsForUser.all(uid).length;
+      if (!existing && user.role !== "admin" && runCount >= 3) {
+        res.writeHead(403, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({
+          error: "Free plan limit reached (3 scans). Sign in to your dashboard to manage projects or upgrade.",
+        }));
+        return;
+      }
+
+      stmts.upsertRun.run(projectId, uid, ciphertext);
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ ok: true, projectId }));
     } catch (err) {
@@ -304,6 +316,12 @@ const server = http.createServer(async (req, res) => {
 
   // ── API: POST /api/evaluate (unchanged) ─────────────────────────────────
   if (req.method === "POST" && req.url === "/api/evaluate") {
+    const user = getAuthUser(req);
+    if (!user) {
+      res.writeHead(401, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Please sign in to use the scoring tool." }));
+      return;
+    }
     try {
       const body = await readBody(req);
       const payload = JSON.parse(body);
@@ -339,6 +357,12 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (req.method === "GET" && urlPath === "/tool") {
+    const user = getAuthUser(req);
+    if (!user) {
+      res.writeHead(302, { Location: "/login?next=/tool" });
+      res.end();
+      return;
+    }
     serveStatic(res, path.join(WEB_DIR, "tool.html"));
     return;
   }

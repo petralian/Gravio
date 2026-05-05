@@ -34,7 +34,7 @@
       <h1 class="ob-title">From zero to first score in 5 minutes</h1>
       <p class="ob-lead">
         This guide is built for non-coders. Follow the steps in order and copy/paste each command.
-        Your local scan works right away. Account login is only needed for cloud sync and dashboard features.
+        Local scan works right away. Registration is required for cloud scoring and dashboard features.
       </p>
       <div class="ob-cta-row">
         <a href="/login" class="m-btn m-btn-neon m-btn-lg">Create account or sign in</a>
@@ -54,7 +54,7 @@
       <article class="ob-step-card">
         <p class="ob-step-num">Step 2</p>
         <h2>Run your first local scan</h2>
-        <p>This works for every user immediately. No login required.</p>
+        <p>This works for every user immediately. No login required for local-only scan.</p>
         <pre class="ob-code" id="cmd-local">node scripts/scanner-daemon.mjs --once</pre>
         <button class="m-btn m-btn-outline ob-copy" type="button" data-copy-id="cmd-local">Copy command</button>
       </article>
@@ -69,8 +69,8 @@
       <article class="ob-step-card">
         <p class="ob-step-num">Step 4</p>
         <h2>Publish encrypted results</h2>
-        <p>Use your API key from the dashboard. Replace placeholders first.</p>
-        <pre class="ob-code" id="cmd-publish">node scripts/scanner-daemon.mjs --once --publish --project my-first-project --server https://gravio-platform.fly.dev --key gv_your_api_key_here</pre>
+        <p>Use your API key from dashboard. Free plan allows 3 encrypted cloud scans.</p>
+        <pre class="ob-code" id="cmd-publish">node scripts/scanner-daemon.mjs --once --publish --project my-first-project --server https://gravio-platform.fly.dev --api-key gv_your_api_key_here</pre>
         <button class="m-btn m-btn-outline ob-copy" type="button" data-copy-id="cmd-publish">Copy command</button>
       </article>
 
@@ -80,7 +80,7 @@
         <p>Go to dashboard, select project, and decrypt in browser.</p>
         <div class="ob-cta-row">
           <a href="/dashboard" class="m-btn m-btn-neon">Open dashboard</a>
-          <a href="/tool" class="m-btn m-btn-ghost">Try scoring sandbox</a>
+          <a href="/login" class="m-btn m-btn-ghost">Manage account</a>
         </div>
       </article>
     </section>
@@ -93,11 +93,11 @@
       </details>
       <details>
         <summary>Does a new user need approval before scanning locally?</summary>
-        <p>No approval needed. Local scan mode runs immediately. Account is needed for cloud publish, saved projects, and dashboard features.</p>
+        <p>No approval needed. Local scan mode runs immediately. Account is needed for cloud publish, saved projects, dashboard, and scoring tool access.</p>
       </details>
       <details>
         <summary>Is the scoring tool the same as production scoring?</summary>
-        <p>The tool is a public sandbox for demonstration and manual evaluation. It helps users understand format and gates quickly.</p>
+        <p>Yes, it uses the same evaluator. It is account-gated so only signed-in users can use it.</p>
       </details>
     </section>
   </main>
