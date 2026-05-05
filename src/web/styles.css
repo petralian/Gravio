@@ -1007,6 +1007,133 @@ body.admin-page { padding-top: 0; }
 }
 
 /* ═══════════════════════════════════════
+   ONBOARDING SURFACE (body.onboarding-page)
+═══════════════════════════════════════ */
+
+body.onboarding-page {
+  background:
+    radial-gradient(ellipse 110% 55% at 50% -5%, rgba(0, 229, 255, 0.055) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 40% at 88% 90%, rgba(59, 130, 246, 0.04) 0%, transparent 60%),
+    var(--bg);
+}
+
+.ob-main {
+  padding-top: 96px;
+  padding-bottom: 96px;
+}
+
+.ob-hero {
+  margin-bottom: 34px;
+}
+
+.ob-title {
+  font-size: clamp(30px, 4.8vw, 54px);
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -1px;
+  margin: 8px 0 14px;
+}
+
+.ob-lead {
+  max-width: 760px;
+  color: var(--text-2);
+  font-size: 17px;
+  line-height: 1.7;
+}
+
+.ob-cta-row {
+  margin-top: 18px;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.ob-steps {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 24px;
+}
+
+.ob-step-card {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 18px;
+}
+
+.ob-step-num {
+  color: var(--neon-cyan);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  margin-bottom: 8px;
+}
+
+.ob-step-card h2 {
+  font-size: 22px;
+  line-height: 1.2;
+  margin-bottom: 8px;
+}
+
+.ob-step-card p {
+  color: var(--text-2);
+  font-size: 14px;
+  line-height: 1.6;
+  margin-bottom: 12px;
+}
+
+.ob-code {
+  background: #060606;
+  border: 1px solid var(--border-bright);
+  border-radius: 10px;
+  padding: 12px;
+  color: var(--neon-green);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin-bottom: 10px;
+}
+
+.ob-copy {
+  min-width: 130px;
+}
+
+.ob-faq {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 18px;
+}
+
+.ob-faq h2 {
+  font-size: 24px;
+  margin-bottom: 10px;
+}
+
+.ob-faq details {
+  border-top: 1px solid var(--border);
+  padding: 12px 0;
+}
+
+.ob-faq details:first-of-type {
+  border-top: 0;
+}
+
+.ob-faq summary {
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ob-faq p {
+  color: var(--text-2);
+  margin-top: 8px;
+}
+
+/* ═══════════════════════════════════════
    APP TOOL SURFACE  (body.app-tool)
 ═══════════════════════════════════════ */
 
@@ -1636,6 +1763,7 @@ button#evaluate-btn:hover {
   .dimensions-grid { grid-template-columns: 1fr 1fr; }
   .db-score-banner { flex-direction: column; gap: 16px; }
   .db-banner-right { align-items: flex-start; }
+  .ob-steps { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 600px) {
@@ -1649,4 +1777,5 @@ button#evaluate-btn:hover {
   .db-metrics-row { grid-template-columns: 1fr; }
   .dimensions-grid { grid-template-columns: 1fr; }
   .gate-detail { display: none; }
+  .ob-main { padding-top: 84px; }
 }

@@ -129,6 +129,15 @@ describe("GET /tool", () => {
   });
 });
 
+describe("GET /onboarding", () => {
+  it("returns 200 with onboarding HTML", async () => {
+    const res = await httpGet(`http://localhost:${TEST_PORT}/onboarding`);
+    assert.strictEqual(res.status, 200);
+    assert.ok(res.headers["content-type"]?.includes("text/html"), "Expected HTML content-type");
+    assert.ok(res.body.includes("Getting Started"), "Expected onboarding headline");
+  });
+});
+
 describe("GET /dashboard", () => {
   it("returns 200 with dashboard HTML", async () => {
     const res = await httpGet(`http://localhost:${TEST_PORT}/dashboard`);
