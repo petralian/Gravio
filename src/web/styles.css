@@ -1133,6 +1133,18 @@ body.onboarding-page {
   margin-top: 8px;
 }
 
+/* onboarding header adapts to logged-in state */
+.ob-user-pill {
+  font-size: 12px;
+  color: var(--text-3);
+  font-family: var(--font-mono);
+  padding: 4px 10px;
+  background: rgba(255,255,255,0.05);
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
+.ob-logout-btn { font-size: 13px; padding: 6px 14px; }
+
 /* ═══════════════════════════════════════
    APP TOOL SURFACE  (body.app-tool)
 ═══════════════════════════════════════ */

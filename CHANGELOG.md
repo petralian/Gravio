@@ -12,6 +12,9 @@ All notable changes to this project will be documented in this file.
 - CLI publish now requires `--api-key` and prints explicit login/dashboard guidance when missing or unauthorized.
 - `/tool` and `POST /api/evaluate` now require authentication; unauthenticated users are redirected to login or receive 401.
 - Free-plan cloud publish limit enforced at 3 scans for non-admin users.
+- Dashboard layout fixed so "My projects" and "API keys" render inside the primary dashboard container with consistent spacing.
+- Onboarding now uses an auth-aware unified header (user pill + sign-out when authenticated; sign-in CTA when unauthenticated).
+- Onboarding hero CTA now adapts to session state, hiding "Create account or sign in" for logged-in users and showing "Open dashboard" instead.
 
 ## [0.4.0] — 2026-05-05
 

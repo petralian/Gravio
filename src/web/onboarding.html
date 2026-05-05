@@ -22,8 +22,10 @@
       </a>
       <nav class="m-nav-links" aria-label="Primary navigation">
         <a href="/">Home</a>
-        <a href="/login">Customer login</a>
-        <a href="/dashboard">Dashboard</a>
+        <a href="/tool">Scoring Tool</a>
+        <span class="ob-user-pill" id="ob-user-pill" hidden></span>
+        <a href="/login" id="ob-login-link" class="m-btn m-btn-outline m-btn-sm">Sign in</a>
+        <button class="m-btn m-btn-outline ob-logout-btn" id="ob-logout" type="button" hidden>Sign out</button>
       </nav>
     </div>
   </header>
@@ -37,8 +39,8 @@
         Local scan works right away. Registration is required for cloud scoring and dashboard features.
       </p>
       <div class="ob-cta-row">
-        <a href="/login" class="m-btn m-btn-neon m-btn-lg">Create account or sign in</a>
-        <a href="/dashboard" class="m-btn m-btn-outline m-btn-lg">Open dashboard</a>
+        <a href="/login" id="ob-signup-cta" class="m-btn m-btn-neon m-btn-lg">Create account or sign in</a>
+        <a href="/dashboard" id="ob-dashboard-cta" class="m-btn m-btn-outline m-btn-lg" hidden>Open dashboard</a>
       </div>
     </section>
 
