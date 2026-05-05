@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gravio — Dashboard</title>
+  <meta name="description" content="Decrypt and view your encrypted agent quality scorecard. Zero-knowledge: decryption happens in your browser only." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="dashboard">
+
+  <!-- ─── NAV ─── -->
+  <header class="m-nav">
+    <div class="m-container m-nav-inner">
+      <a href="/" class="m-brand" aria-label="Gravio home">
+        <svg class="m-brand-icon" width="26" height="26" viewBox="0 0 26 26" fill="none" aria-hidden="true">
+          <rect width="26" height="26" rx="6" fill="rgba(0,229,255,0.1)"/>
+          <path d="M7 13a6 6 0 1 1 6 6H7v-2.5h6a3.5 3.5 0 1 0-3.5-3.5H7V13z" fill="#00e5ff"/>
+        </svg>
+        <span class="m-brand-name">gravio</span>
+      </a>
+      <nav class="m-nav-links" aria-label="Primary navigation">
+        <a href="/">Home</a>
+        <a href="/tool">Scoring Tool</a>
+        <a href="/dashboard" aria-current="page" class="m-nav-active">Dashboard</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="db-main m-container">
+
+    <!-- ─── PAGE HEADER ─── -->
+    <div class="db-header">
+      <p class="m-eyebrow">ZERO-KNOWLEDGE DASHBOARD</p>
+      <h1 class="db-h1">Decrypt your agent scorecard</h1>
+      <p class="db-lead">
+        Your run data is encrypted on your machine. Enter your project ID and key — decryption
+        happens entirely in this browser. Nothing is sent to any server.
+      </p>
+      <div class="db-zk-badge">
+        <span class="t-pass">⚿</span>
+        <span>Client-side decryption only — server never sees your plaintext</span>
+      </div>
+    </div>
+
+    <!-- ─── DECRYPT FORM ─── -->
+    <section class="db-form-card" id="form-section">
+      <div class="db-form-row">
+        <div class="db-field">
+          <label for="db-project-id">Project ID</label>
+          <input type="text" id="db-project-id" placeholder="my-project" autocomplete="off" spellcheck="false" />
+          <p class="db-field-hint">The ID you used when running <code>agentscored scan --publish --project &lt;id&gt;</code></p>
+        </div>
+      </div>
+
+      <!-- Key mode toggle -->
+      <div class="db-key-mode" role="radiogroup" aria-label="Key input mode">
+        <button class="db-mode-btn db-mode-active" id="mode-hex" type="button" aria-pressed="true">Raw hex key</button>
+        <button class="db-mode-btn" id="mode-passphrase" type="button" aria-pressed="false">Passphrase + salt</button>
+      </div>
+
+      <!-- Panel: raw key -->
+      <div class="db-key-panel" id="panel-hex">
+        <div class="db-field">
+          <label for="db-key-hex">Encryption key (64-char hex)</label>
+          <input type="password" id="db-key-hex" placeholder="e.g. 3a7f9b... (64 characters)" autocomplete="off" spellcheck="false" />
+          <p class="db-field-hint">Printed by the daemon when the key was auto-generated. Keep it secret.</p>
+        </div>
+      </div>
+
+      <!-- Panel: passphrase -->
+      <div class="db-key-panel db-panel-hidden" id="panel-passphrase">
+        <div class="db-form-row">
+          <div class="db-field">
+            <label for="db-passphrase">Passphrase</label>
+            <input type="password" id="db-passphrase" placeholder="Your passphrase" autocomplete="off" />
+          </div>
+          <div class="db-field">
+            <label for="db-salt">Salt (hex)</label>
+            <input type="text" id="db-salt" placeholder="32-char hex salt" autocomplete="off" spellcheck="false" />
+            <p class="db-field-hint">Printed by the daemon alongside the passphrase prompt.</p>
+          </div>
+        </div>
+      </div>
+
+      <p class="db-error" id="db-error" hidden></p>
+      <button class="m-btn m-btn-neon m-btn-lg db-submit" id="db-submit" type="button">
+        <span id="db-submit-label">Decrypt &amp; load scorecard →</span>
+      </button>
+    </section>
+
+    <!-- ─── RESULTS ─── -->
+    <section class="db-results" id="db-results" hidden>
+
+      <!-- Score banner -->
+      <div class="db-score-banner">
+        <div>
+          <p class="db-score-label">Overall Score</p>
+          <div class="db-score-value" id="db-score-value">—</div>
+        </div>
+        <div class="db-banner-right">
+          <div class="badge" id="db-pass-badge">—</div>
+          <div class="db-meta" id="db-run-id"></div>
+          <div class="db-meta" id="db-published-at"></div>
+        </div>
+      </div>
+
+      <!-- Top metrics -->
+      <div class="db-metrics-row">
+        <div class="metric">
+          <span class="metric-label">Workflow pass rate</span>
+          <span class="metric-value" id="db-wpr">—</span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">Safety score</span>
+          <span class="metric-value" id="db-safety">—</span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">Critical failures</span>
+          <span class="metric-value" id="db-critical">—</span>
+        </div>
+      </div>
+
+      <!-- Gates -->
+      <h2 class="db-section-h2">Gate results</h2>
+      <ul class="gates-list" id="db-gates"></ul>
+
+      <!-- Dimensions -->
+      <h2 class="db-section-h2">Dimension scores</h2>
+      <div class="dimensions-grid" id="db-dimensions"></div>
+
+      <!-- Raw JSON accordion -->
+      <details class="db-raw-details">
+        <summary class="db-raw-summary">Raw run JSON</summary>
+        <textarea class="db-raw-json" id="db-raw-json" readonly spellcheck="false"></textarea>
+      </details>
+
+      <!-- Reload -->
+      <div class="db-reload-row">
+        <button class="m-btn m-btn-outline" id="db-reload" type="button">← Load a different project</button>
+      </div>
+
+    </section>
+
+  </main>
+
+  <footer class="m-footer">
+    <div class="m-container m-footer-inner">
+      <a href="/" class="m-brand"><span class="m-brand-name">gravio</span></a>
+      <p class="m-footer-copy">© 2026 Gravio. Decryption is client-side only.</p>
+      <a class="m-footer-link" href="mailto:hello@gravio.dev">hello@gravio.dev</a>
+    </div>
+  </footer>
+
+  <script src="dashboard.js"></script>
+</body>
+</html>

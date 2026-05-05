@@ -133,6 +133,16 @@ describe("GET /tool", () => {
   });
 });
 
+describe("GET /dashboard", () => {
+  it("returns 200 with dashboard HTML", async () => {
+    const res = await httpGet(`http://localhost:${TEST_PORT}/dashboard`);
+    assert.strictEqual(res.status, 200);
+    assert.ok(res.headers["content-type"]?.includes("text/html"), "Expected HTML content-type");
+    assert.ok(res.body.includes("Gravio"), "Expected Gravio brand text");
+    assert.ok(res.body.includes("dashboard.js"), "Expected dashboard.js script tag");
+  });
+});
+
 describe("GET /health", () => {
   it("returns {status: ok}", async () => {
     const res = await httpGet(`http://localhost:${TEST_PORT}/health`);

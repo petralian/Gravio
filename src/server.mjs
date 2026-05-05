@@ -143,6 +143,12 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // /dashboard → serve dashboard.html
+  if (req.method === "GET" && (req.url === "/dashboard" || req.url === "/dashboard/")) {
+    serveStatic(res, path.join(WEB_DIR, "dashboard.html"));
+    return;
+  }
+
   // Static files
   if (req.method === "GET") {
     let urlPath = req.url.split("?")[0];

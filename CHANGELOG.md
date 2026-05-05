@@ -18,6 +18,12 @@ All notable changes to this project will be documented in this file.
 - Phase 2 — Zero-knowledge E2EE crypto module at src/core/crypto-e2ee.mjs (AES-256-GCM, PBKDF2 key derivation)
 - Phase 2 — Server blind-store endpoints: POST /api/publish, GET /api/runs/:projectId (ciphertext never decrypted)
 - Phase 2 — Scanner CLI --publish, --project, --server, --key, --passphrase, --salt flags for encrypted cloud publish
+- Phase 3 — Browser WebCrypto dashboard at src/web/dashboard.html + src/web/dashboard.js
+- Phase 3 — Client-side AES-256-GCM decrypt (window.crypto.subtle) matching Node wire format exactly
+- Phase 3 — PBKDF2 passphrase key derivation in browser (210,000 iterations, SHA-256) via subtlecrypto
+- Phase 3 — Scorecard display: score banner, gate results list, dimension grid, raw JSON accordion
+- Phase 3 — Server: GET /dashboard route serving dashboard.html
+- Phase 3 — Dashboard CSS namespace body.dashboard added to styles.css
 - Phase 2 — Crypto unit tests at tests/crypto-e2ee.test.mjs (17 tests)
 - Phase 2 — Server integration tests at tests/server.test.mjs now wired into npm test
 
