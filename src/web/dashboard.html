@@ -26,6 +26,8 @@
         <a href="/">Home</a>
         <a href="/tool">Scoring Tool</a>
         <a href="/dashboard" aria-current="page" class="m-nav-active">Dashboard</a>
+        <span class="db-user-pill" id="db-user-pill" hidden></span>
+        <button class="m-btn m-btn-outline db-logout-btn" id="db-logout" type="button" hidden>Sign out</button>
       </nav>
     </div>
   </header>
@@ -143,6 +145,36 @@
         <button class="m-btn m-btn-outline" id="db-reload" type="button">← Load a different project</button>
       </div>
 
+    </section>
+
+  </main>
+
+    <!-- ─── MY PROJECTS ─── -->
+    <section class="db-projects-section" id="db-projects-section" hidden>
+      <h2 class="db-section-h2">My projects</h2>
+      <p class="db-lead" style="margin-bottom:16px">Click a project to load and decrypt it below.</p>
+      <ul class="db-projects-list" id="db-projects-list"></ul>
+    </section>
+
+    <!-- ─── API KEYS ─── -->
+    <section class="db-apikeys-section" id="db-apikeys-section" hidden>
+      <h2 class="db-section-h2">API keys</h2>
+      <p class="db-lead" style="margin-bottom:16px">
+        Use a key as a Bearer token with <code class="db-inline-code">agentscored scan --publish --key &lt;key&gt;</code>.
+        Keys are shown once — copy immediately.
+      </p>
+      <div class="db-key-actions">
+        <input type="text" id="db-key-label" placeholder="Key label (optional)" class="db-key-label-input" />
+        <button class="m-btn m-btn-neon" id="db-gen-key" type="button">Generate new key</button>
+      </div>
+      <div class="db-new-key-banner" id="db-new-key-banner" hidden>
+        <p class="db-new-key-label">New key — copy now, it won't be shown again:</p>
+        <div class="db-new-key-row">
+          <code class="db-new-key-value" id="db-new-key-value"></code>
+          <button class="m-btn m-btn-outline db-copy-btn" id="db-copy-key" type="button">Copy</button>
+        </div>
+      </div>
+      <ul class="db-keys-list" id="db-keys-list"></ul>
     </section>
 
   </main>

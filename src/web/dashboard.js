@@ -28,6 +28,137 @@ const $ = (id) => document.getElementById(id);
 const elProjectId    = $("db-project-id");
 const elKeyHex       = $("db-key-hex");
 const elPassphrase   = $("db-passphrase");
+
+/* ─── Auth guard + user bar ─────────────────────────────────────────────────── */
+let currentUser = null;
+
+(async () => {
+  try {
+    const res = await fetch("/api/me");
+    if (!res.ok) {
+      location.href = "/login?next=/dashboard";
+      return;
+    }
+    currentUser = await res.json();
+    // Show user pill + logout
+    const pill = $("db-user-pill");
+    pill.textContent = currentUser.email;
+    pill.removeAttribute("hidden");
+    const logoutBtn = $("db-logout");
+    logoutBtn.removeAttribute("hidden");
+    logoutBtn.addEventListener("click", async () => {
+      await fetch("/auth/logout", { method: "POST" });
+      location.href = "/login";
+    });
+    // Load projects and API keys
+    loadProjects();
+    loadApiKeys();
+  } catch {
+    location.href = "/login?next=/dashboard";
+  }
+})();
+
+/* ─── Projects list ──────────────────────────────────────────────────────────── */
+async function loadProjects() {
+  try {
+    const res = await fetch("/api/runs/list");
+    if (!res.ok) return;
+    const { runs } = await res.json();
+    const section = $("db-projects-section");
+    const list = $("db-projects-list");
+    if (runs.length === 0) {
+      list.innerHTML = `<li class="db-project-empty">No runs published yet. Run the daemon with <code>--publish</code> to see your projects here.</li>`;
+    } else {
+      list.innerHTML = runs.map((r) => `
+        <li class="db-project-item">
+          <button class="db-project-btn" type="button" data-project="${esc(r.project_id)}">
+            <span class="db-project-id">${esc(r.project_id)}</span>
+            <span class="db-project-date">${new Date(r.published_at).toLocaleString()}</span>
+          </button>
+        </li>
+      `).join("");
+      list.addEventListener("click", (e) => {
+        const btn = e.target.closest("[data-project]");
+        if (!btn) return;
+        elProjectId.value = btn.dataset.project;
+        document.getElementById("form-section").scrollIntoView({ behavior: "smooth" });
+        elProjectId.focus();
+      });
+    }
+    section.removeAttribute("hidden");
+  } catch { /* silently ignore — projects section is supplemental */ }
+}
+
+function esc(str) {
+  return String(str ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+/* ─── API keys ─────────────────────────────────────────────────────────────── */
+async function loadApiKeys() {
+  try {
+    const res = await fetch("/api/keys");
+    if (!res.ok) return;
+    const { keys } = await res.json();
+    renderKeyList(keys);
+    $("db-apikeys-section").removeAttribute("hidden");
+  } catch { /* silently ignore */ }
+}
+
+function renderKeyList(keys) {
+  const list = $("db-keys-list");
+  if (!keys || keys.length === 0) {
+    list.innerHTML = `<li class="db-key-empty">No API keys yet. Generate one above to use with the CLI.</li>`;
+    return;
+  }
+  list.innerHTML = keys.map((k) => `
+    <li class="db-key-item">
+      <span class="db-key-label">${esc(k.label)}</span>
+      <span class="db-key-created">${new Date(k.created_at).toLocaleDateString()}</span>
+      <button class="adm-act-btn adm-act-danger" data-key-id="${k.id}" type="button">Revoke</button>
+    </li>
+  `).join("");
+  list.addEventListener("click", async (e) => {
+    const btn = e.target.closest("[data-key-id]");
+    if (!btn) return;
+    if (!confirm("Revoke this API key? The CLI will stop working until you use a new key.")) return;
+    btn.disabled = true;
+    await fetch(`/api/keys/${btn.dataset.keyId}`, { method: "DELETE" });
+    loadApiKeys();
+  }, { once: true });
+}
+
+$("db-gen-key").addEventListener("click", async () => {
+  const label = $("db-key-label").value.trim() || "default";
+  const btn = $("db-gen-key");
+  btn.disabled = true;
+  try {
+    const res = await fetch("/api/keys", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ label }),
+    });
+    const data = await res.json();
+    if (!res.ok) { alert(data.error ?? "Failed"); return; }
+    // Show new key banner
+    const banner = $("db-new-key-banner");
+    $("db-new-key-value").textContent = data.key;
+    banner.removeAttribute("hidden");
+    $("db-key-label").value = "";
+    renderKeyList(data.keys);
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+$("db-copy-key").addEventListener("click", () => {
+  const val = $("db-new-key-value").textContent;
+  navigator.clipboard?.writeText(val).then(() => {
+    $("db-copy-key").textContent = "Copied!";
+    setTimeout(() => { $("db-copy-key").textContent = "Copy"; }, 2000);
+  });
+});
+
+
 const elSalt         = $("db-salt");
 const elError        = $("db-error");
 const elSubmit       = $("db-submit");

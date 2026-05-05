@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gravio — Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="admin-page">
+
+  <header class="adm-header">
+    <div class="m-container adm-header-inner">
+      <a href="/" class="m-brand" aria-label="Gravio home">
+        <svg width="24" height="24" viewBox="0 0 26 26" fill="none" aria-hidden="true">
+          <rect width="26" height="26" rx="6" fill="rgba(0,229,255,0.1)"/>
+          <path d="M7 13a6 6 0 1 1 6 6H7v-2.5h6a3.5 3.5 0 1 0-3.5-3.5H7V13z" fill="#00e5ff"/>
+        </svg>
+        <span class="m-brand-name">gravio</span>
+        <span class="adm-badge">admin</span>
+      </a>
+      <nav class="adm-nav">
+        <a href="/dashboard">Dashboard</a>
+        <button class="adm-logout" id="adm-logout" type="button">Sign out</button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="adm-main m-container">
+
+    <div class="adm-page-header">
+      <h1 class="adm-h1">Admin panel</h1>
+      <p class="adm-lead">Manage users, view all published runs, and monitor platform activity.</p>
+    </div>
+
+    <!-- Stat cards -->
+    <div class="adm-stats" id="adm-stats">
+      <div class="adm-stat"><span class="adm-stat-value" id="stat-users">—</span><span class="adm-stat-label">Users</span></div>
+      <div class="adm-stat"><span class="adm-stat-value" id="stat-runs">—</span><span class="adm-stat-label">Total runs</span></div>
+      <div class="adm-stat"><span class="adm-stat-value" id="stat-active">—</span><span class="adm-stat-label">Active accounts</span></div>
+    </div>
+
+    <!-- Users table -->
+    <section class="adm-section">
+      <h2 class="adm-section-h2">Users</h2>
+      <div class="adm-table-wrap">
+        <table class="adm-table" id="adm-users-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Email</th>
+              <th>Role</th>
+              <th>Runs</th>
+              <th>Status</th>
+              <th>Joined</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="adm-users-body">
+            <tr><td colspan="7" class="adm-loading">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Recent runs -->
+    <section class="adm-section">
+      <h2 class="adm-section-h2">Recent published runs</h2>
+      <div class="adm-table-wrap">
+        <table class="adm-table" id="adm-runs-table">
+          <thead>
+            <tr>
+              <th>Project ID</th>
+              <th>User</th>
+              <th>Published at</th>
+            </tr>
+          </thead>
+          <tbody id="adm-runs-body">
+            <tr><td colspan="3" class="adm-loading">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+
+  <script src="admin.js"></script>
+</body>
+</html>

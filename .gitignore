@@ -6,6 +6,9 @@ node_modules/
 # Rotated run artifact — previous run data, not committed
 agent-quality/runs/previous.json
 
+# SQLite data (local dev + test)
+data/
+
 # Build / temp
 *.log
 .DS_Store
