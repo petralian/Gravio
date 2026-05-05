@@ -8,6 +8,16 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { evaluate } from "./core/evaluate.mjs";
 
+// ── In-memory run store (Phase 2 MVP — not persisted across restarts) ──
+// Key: projectId (validated string). Value: { ciphertext, publishedAt }.
+// The server never decrypts ciphertext — zero-knowledge by design.
+const runStore = new Map();
+
+/** Validate projectId: 1–64 chars, alphanumeric + hyphens + underscores only. */
+function isValidProjectId(id) {
+  return typeof id === "string" && /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/.test(id);
+}
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const WEB_DIR = path.join(__dirname, "web");
 const PORT = process.env.PORT ?? 3000;
@@ -69,6 +79,67 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(400, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ error: err.message }));
     }
+    return;
+  }
+
+  // API: POST /api/publish — blind-store encrypted run payload
+  // Body: { projectId: string, ciphertext: string }
+  // Server never decrypts. Overwrites previous entry for same projectId.
+  if (req.method === "POST" && req.url === "/api/publish") {
+    try {
+      const body = await readBody(req);
+      const { projectId, ciphertext } = JSON.parse(body);
+      if (!isValidProjectId(projectId)) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Invalid projectId. Use 1–64 alphanumeric, hyphen, or underscore characters." }));
+        return;
+      }
+      if (typeof ciphertext !== "string" || ciphertext.length === 0) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "ciphertext is required and must be a non-empty string" }));
+        return;
+      }
+      runStore.set(projectId, { ciphertext, publishedAt: new Date().toISOString() });
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ ok: true, projectId }));
+    } catch (err) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: err.message }));
+    }
+    return;
+  }
+
+  // API: GET /api/runs/:projectId — retrieve stored encrypted payload
+  // Returns: { ciphertext, publishedAt } — client decrypts locally
+  const runsMatch = req.method === "GET" && /^\/api\/runs\/([^/?]+)/.exec(req.url);
+  if (runsMatch) {
+    const projectId = decodeURIComponent(runsMatch[1]);
+    if (!isValidProjectId(projectId)) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Invalid projectId" }));
+      return;
+    }
+    const entry = runStore.get(projectId);
+    if (!entry) {
+      res.writeHead(404, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Project not found" }));
+      return;
+    }
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify(entry));
+    return;
+  }
+
+  // Health check
+  if (req.method === "GET" && req.url === "/health") {
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ status: "ok" }));
+    return;
+  }
+
+  // /tool → serve tool.html
+  if (req.method === "GET" && (req.url === "/tool" || req.url === "/tool/")) {
+    serveStatic(res, path.join(WEB_DIR, "tool.html"));
     return;
   }
 

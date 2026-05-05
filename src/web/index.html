@@ -3,136 +3,333 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Agent Scorecard Platform</title>
+  <title>Gravio — AI Agent Quality Engine</title>
+  <meta name="description" content="Gravio scans your project, scores AI agent behavior across safety and reliability, and publishes encrypted insights only you can decrypt." />
+  <meta property="og:title" content="Gravio — AI Agent Quality Engine" />
+  <meta property="og:description" content="Drop the daemon. Get your agent quality score. Zero-knowledge by design." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
 </head>
-<body>
-  <div id="app">
-    <header>
-      <h1>Agent Scorecard Platform</h1>
-      <p class="subtitle">Evaluate agent run artifacts with guided JSON templates, validation, and a no-code builder</p>
-    </header>
+<body class="marketing">
 
-    <main>
-      <section class="quickstart card">
-        <h2>Quick Start</h2>
-        <ol class="quickstart-list">
-          <li>Paste a run artifact in Run JSON, or click Load realistic sample.</li>
-          <li>Optionally paste a previous run artifact to enable regression gate checks.</li>
-          <li>Click Evaluate to compute score, gate outcomes, and dimension breakdown.</li>
-        </ol>
-        <p class="schema-title">Required shape for Run JSON</p>
-        <pre class="schema-block">{
-  "runId": "string",
-  "scorecard": {
-    "safety": 0-100,
-    "reliability": 0-100,
-    "evaluation": 0-100,
-    "observability": 0-100,
-    "governance": 0-100
-  },
-  "workflowResults": [{ "id": "x", "status": "pass|fail" }],
-  "adversarialResults": [{ "id": "llm01", "status": "pass|fail" }]
-}</pre>
-      </section>
+  <!-- ─── NAV ─── -->
+  <header class="m-nav">
+    <div class="m-container m-nav-inner">
+      <a href="/" class="m-brand" aria-label="Gravio home">
+        <svg class="m-brand-icon" width="26" height="26" viewBox="0 0 26 26" fill="none" aria-hidden="true">
+          <rect width="26" height="26" rx="6" fill="rgba(0,229,255,0.1)"/>
+          <path d="M7 13a6 6 0 1 1 6 6H7v-2.5h6a3.5 3.5 0 1 0-3.5-3.5H7V13z" fill="#00e5ff"/>
+        </svg>
+        <span class="m-brand-name">gravio</span>
+      </a>
+      <nav class="m-nav-links" aria-label="Primary navigation">
+        <a href="#how">How it works</a>
+        <a href="#pricing">Pricing</a>
+        <a href="#install">Install</a>
+        <a href="mailto:hello@gravio.dev" class="m-btn m-btn-outline m-btn-sm">Book demo</a>
+        <a href="/tool" class="m-btn m-btn-neon m-btn-sm">Try the tool →</a>
+      </nav>
+    </div>
+  </header>
 
-      <section class="input-section card">
-        <div class="section-head">
-          <h2>Run Evaluator</h2>
-          <div class="toolbar">
-            <button id="load-minimal-btn" type="button" class="btn-secondary">Load minimal sample</button>
-            <button id="load-realistic-btn" type="button" class="btn-secondary">Load realistic sample</button>
-            <button id="format-run-btn" type="button" class="btn-secondary">Format JSON</button>
-            <button id="clear-run-btn" type="button" class="btn-secondary">Clear</button>
+  <main>
+
+    <!-- ─── HERO ─── -->
+    <section class="m-hero m-container">
+      <div class="m-hero-copy">
+        <p class="m-eyebrow">AI AGENT QUALITY ENGINE</p>
+        <h1 class="m-hero-h1">
+          Your AI agent<br/>ships fast.
+          <br/><span class="m-gradient-text">Gravio keeps it</span>
+          <br/><span class="m-neon-text">production-safe.</span>
+        </h1>
+        <p class="m-hero-lead">
+          Drop the daemon in your project root. It scans silently, scores your agent
+          on safety, reliability, and governance — then publishes encrypted results
+          only your browser can decrypt.
+        </p>
+        <div class="m-cta-row">
+          <a href="#pricing" class="m-btn m-btn-neon m-btn-lg">Get started free</a>
+          <a href="#how" class="m-btn m-btn-ghost m-btn-lg">See how it works →</a>
+        </div>
+        <p class="m-hero-note">No source code leaves your machine unencrypted. <span class="m-neon-subtle">Zero-knowledge by design.</span></p>
+      </div>
+
+      <div class="m-terminal-card" role="img" aria-label="Terminal showing Gravio scan output">
+        <div class="m-terminal-header">
+          <div class="m-terminal-dots" aria-hidden="true">
+            <span class="dot dot-red"></span>
+            <span class="dot dot-yellow"></span>
+            <span class="dot dot-green"></span>
+          </div>
+          <span class="m-terminal-title">agentscored scan</span>
+        </div>
+        <div class="m-terminal-body">
+<pre class="m-terminal-pre"><span class="t-prompt">$</span> <span class="t-cmd">agentscored scan</span>
+
+  <span class="t-comment">Gravio v1.0                     2026-05-05</span>
+  <span class="t-comment">────────────────────────────────────────</span>
+  <span class="t-comment">Scanning</span>  <span class="t-path">/Users/dev/my-saas-app</span>
+
+  <span class="t-pass">[✓]</span> <span class="t-label">Secret exposure   </span>  <span class="t-value">0 files exposed</span>
+  <span class="t-pass">[✓]</span> <span class="t-label">Test signal       </span>  <span class="t-value">tests/ detected</span>
+  <span class="t-pass">[✓]</span> <span class="t-label">Changelog present </span>  <span class="t-value">CHANGELOG.md</span>
+  <span class="t-pass">[✓]</span> <span class="t-label">Session notes     </span>  <span class="t-value">.claude/ found</span>
+  <span class="t-pass">[✓]</span> <span class="t-label">Git hygiene       </span>  <span class="t-value">clean</span>
+
+  <span class="t-comment">────────────────────────────────────────</span>
+  <span class="t-label">Safety      </span><span class="t-bar-full">████████████</span>  <span class="t-score-hi">100</span>
+  <span class="t-label">Reliability </span><span class="t-bar-full">███████████░</span>   <span class="t-score-hi">95</span>
+  <span class="t-label">Governance  </span><span class="t-bar-mid">██████████░░</span>   <span class="t-score-mid">88</span>
+  <span class="t-label">Evaluation  </span><span class="t-bar-full">███████████░</span>   <span class="t-score-hi">91</span>
+  <span class="t-comment">────────────────────────────────────────</span>
+  <span class="t-comment">Score:</span> <span class="t-score-final">96.2 / 100</span>  <span class="t-comment">·</span>  <span class="t-pass-badge">PASS</span>  <span class="t-comment">·  0 critical risks</span>
+
+  <span class="t-pass">[✓]</span> <span class="t-comment">Encrypting result...</span>
+  <span class="t-pass">[✓]</span> <span class="t-comment">Published to </span><span class="t-path">gravio.dev/dashboard</span><span class="t-cursor">█</span></pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─── TRUST STRIP ─── -->
+    <div class="m-trust-strip">
+      <div class="m-container m-trust-inner">
+        <p class="m-trust-label">Works with your entire AI stack</p>
+        <div class="m-trust-items">
+          <span>GitHub Copilot</span><span class="m-dot">·</span>
+          <span>Cursor</span><span class="m-dot">·</span>
+          <span>Claude</span><span class="m-dot">·</span>
+          <span>Continue</span><span class="m-dot">·</span>
+          <span>Cody</span><span class="m-dot">·</span>
+          <span>ChatGPT</span><span class="m-dot">·</span>
+          <span>Windsurf</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── HOW IT WORKS ─── -->
+    <section id="how" class="m-section m-container">
+      <div class="m-section-header">
+        <p class="m-eyebrow">HOW IT WORKS</p>
+        <h2 class="m-section-h2">Three steps to production confidence</h2>
+      </div>
+      <div class="m-steps">
+        <div class="m-step-card">
+          <p class="m-step-num">01</p>
+          <div class="m-step-icon">⬇</div>
+          <h3>Install the daemon</h3>
+          <p>One command: <code>npm install -g agentscored</code>. Drop it in any project or run globally. Zero config required.</p>
+        </div>
+        <div class="m-step-connector" aria-hidden="true"></div>
+        <div class="m-step-card">
+          <p class="m-step-num">02</p>
+          <div class="m-step-icon">⚡</div>
+          <h3>Scan automatically</h3>
+          <p>The daemon watches your project and scores AI agent behavior across safety, reliability, evaluation, and governance — in real time.</p>
+        </div>
+        <div class="m-step-connector" aria-hidden="true"></div>
+        <div class="m-step-card">
+          <p class="m-step-num">03</p>
+          <div class="m-step-icon">🔐</div>
+          <h3>Read your results</h3>
+          <p>Results are encrypted with your passphrase before upload. Your dashboard decrypts them client-side. We never see your data.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─── SCORING DIMENSIONS ─── -->
+    <section class="m-section m-section-alt m-container">
+      <div class="m-section-header">
+        <p class="m-eyebrow">WHAT WE MEASURE</p>
+        <h2 class="m-section-h2">Five dimensions of agent quality</h2>
+        <p class="m-section-sub">Every score is backed by concrete evidence from real agent behavior — not heuristics or guesses.</p>
+      </div>
+      <div class="m-dimensions">
+        <div class="m-dim-card m-dim-safety">
+          <div class="m-dim-header">
+            <span class="m-dim-badge safety">Safety</span>
+            <span class="m-dim-weight">30%</span>
+          </div>
+          <p>Secret exposure detection, env file leak prevention, adversarial prompt resistance, and path traversal guards.</p>
+        </div>
+        <div class="m-dim-card m-dim-reliability">
+          <div class="m-dim-header">
+            <span class="m-dim-badge reliability">Reliability</span>
+            <span class="m-dim-weight">25%</span>
+          </div>
+          <p>Test suite presence and pass status, build stability, lint compliance, and edit discipline enforcement.</p>
+        </div>
+        <div class="m-dim-card m-dim-evaluation">
+          <div class="m-dim-header">
+            <span class="m-dim-badge evaluation">Evaluation</span>
+            <span class="m-dim-weight">20%</span>
+          </div>
+          <p>Verification suite execution, regression detection across runs, evidence-grounded claims, and quality gate outcomes.</p>
+        </div>
+        <div class="m-dim-card m-dim-observability">
+          <div class="m-dim-header">
+            <span class="m-dim-badge observability">Observability</span>
+            <span class="m-dim-weight">10%</span>
+          </div>
+          <p>Trace capture with required OTel attributes, span coverage, error event detection, and session traceability.</p>
+        </div>
+        <div class="m-dim-card m-dim-governance">
+          <div class="m-dim-header">
+            <span class="m-dim-badge governance">Governance</span>
+            <span class="m-dim-weight">15%</span>
+          </div>
+          <p>Session bootstrap compliance, handoff completeness, changelog hygiene, open-loop tracking, and self-improvement signals.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─── PRICING ─── -->
+    <section id="pricing" class="m-section m-container">
+      <div class="m-section-header">
+        <p class="m-eyebrow">PRICING</p>
+        <h2 class="m-section-h2">Start free. Scale when you need it.</h2>
+        <p class="m-section-sub">The daemon is always free for local use. Upgrade for cloud sync, history, and team features.</p>
+      </div>
+      <div class="m-pricing-grid">
+
+        <div class="m-plan-card">
+          <div class="m-plan-tier">Free</div>
+          <div class="m-plan-price">
+            <span class="m-plan-amount">$0</span>
+          </div>
+          <p class="m-plan-desc">Local scanning, no cloud dependency. Perfect for solo developers getting started.</p>
+          <ul class="m-plan-features">
+            <li><span class="t-pass">✓</span> Daemon CLI (macOS / Win / Linux)</li>
+            <li><span class="t-pass">✓</span> Local JSON scorecard output</li>
+            <li><span class="t-pass">✓</span> 14 workflow checks</li>
+            <li><span class="t-pass">✓</span> Secret exposure detection</li>
+            <li><span class="t-pass">✓</span> 3 projects</li>
+            <li class="m-plan-no"><span>—</span> Encrypted cloud dashboard</li>
+            <li class="m-plan-no"><span>—</span> Score trend history</li>
+          </ul>
+          <a href="mailto:hello@gravio.dev" class="m-btn m-btn-outline m-btn-full">Download free</a>
+        </div>
+
+        <div class="m-plan-card m-plan-featured">
+          <div class="m-plan-badge">Most popular</div>
+          <div class="m-plan-tier">Pro</div>
+          <div class="m-plan-price">
+            <span class="m-plan-amount">$19</span><span class="m-plan-per">/month</span>
+          </div>
+          <p class="m-plan-desc">Encrypted cloud sync, trend analytics, and explainability reports. For developers who take quality seriously.</p>
+          <ul class="m-plan-features">
+            <li><span class="t-pass">✓</span> Everything in Free</li>
+            <li><span class="t-pass">✓</span> Zero-knowledge encrypted dashboard</li>
+            <li><span class="t-pass">✓</span> Score trend history &amp; regressions</li>
+            <li><span class="t-pass">✓</span> Explainability reports</li>
+            <li><span class="t-pass">✓</span> 10 projects</li>
+            <li><span class="t-pass">✓</span> Email support</li>
+            <li><span class="t-pass">✓</span> Prompt packs (fix this for me)</li>
+          </ul>
+          <a href="mailto:hello@gravio.dev" class="m-btn m-btn-neon m-btn-full">Get early access</a>
+        </div>
+
+        <div class="m-plan-card">
+          <div class="m-plan-tier">Team</div>
+          <div class="m-plan-price">
+            <span class="m-plan-amount">$49</span><span class="m-plan-per">/month</span>
+          </div>
+          <p class="m-plan-desc">Policy enforcement and audit exports for teams shipping with multiple AI agents.</p>
+          <ul class="m-plan-features">
+            <li><span class="t-pass">✓</span> Everything in Pro</li>
+            <li><span class="t-pass">✓</span> Unlimited projects</li>
+            <li><span class="t-pass">✓</span> Custom policy packs</li>
+            <li><span class="t-pass">✓</span> SSO</li>
+            <li><span class="t-pass">✓</span> Audit export (CSV / JSON)</li>
+            <li><span class="t-pass">✓</span> Priority support + SLA</li>
+            <li><span class="t-pass">✓</span> Peer percentile benchmarking</li>
+          </ul>
+          <a href="mailto:hello@gravio.dev" class="m-btn m-btn-outline m-btn-full">Contact sales</a>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ─── INSTALL ─── -->
+    <section id="install" class="m-section m-container">
+      <div class="m-install-inner">
+        <div class="m-install-copy">
+          <p class="m-eyebrow">ZERO CONFIG</p>
+          <h2 class="m-section-h2">Up and running<br/>in 30 seconds.</h2>
+          <p class="m-section-sub">One install command. Works in any project. The daemon handles the rest.</p>
+          <div class="m-install-feats">
+            <div class="m-install-feat"><span class="t-pass">✓</span> macOS · Windows · Linux</div>
+            <div class="m-install-feat"><span class="t-pass">✓</span> No runtime dependencies</div>
+            <div class="m-install-feat"><span class="t-pass">✓</span> Signed binaries · Reproducible builds</div>
+            <div class="m-install-feat"><span class="t-pass">✓</span> Works in any git-tracked project</div>
           </div>
         </div>
+        <div class="m-terminal-card m-install-terminal">
+          <div class="m-terminal-header">
+            <div class="m-terminal-dots" aria-hidden="true">
+              <span class="dot dot-red"></span>
+              <span class="dot dot-yellow"></span>
+              <span class="dot dot-green"></span>
+            </div>
+            <span class="m-terminal-title">Terminal</span>
+          </div>
+          <div class="m-terminal-body">
+<pre class="m-terminal-pre"><span class="t-comment"># Install globally</span>
+<span class="t-prompt">$</span> <span class="t-cmd">npm install -g agentscored</span>
 
-        <label for="run-json">Run JSON <span class="hint">(latest.json-like artifact)</span></label>
-        <textarea id="run-json" placeholder='{ "runId": "...", "scorecard": { ... }, ... }' rows="12"></textarea>
-        <div class="import-row">
-          <label for="run-file" class="file-label">Import from .json file</label>
-          <input id="run-file" type="file" accept="application/json,.json" />
+<span class="t-comment"># One-time scan → writes agent-quality/runs/latest.json</span>
+<span class="t-prompt">$</span> <span class="t-cmd">agentscored scan</span>
+
+<span class="t-comment"># Watch mode — rescans on file change</span>
+<span class="t-prompt">$</span> <span class="t-cmd">agentscored watch</span>
+
+<span class="t-comment"># Publish encrypted results to your dashboard</span>
+<span class="t-prompt">$</span> <span class="t-cmd">agentscored publish --project my-saas</span><span class="t-cursor">█</span></pre>
+          </div>
         </div>
+      </div>
+    </section>
 
-        <label for="prev-json">Previous Run JSON <span class="hint">(optional, enables regression gate)</span></label>
-        <textarea id="prev-json" placeholder='{ "summary": { "overallScore": 89 } }' rows="4"></textarea>
-        <div class="toolbar small-gap">
-          <button id="load-prev-btn" type="button" class="btn-secondary">Load previous sample</button>
-          <button id="format-prev-btn" type="button" class="btn-secondary">Format previous JSON</button>
+    <!-- ─── SECURITY CALLOUT ─── -->
+    <section class="m-security-strip m-container">
+      <div class="m-security-inner">
+        <p class="m-eyebrow">ZERO-KNOWLEDGE ARCHITECTURE</p>
+        <h2 class="m-security-h2">We cannot read your data.<br/><span class="m-neon-text">By design.</span></h2>
+        <p>Every scan result is encrypted on your machine with a key only you hold, before it ever leaves your network. Our servers store ciphertext only. A full database breach exposes nothing readable.</p>
+        <div class="m-security-pills">
+          <span class="m-pill">AES-256-GCM encryption</span>
+          <span class="m-pill">Client-side key generation</span>
+          <span class="m-pill">No server-side key escrow</span>
+          <span class="m-pill">Open-source daemon</span>
+          <span class="m-pill">Signed binaries</span>
         </div>
+      </div>
+    </section>
 
-        <div class="actions-row">
-          <button id="evaluate-btn" type="button">Evaluate</button>
-        </div>
+    <!-- ─── FINAL CTA ─── -->
+    <section class="m-cta-final m-container">
+      <p class="m-eyebrow">EARLY ACCESS</p>
+      <h2 class="m-cta-h2">Ready to see your agent quality score?</h2>
+      <p>Get running in under 30 seconds. Free forever on local mode.</p>
+      <div class="m-cta-row">
+        <a href="mailto:hello@gravio.dev" class="m-btn m-btn-neon m-btn-lg">Get early access</a>
+        <a href="/tool" class="m-btn m-btn-ghost m-btn-lg">Try the scoring tool →</a>
+      </div>
+    </section>
 
-        <div id="error-msg" class="error" hidden></div>
-        <ul id="validation-list" class="validation-list" hidden></ul>
-      </section>
+  </main>
 
-      <section class="builder card">
-        <h2>JSON Builder</h2>
-        <p class="builder-subtitle">Use this when you do not already have a run artifact. Fill values, then generate valid Run JSON.</p>
-        <div class="builder-grid">
-          <label>Run ID
-            <input id="builder-run-id" type="text" value="manual-001" />
-          </label>
-          <label>Safety
-            <input id="builder-safety" type="number" min="0" max="100" value="95" />
-          </label>
-          <label>Reliability
-            <input id="builder-reliability" type="number" min="0" max="100" value="90" />
-          </label>
-          <label>Evaluation
-            <input id="builder-evaluation" type="number" min="0" max="100" value="90" />
-          </label>
-          <label>Observability
-            <input id="builder-observability" type="number" min="0" max="100" value="88" />
-          </label>
-          <label>Governance
-            <input id="builder-governance" type="number" min="0" max="100" value="93" />
-          </label>
-          <label>Workflow checks total
-            <input id="builder-workflow-total" type="number" min="1" value="14" />
-          </label>
-          <label>Workflow checks passed
-            <input id="builder-workflow-pass" type="number" min="0" value="14" />
-          </label>
-          <label>Adversarial checks total
-            <input id="builder-adv-total" type="number" min="1" value="10" />
-          </label>
-          <label>Adversarial failures
-            <input id="builder-adv-fail" type="number" min="0" value="0" />
-          </label>
-        </div>
-        <div class="actions-row">
-          <button id="generate-from-builder-btn" type="button" class="btn-secondary">Generate Run JSON from Builder</button>
-        </div>
-      </section>
+  <footer class="m-footer">
+    <div class="m-container m-footer-inner">
+      <a href="/" class="m-brand" aria-label="Gravio home">
+        <span class="m-brand-name">gravio</span>
+      </a>
+      <p class="m-footer-copy">© 2026 Gravio. AI agent quality, made operational.</p>
+      <a class="m-footer-link" href="mailto:hello@gravio.dev">hello@gravio.dev</a>
+    </div>
+  </footer>
 
-      <section id="results" class="results-section" hidden>
-        <div id="score-banner" class="score-banner">
-          <span id="score-value" class="score-value"></span>
-          <span id="pass-badge" class="badge"></span>
-        </div>
-
-        <div class="metrics-row">
-          <div class="metric"><span class="metric-label">Workflow pass rate</span><span id="wpr" class="metric-value"></span></div>
-          <div class="metric"><span class="metric-label">Safety score</span><span id="safety" class="metric-value"></span></div>
-          <div class="metric"><span class="metric-label">Critical failures</span><span id="critical" class="metric-value"></span></div>
-        </div>
-
-        <h2>Gate checks</h2>
-        <ul id="gates-list" class="gates-list"></ul>
-
-        <h2>Dimensions</h2>
-        <div id="dimensions-grid" class="dimensions-grid"></div>
-
-        <h2>Raw API Result</h2>
-        <textarea id="raw-result" rows="10" readonly></textarea>
-      </section>
-    </main>
-  </div>
-
-  <script src="app.js"></script>
 </body>
 </html>

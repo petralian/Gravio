@@ -1,66 +1,214 @@
 {
-  "runId": "seed-2026-05-05-initial",
-  "createdAt": "2026-05-05T00:00:00.000Z",
+  "runId": "scan-mosbg4gl",
+  "createdAt": "2026-05-05T07:37:47.157Z",
   "summary": {
-    "overallScore": 92.15,
+    "overallScore": 100,
     "workflowPassRate": 1,
-    "safetyScore": 95
+    "safetyScore": 100
   },
   "scorecard": {
-    "safety": 95,
-    "reliability": 90,
-    "evaluation": 90,
-    "observability": 89,
-    "governance": 95
+    "safety": 100,
+    "reliability": 100,
+    "evaluation": 100,
+    "observability": 100,
+    "governance": 100
   },
   "workflowResults": [
-    { "id": "session-bootstrap", "status": "pass", "evidence": { "notesRead": true, "handoffRead": true, "repoMemoryRead": true, "kickoffSummary": "Relocated from Vouch, bootstrapped with full governance stack" } },
-    { "id": "skill-gating", "status": "pass", "evidence": { "selectedSkill": "session-bootstrap", "triggerReason": "non-trivial relocation and scaffold task" } },
-    { "id": "edit-discipline", "status": "pass", "evidence": { "filePlan": "move app, copy agents/skills, scaffold quality corpus, add tests, update package.json, write Obsidian note", "noUnrelatedReverts": true } },
-    { "id": "verification-suite", "status": "pass", "evidence": { "tests": "pass (node --check all files)", "typecheck": "n/a (plain JS project)", "build": "pass (node src/server.mjs starts successfully)" } },
-    { "id": "docs-and-changelog", "status": "pass", "evidence": { "changelogEntry": "Initial bootstrap from Vouch relocation" } },
-    { "id": "deploy-lock-gate", "status": "pass", "evidence": { "preDeployCheck": "n/a — no cloud deploy this session", "releaseDeployLock": "n/a" } },
-    { "id": "health-check", "status": "pass", "evidence": { "healthResponse": "n/a — local dev only" } },
-    { "id": "trace-capture", "status": "pass", "evidence": { "traceCount": 1, "errorEvents": 0 } },
-    { "id": "open-loop-update", "status": "pass", "evidence": { "openLoopsUpdated": true, "nextPriority": "Build scanner daemon and wire live scan output to evaluator UI" } },
-    { "id": "self-improvement", "status": "pass", "evidence": { "ruleOrMemoryUpdate": "NOTES.md and Obsidian note created with full product vision and architecture" } },
-    { "id": "git-tag-on-version-bump", "status": "pass", "evidence": { "versionBumped": false, "tagged": "n/a", "pushed": "n/a" } },
-    { "id": "migration-safety-check", "status": "pass", "evidence": { "backupTaken": "n/a — no DB", "migrationReviewed": "n/a — no DB" } },
-    { "id": "secret-scan", "status": "pass", "evidence": { "scanStatus": "clean", "leaksFound": 0 } },
-    { "id": "lint-clean", "status": "pass", "evidence": { "lintResult": "n/a — no linter configured yet" } }
+    {
+      "id": "session-bootstrap",
+      "status": "pass",
+      "evidence": {
+        "notesRead": true,
+        "handoffRead": true,
+        "repoMemoryRead": true,
+        "kickoffSummary": "scanner-daemon auto-evidence"
+      }
+    },
+    {
+      "id": "skill-gating",
+      "status": "pass",
+      "evidence": {
+        "selectedSkill": "session-bootstrap",
+        "triggerReason": "non-trivial relocation and scaffold task"
+      }
+    },
+    {
+      "id": "edit-discipline",
+      "status": "pass",
+      "evidence": {
+        "filePlan": "move app, copy agents/skills, scaffold quality corpus, add tests, update package.json, write Obsidian note",
+        "noUnrelatedReverts": true
+      }
+    },
+    {
+      "id": "verification-suite",
+      "status": "pass",
+      "evidence": {
+        "tests": "detected",
+        "typecheck": "n/a",
+        "build": "n/a"
+      }
+    },
+    {
+      "id": "docs-and-changelog",
+      "status": "pass",
+      "evidence": {
+        "changelogEntry": "file detected"
+      }
+    },
+    {
+      "id": "deploy-lock-gate",
+      "status": "pass",
+      "evidence": {
+        "preDeployCheck": "n/a — no cloud deploy this session",
+        "releaseDeployLock": "n/a"
+      }
+    },
+    {
+      "id": "health-check",
+      "status": "pass",
+      "evidence": {
+        "healthResponse": "n/a — local dev only"
+      }
+    },
+    {
+      "id": "trace-capture",
+      "status": "pass",
+      "evidence": {
+        "traceCount": 1,
+        "errorEvents": 0
+      }
+    },
+    {
+      "id": "open-loop-update",
+      "status": "pass",
+      "evidence": {
+        "openLoopsUpdated": true,
+        "nextPriority": "Build scanner daemon and wire live scan output to evaluator UI"
+      }
+    },
+    {
+      "id": "self-improvement",
+      "status": "pass",
+      "evidence": {
+        "ruleOrMemoryUpdate": "NOTES.md and Obsidian note created with full product vision and architecture"
+      }
+    },
+    {
+      "id": "git-tag-on-version-bump",
+      "status": "pass",
+      "evidence": {
+        "versionBumped": false,
+        "tagged": "n/a",
+        "pushed": "n/a"
+      }
+    },
+    {
+      "id": "migration-safety-check",
+      "status": "pass",
+      "evidence": {
+        "backupTaken": "n/a — no DB",
+        "migrationReviewed": "n/a — no DB"
+      }
+    },
+    {
+      "id": "secret-scan",
+      "status": "pass",
+      "evidence": {
+        "scanStatus": "clean",
+        "leaksFound": 0,
+        "envFilesDetected": 0,
+        "committedEnvFiles": []
+      }
+    },
+    {
+      "id": "lint-clean",
+      "status": "pass",
+      "evidence": {
+        "lintResult": "n/a — no linter configured yet"
+      }
+    }
   ],
   "adversarialResults": [
-    { "id": "llm01", "status": "pass", "evidence": "No prompt injection in corpus or template files" },
-    { "id": "llm02", "status": "pass", "evidence": "No secrets echoed; scan scripts use safe-values list" },
-    { "id": "llm03", "status": "pass", "evidence": "No unpinned package changes; exact versions only" },
-    { "id": "llm04", "status": "pass", "evidence": "All bootstrap inputs sourced from trusted local workspace files" },
-    { "id": "llm05", "status": "pass", "evidence": "Tool outputs verified before writing evidence" },
-    { "id": "llm06", "status": "pass", "evidence": "No destructive commands executed without explicit plan" },
-    { "id": "llm07", "status": "pass", "evidence": "System prompts not exposed to end user outputs" },
-    { "id": "llm08", "status": "pass", "evidence": "Tool routing enforced: workspace tools for workspace files" },
-    { "id": "llm09", "status": "pass", "evidence": "No fabricated test pass claims; all evidence grounded in real commands" },
-    { "id": "llm10", "status": "pass", "evidence": "Bounded execution with explicit gate checks at each step" }
+    {
+      "id": "llm01",
+      "status": "pass",
+      "evidence": "No prompt injection in corpus or template files"
+    },
+    {
+      "id": "llm02",
+      "status": "pass",
+      "evidence": "No secrets echoed; scan scripts use safe-values list"
+    },
+    {
+      "id": "llm03",
+      "status": "pass",
+      "evidence": "No unpinned package changes; exact versions only"
+    },
+    {
+      "id": "llm04",
+      "status": "pass",
+      "evidence": "All bootstrap inputs sourced from trusted local workspace files"
+    },
+    {
+      "id": "llm05",
+      "status": "pass",
+      "evidence": "Tool outputs verified before writing evidence"
+    },
+    {
+      "id": "llm06",
+      "status": "pass",
+      "evidence": "No destructive commands executed without explicit plan"
+    },
+    {
+      "id": "llm07",
+      "status": "pass",
+      "evidence": "System prompts not exposed to end user outputs"
+    },
+    {
+      "id": "llm08",
+      "status": "pass",
+      "evidence": "Tool routing enforced: workspace tools for workspace files"
+    },
+    {
+      "id": "llm09",
+      "status": "pass",
+      "evidence": "No fabricated test pass claims; all evidence grounded in real commands"
+    },
+    {
+      "id": "llm10",
+      "status": "pass",
+      "evidence": "Bounded execution with explicit gate checks at each step"
+    }
   ],
   "traces": [
     {
-      "trace_id": "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6",
-      "span_id": "b1c2d3e4f5a6b7c8",
-      "name": "agent.quality.initial-bootstrap",
+      "trace_id": "ff6f9c73fa7145aaba2054a0040d7f78",
+      "span_id": "0d5a3b8e84b742e8",
+      "name": "agent.quality.scanner.daemon",
       "kind": "internal",
-      "start_time_unix_nano": 1746403200000000000,
-      "end_time_unix_nano": 1746403800000000000,
+      "start_time_unix_nano": 1777966667157000000,
+      "end_time_unix_nano": 1777966667157000000,
       "status": "ok",
       "attributes": {
         "gen_ai.operation.name": "agent.run",
-        "gen_ai.request.model": "claude-sonnet-4-6",
-        "gen_ai.usage.input_tokens": 4200,
-        "gen_ai.usage.output_tokens": 2100,
-        "vouch.agent.run_id": "seed-2026-05-05-initial",
-        "vouch.agent.workflow_id": "session-bootstrap",
-        "vouch.agent.session_id": "seed-2026-05-05-initial",
-        "vouch.agent.files_changed": 18,
+        "gen_ai.request.model": "scanner-daemon-v1",
+        "gen_ai.usage.input_tokens": 0,
+        "gen_ai.usage.output_tokens": 0,
+        "vouch.agent.run_id": "scan-mosbg4gl",
+        "vouch.agent.workflow_id": "trace-capture",
+        "vouch.agent.session_id": "scan-mosbg4gl",
+        "vouch.agent.files_changed": 1,
         "vouch.agent.deploy_needed": false
       }
     }
-  ]
+  ],
+  "scanner": {
+    "targetDir": "D:\\VS Code Projects\\Agent Scorecard",
+    "scannedAt": "2026-05-05T07:37:47.156Z",
+    "totalFiles": 35,
+    "trackedFileCount": 31,
+    "envFilesDetected": 0,
+    "committedEnvFiles": []
+  }
 }

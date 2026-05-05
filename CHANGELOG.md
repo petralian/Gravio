@@ -4,6 +4,27 @@ All notable changes to this project will be documented in this file.
 
 ---
 
+## [Unreleased]
+
+### Added
+- Scanner Daemon v1 MVP core at src/core/scanner-daemon.mjs
+- Scanner CLI command at scripts/scanner-daemon.mjs
+- New npm scripts: scorecard:scan (one-time) and scorecard:scan:watch (daemon mode)
+- Scanner test suite at tests/scanner-daemon.test.mjs
+- gravio.dev marketing website at src/web/index.html (hero, pricing, install, zero-knowledge callout)
+- Evaluation tool moved to src/web/tool.html with dedicated /tool route
+- Complete design system at src/web/styles.css (neon palette, terminal tokens, marketing + tool namespaces, responsive)
+- Server routes: GET /tool (serves tool.html), GET /health (returns {"status":"ok"})
+- Phase 2 — Zero-knowledge E2EE crypto module at src/core/crypto-e2ee.mjs (AES-256-GCM, PBKDF2 key derivation)
+- Phase 2 — Server blind-store endpoints: POST /api/publish, GET /api/runs/:projectId (ciphertext never decrypted)
+- Phase 2 — Scanner CLI --publish, --project, --server, --key, --passphrase, --salt flags for encrypted cloud publish
+- Phase 2 — Crypto unit tests at tests/crypto-e2ee.test.mjs (17 tests)
+- Phase 2 — Server integration tests at tests/server.test.mjs now wired into npm test
+
+### Changed
+- npm test now runs all 4 test suites (47 tests total)
+- GET / serves marketing homepage; evaluation tool accessible at /tool
+
 ## [0.1.0] — 2026-05-05
 
 ### Added

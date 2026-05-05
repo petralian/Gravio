@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gravio — Scoring Tool</title>
+  <meta name="description" content="Gravio Agent Scorecard evaluation tool — paste your run JSON and score it instantly." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="app-tool">
+
+  <div id="app">
+    <header>
+      <div class="tool-topbar">
+        <a href="/" class="m-brand tool-brand" aria-label="Back to Gravio home">
+          <svg width="22" height="22" viewBox="0 0 26 26" fill="none" aria-hidden="true">
+            <rect width="26" height="26" rx="6" fill="rgba(0,229,255,0.1)"/>
+            <path d="M7 13a6 6 0 1 1 6 6H7v-2.5h6a3.5 3.5 0 1 0-3.5-3.5H7V13z" fill="#00e5ff"/>
+          </svg>
+          <span class="m-brand-name">gravio</span>
+        </a>
+        <span class="tool-tag">Scoring Tool</span>
+      </div>
+      <h1>Agent Scorecard <span class="tool-beta">BETA</span></h1>
+      <p class="subtitle">Paste your run evidence JSON and evaluate your agent's quality score instantly.</p>
+    </header>
+
+    <main>
+
+      <!-- QUICKSTART -->
+      <div class="card">
+        <div class="section-head">
+          <h2>Quick start</h2>
+        </div>
+        <ul class="quickstart-list">
+          <li>Load a sample run below or import your own <code>latest.json</code></li>
+          <li>Optionally paste a previous run to enable regression detection</li>
+          <li>Click <strong>Evaluate</strong> to score against all gates and dimensions</li>
+        </ul>
+        <p class="schema-title">Required run shape</p>
+        <pre class="schema-block">{ runId, scorecard: { safety, reliability, evaluation, observability, governance },
+  workflowResults: [{ id, status }], adversarialResults: [{ id, status }] }</pre>
+      </div>
+
+      <!-- RUN JSON INPUT -->
+      <div class="card">
+        <div class="section-head">
+          <h2>Run JSON</h2>
+          <div class="toolbar">
+            <button class="btn-secondary" id="load-minimal-btn">Load minimal sample</button>
+            <button class="btn-secondary" id="load-realistic-btn">Load realistic sample</button>
+            <button class="btn-secondary" id="format-run-btn">Format</button>
+            <button class="btn-secondary" id="clear-run-btn">Clear</button>
+          </div>
+        </div>
+
+        <div class="import-row small-gap">
+          <label for="run-file" class="btn-secondary file-label" style="cursor:pointer;">Import JSON file</label>
+          <input type="file" id="run-file" accept=".json" style="display:none" />
+        </div>
+
+        <label for="run-json">Run evidence JSON</label>
+        <textarea id="run-json" rows="18" spellcheck="false" placeholder='{ "runId": "run-2026-...", "scorecard": { ... }, "workflowResults": [...], ... }'></textarea>
+        <ul class="validation-list" id="validation-list" hidden></ul>
+      </div>
+
+      <!-- BUILDER -->
+      <div class="card">
+        <div class="section-head">
+          <h2>Quick builder</h2>
+          <p class="builder-subtitle">Fill scores and counts → generates valid run JSON</p>
+        </div>
+        <div class="builder-grid">
+          <div>
+            <label for="builder-run-id">Run ID</label>
+            <input type="text" id="builder-run-id" placeholder="my-run-2026" />
+          </div>
+          <div>
+            <label for="builder-safety">Safety (0–100)</label>
+            <input type="number" id="builder-safety" min="0" max="100" value="90" />
+          </div>
+          <div>
+            <label for="builder-reliability">Reliability (0–100)</label>
+            <input type="number" id="builder-reliability" min="0" max="100" value="88" />
+          </div>
+          <div>
+            <label for="builder-evaluation">Evaluation (0–100)</label>
+            <input type="number" id="builder-evaluation" min="0" max="100" value="85" />
+          </div>
+          <div>
+            <label for="builder-observability">Observability (0–100)</label>
+            <input type="number" id="builder-observability" min="0" max="100" value="82" />
+          </div>
+          <div>
+            <label for="builder-governance">Governance (0–100)</label>
+            <input type="number" id="builder-governance" min="0" max="100" value="90" />
+          </div>
+          <div>
+            <label for="builder-workflow-total">Workflows total</label>
+            <input type="number" id="builder-workflow-total" min="1" value="14" />
+          </div>
+          <div>
+            <label for="builder-workflow-pass">Workflows passing</label>
+            <input type="number" id="builder-workflow-pass" min="0" value="14" />
+          </div>
+          <div>
+            <label for="builder-adv-total">Adversarial tests total</label>
+            <input type="number" id="builder-adv-total" min="1" value="10" />
+          </div>
+          <div>
+            <label for="builder-adv-fail">Adversarial failures</label>
+            <input type="number" id="builder-adv-fail" min="0" value="0" />
+          </div>
+        </div>
+        <div class="actions-row">
+          <button class="btn-secondary" id="generate-from-builder-btn">Generate run JSON from builder →</button>
+        </div>
+      </div>
+
+      <!-- PREVIOUS RUN -->
+      <div class="card">
+        <div class="section-head">
+          <h2>Previous run <span class="hint">(optional — enables regression gate)</span></h2>
+          <button class="btn-secondary" id="load-prev-btn">Load sample previous</button>
+          <button class="btn-secondary" id="format-prev-btn">Format</button>
+        </div>
+        <label for="prev-json">Previous run JSON</label>
+        <textarea id="prev-json" rows="5" spellcheck="false" placeholder='{ "summary": { "overallScore": 89 } }'></textarea>
+      </div>
+
+      <!-- EVALUATE -->
+      <div class="card">
+        <p id="error-msg" class="error" hidden></p>
+        <button id="evaluate-btn">Evaluate →</button>
+      </div>
+
+      <!-- RESULTS -->
+      <div id="results" class="results-section" hidden>
+        <div class="score-banner">
+          <div class="score-value" id="score-value">—</div>
+          <div>
+            <div class="badge" id="pass-badge">—</div>
+          </div>
+        </div>
+
+        <div class="metrics-row">
+          <div class="metric">
+            <span class="metric-label">Workflow pass rate</span>
+            <span class="metric-value" id="wpr">—</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">Safety score</span>
+            <span class="metric-value" id="safety">—</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">Critical failures</span>
+            <span class="metric-value" id="critical">—</span>
+          </div>
+        </div>
+
+        <h2>Gate results</h2>
+        <ul class="gates-list" id="gates-list"></ul>
+
+        <h2>Dimension scores</h2>
+        <div class="dimensions-grid" id="dimensions-grid"></div>
+
+        <h2 style="margin-top:28px;">Raw result JSON</h2>
+        <textarea id="raw-result" rows="14" readonly spellcheck="false"></textarea>
+      </div>
+
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

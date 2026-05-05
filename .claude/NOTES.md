@@ -21,7 +21,7 @@ The Agent Scorecard Platform evaluates whether an AI coding agent is operating s
 2. **Gate outcomes** — hard pass/fail gates that block unsafe behavior regardless of weighted score
 3. **Explainability** — for every failed check: what happened, why it matters, how to fix it
 4. **Periodic re-assessment** — trend tracking across sessions to prevent decay
-5. **Scanner daemon** (planned) — watches project folders, collects live evidence, removes need for manual JSON authoring
+5. **Scanner daemon** (v1 implemented) — watches project folders, collects live evidence, removes need for manual JSON authoring
 6. **Parallel agent coordination** (planned) — detects file-level conflicts, manages agent work queue
 
 ---
@@ -30,39 +30,42 @@ The Agent Scorecard Platform evaluates whether an AI coding agent is operating s
 
 ```
 src/
-  server.mjs          HTTP server (node:http) — serves UI + /api/evaluate
+  server.mjs               HTTP server (node:http) — serves UI + /api/evaluate
   core/
-    evaluate.mjs      Evaluator engine — pure function, framework-agnostic
+    evaluate.mjs           Evaluator engine — pure function, framework-agnostic
+    scanner-daemon.mjs     Scanner Daemon v1 core (scan + evidence generation)
 
 src/web/
-  index.html          Single-page UI with guided onboarding, builder, sample loading
-  styles.css          Dark UI with CSS variables
-  app.js              Browser JS — file import, builder, validation, evaluation
+  index.html               Single-page UI with guided onboarding, builder, sample loading
+  styles.css               Dark UI with CSS variables
+  app.js                   Browser JS — file import, builder, validation, evaluation
 
 scripts/
-  scorecard-gate.mjs  Self-quality gate (exits 0=pass, 1=fail)
-  new-run.mjs         Scaffold new run stub + rotate latest→previous
-  secret-scan.mjs     Context-aware secret scanner
+  scorecard-gate.mjs       Self-quality gate (exits 0=pass, 1=fail)
+  new-run.mjs              Scaffold new run stub + rotate latest→previous
+  secret-scan.mjs          Context-aware secret scanner
+  scanner-daemon.mjs       Scanner Daemon v1 CLI (one-time and watch mode)
 
 tests/
-  evaluate.test.mjs   Unit tests for evaluator engine (node:test)
-  server.test.mjs     Integration tests for HTTP server
+  evaluate.test.mjs        Unit tests for evaluator engine (node:test)
+  server.test.mjs          Integration tests for HTTP server
+  scanner-daemon.test.mjs  Unit tests for scanner daemon behavior
 
 agent-quality/
-  baseline.json       Gate thresholds + regression limits
+  baseline.json            Gate thresholds + regression limits
   runs/
-    latest.json       Latest agent run evidence (filled by agent each session)
-    previous.json     Previous run (auto-rotated by new-run.mjs)
+    latest.json            Latest agent run evidence (scanner-updatable)
+    previous.json          Previous run (auto-rotated by new-run.mjs)
   evals/
-    workflow-corpus.json  14 workflows with descriptions + required evidence
+    workflow-corpus.json   14 workflows with descriptions + required evidence
   schemas/
-    agent-trace.schema.json  Required OpenTelemetry-style trace attributes
+    agent-trace.schema.json Required OpenTelemetry-style trace attributes
   scorecard/
-    weights.json      Dimension weights + per-dimension score thresholds
+    weights.json           Dimension weights + per-dimension score thresholds
 
 .github/
-  agents/             Agent definitions (scorecard-test, scorecard-impl, etc.)
-  skills/             Skill definitions (session-bootstrap, etc.)
+  agents/                  Agent definitions (scorecard-test, scorecard-impl, etc.)
+  skills/                  Skill definitions (session-bootstrap, etc.)
   copilot-instructions.md  Project-wide coding + governance rules
 ```
 
@@ -95,34 +98,37 @@ agent-quality/
 ## Key Commands
 
 ```bash
-npm start             # Start web UI at http://localhost:3000
-npm test              # Run full test suite
-npm run scorecard:check   # Run quality gate (exits 1 if failing)
-npm run scorecard:new-run # Scaffold new run stub
-npm run secret-scan   # Run secret scanner
-npm run verify        # secret-scan + tests + gate (full CI check)
+npm start                      # Start web UI at http://localhost:3000
+npm test                       # Run evaluator + scanner tests
+npm run scorecard:check        # Run quality gate (exits 1 if failing)
+npm run scorecard:new-run      # Scaffold new run stub
+npm run scorecard:scan         # One-time scanner run to generate latest.json
+npm run scorecard:scan:watch   # Watch target folder and regenerate latest.json on change
+npm run secret-scan            # Run secret scanner
+npm run verify                 # secret-scan + tests + gate (full CI check)
 ```
 
 ---
 
 ## Planned Next Steps
 
-1. **Scanner Daemon** — Node.js file watcher that scans project folders and emits live JSON evidence
-2. **Explainability Engine** — Per-check explanations with What/Why/How/Effort/Impact
-3. **Prompt Generator** — Ready-to-run agent prompts per failed check
-4. **Trend Dashboard** — Score over time, regression highlights, improvement streaks
-5. **Parallel Agent Coordination** — Lock manager for multi-agent file access
-6. **Token Efficiency Module** — Detect repeated-failure loops, suggest minimal context packs
-7. **Policy Packs** — Configurable check sets: Solo Starter, Agency Team, Enterprise Secure
+1. **Scanner Daemon enhancements** — richer checks (git cleanliness, CI status, command execution hooks)
+2. **Explainability Engine** — per-check explanations with What/Why/How/Effort/Impact
+3. **Prompt Generator** — ready-to-run agent prompts per failed check
+4. **Trend Dashboard** — score over time, regression highlights, improvement streaks
+5. **Parallel Agent Coordination** — lock manager for multi-agent file access
+6. **Token Efficiency Module** — detect repeated-failure loops, suggest minimal context packs
+7. **Policy Packs** — configurable check sets: Solo Starter, Agency Team, Enterprise Secure
 
 ---
 
 ## Open Loops
 
-- Scanner daemon not yet implemented
-- Tests require `server.mjs` to export the server object (currently no export — test uses dynamic import side-effect)
+- Scanner daemon v1 shipped; deeper evidence checks still pending
 - No CI yet — GitHub Actions workflow to add
 - No deployment target yet — local only
+- Agent definitions in `.github/agents` still use Vouch naming and should be migrated
+- Explainability engine not yet implemented
 
 ---
 
