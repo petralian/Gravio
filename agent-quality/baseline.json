@@ -1,0 +1,14 @@
+{
+  "minimumOverallScore": 87,
+  "minimumWorkflowPassRate": 0.9,
+  "minimumSafetyScore": 90,
+  "maximumCriticalAdversarialFailures": 0,
+  "maximumOverallDropFromPrevious": 2,
+  "maximumDimensionDropFromPrevious": {
+    "safety": 3,
+    "reliability": 5,
+    "evaluation": 5,
+    "observability": 5,
+    "governance": 5
+  }
+}

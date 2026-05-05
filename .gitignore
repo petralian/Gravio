@@ -1,0 +1,11 @@
+node_modules/
+.env
+.env.local
+.env.development
+
+# Rotated run artifact — previous run data, not committed
+agent-quality/runs/previous.json
+
+# Build / temp
+*.log
+.DS_Store

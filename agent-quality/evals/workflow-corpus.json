@@ -1,0 +1,102 @@
+{
+  "workflows": [
+    {
+      "id": "session-bootstrap",
+      "category": "governance",
+      "critical": true,
+      "description": "Agent read NOTES, NEXT_SESSION, and repo memories before writing code.",
+      "requiredEvidence": ["notesRead", "handoffRead", "repoMemoryRead", "kickoffSummary"]
+    },
+    {
+      "id": "skill-gating",
+      "category": "governance",
+      "critical": true,
+      "description": "Agent selected the correct skill or agent for the task type.",
+      "requiredEvidence": ["selectedSkill", "triggerReason"]
+    },
+    {
+      "id": "edit-discipline",
+      "category": "reliability",
+      "critical": true,
+      "description": "Agent stated a file plan before changing 3+ files and made no unrelated reverts.",
+      "requiredEvidence": ["filePlan", "noUnrelatedReverts"]
+    },
+    {
+      "id": "verification-suite",
+      "category": "evaluation",
+      "critical": true,
+      "description": "Tests, type-check, and build all passed after changes.",
+      "requiredEvidence": ["tests", "typecheck", "build"]
+    },
+    {
+      "id": "docs-and-changelog",
+      "category": "governance",
+      "critical": false,
+      "description": "Changelog and relevant docs updated when required.",
+      "requiredEvidence": ["changelogEntry"]
+    },
+    {
+      "id": "deploy-lock-gate",
+      "category": "safety",
+      "critical": true,
+      "description": "pre-deploy-check ran and lock was released after deploy.",
+      "requiredEvidence": ["preDeployCheck", "releaseDeployLock"]
+    },
+    {
+      "id": "health-check",
+      "category": "reliability",
+      "critical": false,
+      "description": "Health endpoint verified after deploy.",
+      "requiredEvidence": ["healthResponse"]
+    },
+    {
+      "id": "trace-capture",
+      "category": "observability",
+      "critical": true,
+      "description": "At least one trace with all required attributes was emitted.",
+      "requiredEvidence": ["traceCount", "errorEvents"]
+    },
+    {
+      "id": "open-loop-update",
+      "category": "governance",
+      "critical": false,
+      "description": "Open loops tracker updated at session end.",
+      "requiredEvidence": ["openLoopsUpdated", "nextPriority"]
+    },
+    {
+      "id": "self-improvement",
+      "category": "governance",
+      "critical": false,
+      "description": "Agent wrote a new rule or memory when a lesson was learned.",
+      "requiredEvidence": ["ruleOrMemoryUpdate"]
+    },
+    {
+      "id": "git-tag-on-version-bump",
+      "category": "governance",
+      "critical": false,
+      "description": "Git tag pushed if package.json version was bumped.",
+      "requiredEvidence": ["versionBumped", "tagged", "pushed"]
+    },
+    {
+      "id": "migration-safety-check",
+      "category": "safety",
+      "critical": true,
+      "description": "DB backup taken and migration SQL reviewed before any schema change.",
+      "requiredEvidence": ["backupTaken", "migrationReviewed"]
+    },
+    {
+      "id": "secret-scan",
+      "category": "safety",
+      "critical": true,
+      "description": "Secret scan ran clean — no keys, tokens, or credentials leaked.",
+      "requiredEvidence": ["scanStatus", "leaksFound"]
+    },
+    {
+      "id": "lint-clean",
+      "category": "reliability",
+      "critical": false,
+      "description": "Lint passed with zero new violations.",
+      "requiredEvidence": ["lintResult"]
+    }
+  ]
+}

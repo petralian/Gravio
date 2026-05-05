@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Agent Scorecard Platform</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="app">
+    <header>
+      <h1>Agent Scorecard Platform</h1>
+      <p class="subtitle">Evaluate agent run artifacts with guided JSON templates, validation, and a no-code builder</p>
+    </header>
+
+    <main>
+      <section class="quickstart card">
+        <h2>Quick Start</h2>
+        <ol class="quickstart-list">
+          <li>Paste a run artifact in Run JSON, or click Load realistic sample.</li>
+          <li>Optionally paste a previous run artifact to enable regression gate checks.</li>
+          <li>Click Evaluate to compute score, gate outcomes, and dimension breakdown.</li>
+        </ol>
+        <p class="schema-title">Required shape for Run JSON</p>
+        <pre class="schema-block">{
+  "runId": "string",
+  "scorecard": {
+    "safety": 0-100,
+    "reliability": 0-100,
+    "evaluation": 0-100,
+    "observability": 0-100,
+    "governance": 0-100
+  },
+  "workflowResults": [{ "id": "x", "status": "pass|fail" }],
+  "adversarialResults": [{ "id": "llm01", "status": "pass|fail" }]
+}</pre>
+      </section>
+
+      <section class="input-section card">
+        <div class="section-head">
+          <h2>Run Evaluator</h2>
+          <div class="toolbar">
+            <button id="load-minimal-btn" type="button" class="btn-secondary">Load minimal sample</button>
+            <button id="load-realistic-btn" type="button" class="btn-secondary">Load realistic sample</button>
+            <button id="format-run-btn" type="button" class="btn-secondary">Format JSON</button>
+            <button id="clear-run-btn" type="button" class="btn-secondary">Clear</button>
+          </div>
+        </div>
+
+        <label for="run-json">Run JSON <span class="hint">(latest.json-like artifact)</span></label>
+        <textarea id="run-json" placeholder='{ "runId": "...", "scorecard": { ... }, ... }' rows="12"></textarea>
+        <div class="import-row">
+          <label for="run-file" class="file-label">Import from .json file</label>
+          <input id="run-file" type="file" accept="application/json,.json" />
+        </div>
+
+        <label for="prev-json">Previous Run JSON <span class="hint">(optional, enables regression gate)</span></label>
+        <textarea id="prev-json" placeholder='{ "summary": { "overallScore": 89 } }' rows="4"></textarea>
+        <div class="toolbar small-gap">
+          <button id="load-prev-btn" type="button" class="btn-secondary">Load previous sample</button>
+          <button id="format-prev-btn" type="button" class="btn-secondary">Format previous JSON</button>
+        </div>
+
+        <div class="actions-row">
+          <button id="evaluate-btn" type="button">Evaluate</button>
+        </div>
+
+        <div id="error-msg" class="error" hidden></div>
+        <ul id="validation-list" class="validation-list" hidden></ul>
+      </section>
+
+      <section class="builder card">
+        <h2>JSON Builder</h2>
+        <p class="builder-subtitle">Use this when you do not already have a run artifact. Fill values, then generate valid Run JSON.</p>
+        <div class="builder-grid">
+          <label>Run ID
+            <input id="builder-run-id" type="text" value="manual-001" />
+          </label>
+          <label>Safety
+            <input id="builder-safety" type="number" min="0" max="100" value="95" />
+          </label>
+          <label>Reliability
+            <input id="builder-reliability" type="number" min="0" max="100" value="90" />
+          </label>
+          <label>Evaluation
+            <input id="builder-evaluation" type="number" min="0" max="100" value="90" />
+          </label>
+          <label>Observability
+            <input id="builder-observability" type="number" min="0" max="100" value="88" />
+          </label>
+          <label>Governance
+            <input id="builder-governance" type="number" min="0" max="100" value="93" />
+          </label>
+          <label>Workflow checks total
+            <input id="builder-workflow-total" type="number" min="1" value="14" />
+          </label>
+          <label>Workflow checks passed
+            <input id="builder-workflow-pass" type="number" min="0" value="14" />
+          </label>
+          <label>Adversarial checks total
+            <input id="builder-adv-total" type="number" min="1" value="10" />
+          </label>
+          <label>Adversarial failures
+            <input id="builder-adv-fail" type="number" min="0" value="0" />
+          </label>
+        </div>
+        <div class="actions-row">
+          <button id="generate-from-builder-btn" type="button" class="btn-secondary">Generate Run JSON from Builder</button>
+        </div>
+      </section>
+
+      <section id="results" class="results-section" hidden>
+        <div id="score-banner" class="score-banner">
+          <span id="score-value" class="score-value"></span>
+          <span id="pass-badge" class="badge"></span>
+        </div>
+
+        <div class="metrics-row">
+          <div class="metric"><span class="metric-label">Workflow pass rate</span><span id="wpr" class="metric-value"></span></div>
+          <div class="metric"><span class="metric-label">Safety score</span><span id="safety" class="metric-value"></span></div>
+          <div class="metric"><span class="metric-label">Critical failures</span><span id="critical" class="metric-value"></span></div>
+        </div>
+
+        <h2>Gate checks</h2>
+        <ul id="gates-list" class="gates-list"></ul>
+
+        <h2>Dimensions</h2>
+        <div id="dimensions-grid" class="dimensions-grid"></div>
+
+        <h2>Raw API Result</h2>
+        <textarea id="raw-result" rows="10" readonly></textarea>
+      </section>
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

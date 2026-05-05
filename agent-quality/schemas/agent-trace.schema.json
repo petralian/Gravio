@@ -1,0 +1,36 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Agent Trace Span",
+  "type": "object",
+  "required": ["trace_id", "span_id", "name", "attributes"],
+  "properties": {
+    "trace_id": { "type": "string" },
+    "span_id": { "type": "string" },
+    "name": { "type": "string" },
+    "kind": { "type": "string" },
+    "status": { "type": "string" },
+    "attributes": {
+      "type": "object",
+      "required": [
+        "gen_ai.operation.name",
+        "gen_ai.request.model",
+        "vouch.agent.run_id",
+        "vouch.agent.workflow_id",
+        "vouch.agent.session_id",
+        "vouch.agent.files_changed",
+        "vouch.agent.deploy_needed"
+      ],
+      "properties": {
+        "gen_ai.operation.name": { "type": "string" },
+        "gen_ai.request.model": { "type": "string" },
+        "gen_ai.usage.input_tokens": { "type": "number" },
+        "gen_ai.usage.output_tokens": { "type": "number" },
+        "vouch.agent.run_id": { "type": "string" },
+        "vouch.agent.workflow_id": { "type": "string" },
+        "vouch.agent.session_id": { "type": "string" },
+        "vouch.agent.files_changed": { "type": "number" },
+        "vouch.agent.deploy_needed": { "type": "boolean" }
+      }
+    }
+  }
+}
