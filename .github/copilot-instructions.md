@@ -92,6 +92,34 @@ Update NOTES.md when:
 6. **`[hidden]` is sacred.** Never write CSS that sets `display:` on a selector that might also receive the `hidden` attribute. The global `[hidden] { display: none !important }` rule at the top of `styles.css` exists because three separate visual bugs were caused by `.m-btn { display: inline-flex }` and `.ob-auth-modal-wrap { display: grid }` overriding the attribute. Use the attribute, not class toggles, for visibility.
 7. **CLI bundle is committed, not built at deploy time.** Users download `https://gravio.dev/cli/gravio.mjs` — a single self-contained file produced by `npm run build:cli` (esbuild). Whenever you change `scripts/scanner-daemon.mjs`, `src/core/scanner-daemon.mjs`, or `src/core/crypto-e2ee.mjs`, you **must** also run `npm run build:cli` and commit the regenerated `src/web/cli/gravio.mjs` in the same commit. The Dockerfile uses `npm ci --omit=dev`, so esbuild is unavailable in the container — never rely on rebuilding at deploy time.
 
+## Gravio UI/UX Hard Rules
+
+Full rationale and pattern reference: `Design/UX Guidelines.md` in the Obsidian vault.
+
+**Before writing any new front-end page or component, read `Design/UX Guidelines.md` first.**
+
+### Navigation
+8. **SPA views use show/hide, not navigation.** In-page transitions between major sections must use `showView(name)` toggling the `hidden` attribute — never `location.href` or `<a>` links pointing to the same page.
+9. **URL must reflect detail state.** Navigating into a detail view must call `history.pushState/replaceState` (e.g. `?project=id`). `popstate` must restore the correct view. URL param must auto-navigate on page load.
+
+### Collections & Detail
+10. **Cards, not lists.** Any collection of user-owned items (projects, runs, scans) renders as a card grid (`.db-projects-grid` + `.db-proj-card`), not a `<ul>/<li>` list.
+11. **Workspace anatomy is fixed.** Every detail view must have: (a) back nav bar, (b) hero header with name + score + rating badge + trend badge, (c) tab bar + tab panels. Do not omit any of these three layers.
+12. **Tabs use `hidden`, not `display:none`.** Tab panel visibility is controlled with the `hidden` attribute only — never a CSS class that sets `display`.
+
+### Visual Language
+13. **Reuse badge helpers.** Score color → `scoreColorClass(score)`. Rating badge class → `ratingBadgeClass(rating)`. Trend badge HTML → `trendBadgeHtml(direction, delta)`. Do not invent new color/badge logic.
+14. **Relative timestamps as primary label.** Always use `formatDateRelative(ts)` for visible time labels. Full datetime goes in the `title` attribute only.
+15. **Every list has an empty state.** No blank areas — use `.db-empty-state` with title + sub-text whenever a collection is empty or a search returns 0 results.
+16. **Search + sort on any sizeable list.** Any list that could exceed 5 items must have a `.db-search-input` (real-time client-side filter) and `.db-sort-select` (recent / score / name). No server round-trips per keystroke.
+
+### Separation of Concerns
+17. **Settings stay in `/settings`.** API keys, plan info, account credentials, and E2EE tools must never appear on the dashboard. Link to `/settings` from the dashboard header.
+
+### Feedback & Errors
+18. **No silent no-ops.** Every action that can fail must show an inline error via `showError(el, msg)` adjacent to the trigger. Never use `alert()` or `console.error` only.
+19. **In-flight state.** Disable the triggering button and change its label to "Loading…" during any fetch. Re-enable in `finally`.
+
 ---
 
 # PART B — Standardized Engineering Rules (project-agnostic)
