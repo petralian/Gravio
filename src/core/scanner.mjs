@@ -168,6 +168,62 @@ export function scanTargetProject(targetDir) {
   const hasMatch = (fn) => allFiles.some(fn);
   const hasGlob = (prefix) => allFiles.some((f) => f.startsWith(prefix));
 
+  // ━━━ ECOSYSTEM DETECTION ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // Determine primary ecosystem(s) from file signatures. A project can be multi-ecosystem.
+
+  const isPython = hasMatch((f) => /\.py$/.test(f)) ||
+    has("pyproject.toml") || has("setup.py") || has("setup.cfg") || has("Pipfile");
+
+  const isNode = has("package.json");
+
+  const isGo = has("go.mod");
+  const isRust = has("Cargo.toml");
+  const isJava = hasMatch((f) => /\.(java|kt|scala)$/.test(f)) ||
+    has("pom.xml") || hasMatch((f) => /build\.gradle(\.kts)?$/.test(f));
+  const isDotnet = hasMatch((f) => /\.(cs|fs|vb)$/.test(f)) ||
+    hasMatch((f) => /\.(csproj|sln|fsproj)$/.test(f));
+  const isRuby = has("Gemfile");
+
+  // Does this project actually use .env files for configuration?
+  // Evidence: dotenv in deps, .env.example present, or actual .env files found.
+  const usesDotenv =
+    depsText.includes("dotenv") ||
+    depsText.includes("python-dotenv") ||
+    depsText.includes("django-environ") ||
+    depsText.includes("decouple") ||
+    has(".env.example") || has(".env.sample") || has(".env.template") ||
+    allFiles.some((f) => isEnvFileName(path.basename(f)));
+
+  // For retry resilience: check language-appropriate libraries
+  const hasRetryLibrary =
+    // Node
+    depsText.includes("p-retry") || depsText.includes("retry") || depsText.includes("axios-retry") ||
+    depsText.includes("cockatiel") || depsText.includes("backoff") ||
+    // Python
+    depsText.includes("tenacity") || depsText.includes("backoff") ||
+    depsText.includes("stamina") || depsText.includes("retry") ||
+    // Go / Java / Rust
+    depsText.includes("resilience4j") || depsText.includes("spring-retry") ||
+    // Check for common pattern in source: @retry, retry_with_backoff, etc.
+    (() => {
+      if (!isPython) return false;
+      // Look for retry patterns in tracked .py files (cheap heuristic: look at filenames)
+      return hasMatch((f) => f.endsWith(".py") && (
+        f.includes("retry") || f.includes("backoff") || f.includes("resilience")
+      ));
+    })();
+
+  // Eval script: Node uses package.json scripts; Python uses Makefile / tox / pytest targets
+  const packageJson = safeReadJson(path.join(resolvedTarget, "package.json"), null);
+  const hasNodeEvalScript = Object.keys(packageJson?.scripts ?? {}).some(
+    (s) => s === "eval" || s === "evals" || s === "bench" || s === "benchmark" || s.includes("eval")
+  );
+  const hasPythonEvalScript =
+    depsText.includes("pytest") || depsText.includes("tox") ||
+    hasMatch((f) => /make(file)?$/i.test(f)) ||
+    hasMatch((f) => f.endsWith(".py") && (f.includes("eval") || f.includes("bench")));
+  const hasEvalScript = hasNodeEvalScript || (isPython && hasPythonEvalScript);
+
   // ━━━ SAFETY ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   const envFiles = allFiles.filter((f) => isEnvFileName(path.basename(f)));
@@ -179,7 +235,21 @@ export function scanTargetProject(targetDir) {
     const gi = safeReadText(path.join(resolvedTarget, ".gitignore"));
     gitignoreCoversEnv = /^\s*\.env/m.test(gi) || /^\s*\*\.env/m.test(gi);
   }
+  // If this project doesn't use .env files at all, the gitignore-env check is N/A
+  // (not failing — the risk doesn't exist). Mark as covered so it scores as pass.
+  const gitignoreEnvNotApplicable = !usesDotenv;
+  const gitignoreEnvPasses = gitignoreCoversEnv || gitignoreEnvNotApplicable;
 
+  // For other secret formats the project might use instead
+  const hasAltSecretManagement =
+    // Python: environs, pydantic-settings, dynaconf, etc.
+    depsText.includes("environs") || depsText.includes("pydantic-settings") ||
+    depsText.includes("dynaconf") || depsText.includes("konfig") ||
+    // Cloud secrets managers
+    depsText.includes("boto3")     /* AWS Secrets Manager */ ||
+    depsText.includes("google-cloud-secret-manager") ||
+    depsText.includes("azure-keyvault") ||
+    has("secrets.yaml") || has(".sops.yaml") || has(".sops.yml");
   const securityPolicyExists = hasMatch((f) => /^SECURITY\.md$/i.test(f));
 
   const hasSecretScanConfig =
@@ -209,7 +279,6 @@ export function scanTargetProject(targetDir) {
     hasMatch((f) => /Test\.(java|kt|cs)$/.test(f)) ||
     hasMatch((f) => /_spec\.rb$/.test(f));
 
-  const packageJson = safeReadJson(path.join(resolvedTarget, "package.json"), null);
   const hasTestScript = Boolean(packageJson?.scripts?.test);
   const testSignal = {
     testSignal: hasTestFiles || hasTestScript,
@@ -287,11 +356,6 @@ export function scanTargetProject(targetDir) {
     hasGlob("fixtures/") || hasGlob("fixture/") ||
     hasGlob("test-data/") || hasGlob("testdata/") || hasGlob("test_data/");
 
-  const hasEvalScript =
-    Object.keys(packageJson?.scripts ?? {}).some(
-      (s) => s === "eval" || s === "evals" || s === "bench" || s === "benchmark" || s.includes("eval")
-    );
-
   // ━━━ OBSERVABILITY ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   const hasOtelDependency =
@@ -362,11 +426,16 @@ export function scanTargetProject(targetDir) {
     scannedAt: new Date().toISOString(),
     totalFiles: allFiles.length,
     trackedFileCount: trackedFiles.length,
+    // ecosystem
+    isPython, isNode, isGo, isRust, isJava, isDotnet, isRuby,
+    usesDotenv, hasAltSecretManagement,
     // safety
     envFiles, committedEnvFiles, gitignoreExists, gitignoreCoversEnv,
+    gitignoreEnvNotApplicable, gitignoreEnvPasses,
     securityPolicyExists, hasSecretScanConfig, hasDependencyUpdateConfig, hasAgentInstructions,
     // reliability
     testSignal, cicdExists, hasTypeSafety, hasLockFile, hasLintConfig, hasPreCommitHooks,
+    hasRetryLibrary,
     // evaluation
     hasEvalDir, evalCorpusFileCount, hasEvalConfig, hasBaseline, hasGoldenDatasets, hasEvalScript,
     // observability
@@ -377,7 +446,7 @@ export function scanTargetProject(targetDir) {
     // back-compat fields used elsewhere
     hasNotes, hasNextSession,
     evalCorpusExists: hasEvalDir,
-    hasRetryDependency: false,
+    hasRetryDependency: hasRetryLibrary,
   };
 }
 
@@ -409,10 +478,12 @@ function buildWorkflowResults(corpus, scan, previousRun) {
     }
 
     if (workflow.id === "gitignore-guard") {
-      status = (scan.gitignoreExists && scan.gitignoreCoversEnv) ? "pass" : "fail";
+      status = scan.gitignoreEnvPasses ? "pass" : "fail";
       evidence = {
         gitignoreExists: scan.gitignoreExists,
         coversEnv: scan.gitignoreCoversEnv,
+        notApplicable: scan.gitignoreEnvNotApplicable,
+        reason: scan.gitignoreEnvNotApplicable ? "project does not use .env files" : undefined,
       };
     }
 
@@ -534,7 +605,7 @@ function computeRichScorecard(scan) {
   // Core question: Can the agent cause a data breach or security incident?
   let safety = 0;
   if (scan.committedEnvFiles.length === 0) safety += 40; // no secrets in git — biggest risk
-  if (scan.gitignoreCoversEnv)             safety += 20; // env files excluded from tracking
+  if (scan.gitignoreEnvPasses)             safety += 20; // env files excluded / n-a
   if (scan.gitignoreExists)                safety += 10; // at least gitignore exists
   if (scan.hasSecretScanConfig)            safety += 15; // automated secret scanning tooling
   if (scan.securityPolicyExists)           safety += 10; // documented security posture

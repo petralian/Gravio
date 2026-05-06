@@ -148,11 +148,13 @@ function buildCatalog(scan) {
         ? "0 files exposed"
         : `${committedEnvFiles.length} committed: ${committedEnvFiles.slice(0, 2).join(", ")}` },
     { dim: "safety", id: "gitignore-env", severity: "high",
-      pass: gitignoreCoversEnv,
+      pass: scan.gitignoreEnvPasses,
       label: ".gitignore guards",
-      brief: gitignoreCoversEnv
-        ? ".env* covered"
-        : gitignoreExists ? ".gitignore missing .env*" : ".gitignore not found" },
+      brief: scan.gitignoreEnvNotApplicable
+        ? "n/a — project does not use .env files"
+        : scan.gitignoreCoversEnv
+          ? ".env* covered"
+          : scan.gitignoreExists ? ".gitignore missing .env*" : ".gitignore not found" },
     { dim: "safety", id: "security-policy", severity: "medium",
       pass: securityPolicyExists,
       label: "Security policy",
@@ -174,9 +176,13 @@ function buildCatalog(scan) {
       label: "Type safety",
       brief: hasTypeSafety ? "TypeScript / typecheck found" : "no type checking configured" },
     { dim: "reliability", id: "retry-resilience", severity: "medium",
-      pass: hasRetryDependency,
+      pass: scan.hasRetryLibrary ?? scan.hasRetryDependency,
       label: "Retry / resilience",
-      brief: hasRetryDependency ? "retry library found" : "no retry library detected" },
+      brief: (scan.hasRetryLibrary ?? scan.hasRetryDependency)
+        ? "retry library found"
+        : scan.isPython
+          ? "no tenacity / backoff / stamina detected"
+          : "no retry library detected" },
 
     // ── EVALUATION ────────────────────────────────────────────────────────────
     { dim: "evaluation", id: "eval-corpus", severity: "high",
@@ -192,7 +198,9 @@ function buildCatalog(scan) {
     { dim: "evaluation", id: "eval-script", severity: "low",
       pass: hasEvalScript,
       label: "Eval script",
-      brief: hasEvalScript ? "eval script in package.json" : "no eval script found" },
+      brief: hasEvalScript
+        ? (scan.isPython ? "pytest / eval script found" : "eval script in package.json")
+        : (scan.isPython ? "no pytest / tox / eval script detected" : "no eval script found") },
 
     // ── OBSERVABILITY ─────────────────────────────────────────────────────────
     { dim: "observability", id: "otel-tracing", severity: "high",
