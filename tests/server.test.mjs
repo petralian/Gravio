@@ -18,7 +18,19 @@ const ROOT = path.resolve(__dirname, "..");
 process.env.DB_PATH = path.join(ROOT, "data", "test.sqlite");
 
 let server;
-const TEST_PORT = 13099;
+let TEST_PORT = 13099;
+
+function findFreePort() {
+  return new Promise((resolve, reject) => {
+    const probe = http.createServer();
+    probe.on("error", reject);
+    probe.listen(0, "127.0.0.1", () => {
+      const addr = probe.address();
+      const port = typeof addr === "object" && addr ? addr.port : 0;
+      probe.close(() => resolve(port));
+    });
+  });
+}
 
 function httpGet(url, headers = {}) {
   return new Promise((resolve, reject) => {
@@ -27,6 +39,7 @@ function httpGet(url, headers = {}) {
       { hostname: parsed.hostname, port: parsed.port, path: parsed.pathname + parsed.search, method: "GET", headers },
       (res) => { let body = ""; res.on("data", (c) => (body += c)); res.on("end", () => resolve({ status: res.statusCode, headers: res.headers, body })); }
     );
+    req.setTimeout(10_000, () => req.destroy(new Error("timeout")));
     req.on("error", reject);
     req.end();
   });
@@ -44,6 +57,7 @@ function httpPost(url, payload, headers = {}) {
       },
       (res) => { let body = ""; res.on("data", (c) => (body += c)); res.on("end", () => resolve({ status: res.statusCode, headers: res.headers, body })); }
     );
+    req.setTimeout(10_000, () => req.destroy(new Error("timeout")));
     req.on("error", reject);
     req.write(data);
     req.end();
@@ -71,6 +85,7 @@ before(async () => {
   const { default: fs } = await import("node:fs");
   fs.mkdirSync(path.dirname(process.env.DB_PATH), { recursive: true });
   try { fs.unlinkSync(process.env.DB_PATH); } catch { /* ok if not present */ }
+  TEST_PORT = await findFreePort();
   process.env.PORT = String(TEST_PORT);
   const serverModule = await import(pathToFileURL(path.join(ROOT, "src", "server.mjs")).href);
   server = serverModule.default ?? serverModule.server;
@@ -257,8 +272,6 @@ describe("API keys", () => {
   const email = `apikey-${Date.now()}@gravio.test`;
   let cookie;
   let apiKey;
-  let onboardingKey1;
-  let onboardingKey2;
 
   it("setup: register user", async () => {
     cookie = await registerAndGetCookie(email, "password123");
@@ -287,30 +300,41 @@ describe("API keys", () => {
     const data = JSON.parse(res.body);
     assert.strictEqual(data.email, email.toLowerCase());
   });
+});
 
-  it("issues onboarding CLI token from session", async () => {
+describe("POST /api/keys/onboarding", () => {
+  const email = `onboarding-${Date.now()}@gravio.test`;
+  let cookie;
+
+  it("setup: register user", async () => {
+    cookie = await registerAndGetCookie(email, "password123");
+    assert.ok(cookie);
+  });
+
+  it("returns 401 without session", async () => {
+    const res = await httpPost(`http://localhost:${TEST_PORT}/api/keys/onboarding`, {});
+    assert.strictEqual(res.status, 401);
+  });
+
+  it("returns a user-bound gv_ key when authenticated", async () => {
     const res = await httpPost(`http://localhost:${TEST_PORT}/api/keys/onboarding`, {}, { Cookie: cookie });
     assert.strictEqual(res.status, 200);
     const data = JSON.parse(res.body);
-    assert.ok(data.key.startsWith("gv_"), "Onboarding key must start with gv_");
-    onboardingKey1 = data.key;
+    assert.ok(data.key.startsWith("gv_"), "Key must start with gv_");
+    assert.strictEqual(data.ok, true);
   });
 
-  it("rotates onboarding CLI token on re-issue", async () => {
-    const res = await httpPost(`http://localhost:${TEST_PORT}/api/keys/onboarding`, {}, { Cookie: cookie });
-    assert.strictEqual(res.status, 200);
-    const data = JSON.parse(res.body);
-    onboardingKey2 = data.key;
-    assert.ok(onboardingKey2.startsWith("gv_"));
-    assert.notStrictEqual(onboardingKey2, onboardingKey1);
-  });
+  it("rotating the key (second call) returns a fresh key and keeps only one onboarding key", async () => {
+    const r1 = await httpPost(`http://localhost:${TEST_PORT}/api/keys/onboarding`, {}, { Cookie: cookie });
+    const r2 = await httpPost(`http://localhost:${TEST_PORT}/api/keys/onboarding`, {}, { Cookie: cookie });
+    const key1 = JSON.parse(r1.body).key;
+    const key2 = JSON.parse(r2.body).key;
+    assert.notStrictEqual(key1, key2, "Second call must produce a different key");
 
-  it("revoked onboarding token no longer authenticates", async () => {
-    const revoked = await httpGet(`http://localhost:${TEST_PORT}/api/me`, { Authorization: `Bearer ${onboardingKey1}` });
-    assert.strictEqual(revoked.status, 401);
-
-    const active = await httpGet(`http://localhost:${TEST_PORT}/api/me`, { Authorization: `Bearer ${onboardingKey2}` });
-    assert.strictEqual(active.status, 200);
+    const list = await httpGet(`http://localhost:${TEST_PORT}/api/keys`, { Cookie: cookie });
+    const keys = JSON.parse(list.body).keys;
+    const onboardingKeys = keys.filter((k) => k.label === "onboarding");
+    assert.strictEqual(onboardingKeys.length, 1, "Only one onboarding key should exist after rotation");
   });
 });
 

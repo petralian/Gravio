@@ -7,6 +7,16 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- `POST /api/keys/onboarding` — authenticated endpoint that mints a fresh user-bound CLI key (label "onboarding"), deleting any prior key with that label, so the onboarding page always has a real token to auto-fill.
+- 4 new server tests covering the onboarding key route (401 without session, gv_ key returned when authenticated, rotation produces a fresh key, only one "onboarding" key exists after rotation).
+
+### Changed
+- Onboarding flow restructured from 5 steps to 3 action steps + dashboard: (1) Download CLI, (2) Authorize once with real auto-filled API key, (3) Run scan — project is created automatically on first scan.
+- "Create your project name" is no longer a standalone first step; the project name field is now embedded inside the "Authorize" step.
+- Authorize command now always shows the real user-bound API key (not a placeholder) for signed-in users.
+- Step 3 (run scan) copy now explains: first scan auto-creates the project; subsequent scans add results to the existing one.
+- Auth status line updated to reference "Step 2" (was "Step 3").
+
 - `GET /api/runs/:projectId/history` endpoint for project-level scan history with trend stats and recommendations.
 - `POST /api/runs/delete` endpoint to remove selected scans for a project (used by inline delete confirmation flow in dashboard).
 - Plan/tier system: `free`, `pro`, `team` tiers per user stored in the `users` table (`plan` column, idempotent `ALTER TABLE` migration on startup).
@@ -19,6 +29,8 @@ All notable changes to this project will be documented in this file.
 - Dashboard decryption mode for API keys, with browser-side WebCrypto decrypt for encrypted run envelopes.
 
 ### Changed
+- CLI setup (node gravio.mjs --setup) now uses explicit numbered stages (preflight, install, finalize), explains why pip may uninstall/reinstall packages, and summarizes noisy pip output by default to reduce panic during dependency reconciliation.
+- Server integration tests now use a dynamically allocated free port and request timeouts to avoid false failures from local port collisions.
 - Dashboard default UX is now overview-first (last scan, projects, total scans, API key creation), with E2EE tools moved to an optional Pro/Team section.
 - Runs storage changed from single upsert-per-project to append-only scan history rows, enabling per-project timelines and selective scan deletion.
 - Scoring model expanded from 5 to 6 dimensions by adding `agentic` readiness (skills, prompts, orchestration, and human+AI collaboration signals).
@@ -33,7 +45,6 @@ All notable changes to this project will be documented in this file.
 - Onboarding hero CTA now adapts to session state, hiding "Create account or sign in" for logged-in users and showing "Open dashboard" instead.
 - Marketing header now removes the separate onboarding menu item and routes "Start free" directly to guided onboarding.
 - Onboarding flow is now register-first with in-page auth modal, project-first step ordering, and live command updates from the chosen project name.
-- Onboarding steps remain visible to anonymous users, but exact copy-paste CLI commands are now hidden until users register or sign in.
 - Onboarding copy now clarifies that commands must be run in a real project directory (not random folders) to avoid npm/scan command confusion.
 - Canonical host redirects now keep browser sessions on `gravio.dev` (including redirect from `gravio-platform.fly.dev` and `www.gravio.dev`) to improve session continuity.
 - CLI `--once` now auto-publishes when a local folder is authorized, reducing repeated `--project/--api-key` flags.

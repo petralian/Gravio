@@ -325,6 +325,27 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // ── POST /api/keys/onboarding — rotate user-bound onboarding CLI key ────
+  // Returns a freshly-minted key (plaintext, shown once) auto-filled into
+  // the authorize command on the onboarding page. Deletes any prior key
+  // labelled "onboarding" for this user so the list stays clean.
+  if (req.method === "POST" && req.url === "/api/keys/onboarding") {
+    const user = getAuthUser(req);
+    if (!user) {
+      res.writeHead(401, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Not authenticated" }));
+      return;
+    }
+    const uid = user.uid ?? user.id;
+    const existingKeys = stmts.listApiKeys.all(uid);
+    const prior = existingKeys.find((k) => k.label === "onboarding");
+    if (prior) stmts.deleteApiKey.run(prior.id, uid);
+    const key = generateApiKey(uid, "onboarding");
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ ok: true, key }));
+    return;
+  }
+
   // ── POST /api/keys — generate API key ───────────────────────────────────
   if (req.method === "POST" && req.url === "/api/keys") {
     const user = getAuthUser(req);
@@ -807,6 +828,11 @@ const server = http.createServer(async (req, res) => {
 
   if (req.method === "GET" && urlPath === "/dashboard") {
     serveStatic(res, path.join(WEB_DIR, "dashboard.html"));
+    return;
+  }
+
+  if (req.method === "GET" && urlPath === "/settings") {
+    serveStatic(res, path.join(WEB_DIR, "settings.html"));
     return;
   }
 

@@ -13,7 +13,6 @@ const elStartFree = document.getElementById("ob-start-free");
 const elAuthOk = document.getElementById("ob-auth-ok");
 const elProjectId = document.getElementById("ob-project-id");
 const elCmdAuthorize = document.getElementById("cmd-authorize");
-const elDashboardLink = document.getElementById("ob-dashboard-link");
 
 const elModalWrap = document.getElementById("ob-auth-modal-wrap");
 const elModalBackdrop = document.getElementById("ob-auth-backdrop");
@@ -34,9 +33,6 @@ function updateProjectCommands() {
   const tokenPart = onboardingCliToken ?? "gv_sign_in_to_auto_fill_token";
   if (elCmdAuthorize) {
     elCmdAuthorize.textContent = `node gravio.mjs --authorize --target . --project ${projectId} --server https://gravio.dev --api-key ${tokenPart}`;
-  }
-  if (elDashboardLink) {
-    elDashboardLink.href = `/dashboard?project=${encodeURIComponent(projectId)}`;
   }
 }
 
@@ -72,59 +68,20 @@ function closeAuthModal() {
   elModalWrap?.setAttribute("hidden", "");
 }
 
-async function loadExistingProjects() {
-  const wrap = document.getElementById("ob-existing-projects");
-  const pillsEl = document.getElementById("ob-project-pills");
-  if (!wrap || !pillsEl) return;
-  try {
-    const res = await fetch("/api/runs/list");
-    if (!res.ok) return;
-    const data = await res.json();
-    const projects = data.runs ?? [];
-    if (projects.length === 0) { wrap.setAttribute("hidden", ""); return; }
-    pillsEl.innerHTML = "";
-    projects.forEach(({ project_id, scan_count }) => {
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "ob-project-pill";
-      btn.textContent = project_id;
-      if (scan_count != null) {
-        const count = document.createElement("span");
-        count.style.cssText = "opacity:0.5;font-size:11px";
-        count.textContent = `\u00b7 ${scan_count} scan${scan_count === 1 ? "" : "s"}`;
-        btn.appendChild(count);
-      }
-      btn.addEventListener("click", () => {
-        if (elProjectId) {
-          elProjectId.value = project_id;
-          updateProjectCommands();
-        }
-        document.querySelectorAll(".ob-project-pill").forEach((p) => p.classList.remove("ob-pill-active"));
-        btn.classList.add("ob-pill-active");
-      });
-      pillsEl.appendChild(btn);
-    });
-    wrap.removeAttribute("hidden");
-  } catch { /* non-critical, ignore */ }
-}
-
 async function applyAuthState(user) {
   currentUser = user;
   if (user) {
     onboardingCliToken = await fetchOnboardingCliToken();
     updateProjectCommands();
-    await loadExistingProjects();
     if (elStartFree) elStartFree.textContent = "Account connected";
     if (onboardingCliToken) {
-      setAuthStatusMessage(`Signed in as ${user.email}. Your Step 3 command is auto-filled with a user-bound auth token.`);
+      setAuthStatusMessage(`Signed in as ${user.email}. Your Step 2 command is auto-filled with a user-bound auth token.`);
     } else {
       setAuthStatusMessage(`Signed in as ${user.email}. Continue with steps below.`);
     }
   } else {
     onboardingCliToken = null;
     updateProjectCommands();
-    const wrap = document.getElementById("ob-existing-projects");
-    if (wrap) wrap.setAttribute("hidden", "");
     if (elStartFree) elStartFree.textContent = "Create account or sign in";
     clearAuthStatusMessage();
   }
@@ -175,7 +132,7 @@ tabRegister?.addEventListener("click", () => {
 
 elStartFree?.addEventListener("click", () => {
   if (currentUser) {
-    setAuthStatusMessage("You're signed in. Continue with steps 1-4 below.");
+    setAuthStatusMessage("You're signed in. Continue with the steps below.");
     return;
   }
   openAuthModal();
@@ -184,7 +141,7 @@ elStartFree?.addEventListener("click", () => {
 document.querySelectorAll(".ob-open-auth").forEach((btn) => {
   btn.addEventListener("click", () => {
     if (currentUser) {
-      setAuthStatusMessage("You're signed in. Continue with steps 1-4 below.");
+      setAuthStatusMessage("You're signed in. Continue with the steps below.");
       return;
     }
     openAuthModal();
