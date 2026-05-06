@@ -2690,6 +2690,32 @@ button#evaluate-btn:hover {
   padding: 1px 5px;
   border-radius: 4px;
 }
+.st-billing-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.st-billing-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  background: var(--surface-3);
+}
+.st-billing-k {
+  font-size: 12px;
+  color: var(--text-3);
+}
+.st-billing-v {
+  font-size: 13px;
+  color: var(--text-1);
+  font-family: var(--font-mono);
+}
+.st-billing-actions {
+  margin-top: 12px;
+}
 
 /* ─── ADD-PROJECT CARD ─── */
 .db-proj-card-new {
@@ -2960,6 +2986,7 @@ button#evaluate-btn:hover {
   .db-overview-stats { grid-template-columns: 1fr; }
   .db-tabs { overflow-x: auto; }
   .db-tab { padding: 10px 14px; font-size: 13px; }
+  .st-billing-grid { grid-template-columns: 1fr; }
 }
 
 /* ─── DOWNLOAD PAGE ─── */

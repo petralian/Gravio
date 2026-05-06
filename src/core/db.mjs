@@ -43,6 +43,14 @@ db.exec(`
     password_hash TEXT  NOT NULL,
     role        TEXT    NOT NULL DEFAULT 'user' CHECK (role IN ('user','admin')),
     plan        TEXT    NOT NULL DEFAULT 'free' CHECK (plan IN ('free','pro','team')),
+    billing_provider TEXT,
+    lemon_customer_id TEXT,
+    lemon_subscription_id TEXT,
+    billing_status TEXT    NOT NULL DEFAULT 'none',
+    billing_seats INTEGER NOT NULL DEFAULT 1,
+    billing_renews_at TEXT,
+    billing_cancelled INTEGER NOT NULL DEFAULT 0,
+    billing_portal_url TEXT,
     is_active   INTEGER NOT NULL DEFAULT 1,
     created_at  TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
   );
@@ -77,6 +85,47 @@ db.exec(`
 // Add plan column if upgrading from a pre-plan schema
 try {
   db.exec(`ALTER TABLE users ADD COLUMN plan TEXT NOT NULL DEFAULT 'free' CHECK (plan IN ('free','pro','team'))`);
+} catch {
+  // Column already exists — ignore
+}
+
+try {
+  db.exec(`ALTER TABLE users ADD COLUMN billing_provider TEXT`);
+} catch {
+  // Column already exists — ignore
+}
+try {
+  db.exec(`ALTER TABLE users ADD COLUMN lemon_customer_id TEXT`);
+} catch {
+  // Column already exists — ignore
+}
+try {
+  db.exec(`ALTER TABLE users ADD COLUMN lemon_subscription_id TEXT`);
+} catch {
+  // Column already exists — ignore
+}
+try {
+  db.exec(`ALTER TABLE users ADD COLUMN billing_status TEXT NOT NULL DEFAULT 'none'`);
+} catch {
+  // Column already exists — ignore
+}
+try {
+  db.exec(`ALTER TABLE users ADD COLUMN billing_seats INTEGER NOT NULL DEFAULT 1`);
+} catch {
+  // Column already exists — ignore
+}
+try {
+  db.exec(`ALTER TABLE users ADD COLUMN billing_renews_at TEXT`);
+} catch {
+  // Column already exists — ignore
+}
+try {
+  db.exec(`ALTER TABLE users ADD COLUMN billing_cancelled INTEGER NOT NULL DEFAULT 0`);
+} catch {
+  // Column already exists — ignore
+}
+try {
+  db.exec(`ALTER TABLE users ADD COLUMN billing_portal_url TEXT`);
 } catch {
   // Column already exists — ignore
 }
@@ -131,6 +180,24 @@ export const stmts = {
   getUserById: db.prepare(`SELECT * FROM users WHERE id=?`),
   listUsers: db.prepare(`SELECT id, email, role, plan, is_active, created_at FROM users ORDER BY id ASC`),
   setUserPlan: db.prepare(`UPDATE users SET plan=? WHERE id=?`),
+  getBillingForUser: db.prepare(
+    `SELECT id, email, plan, billing_provider, lemon_customer_id, lemon_subscription_id,
+            billing_status, billing_seats, billing_renews_at, billing_cancelled, billing_portal_url
+     FROM users WHERE id=?`,
+  ),
+  setUserBillingState: db.prepare(
+    `UPDATE users
+     SET plan=?,
+         billing_provider='lemonsqueezy',
+         lemon_customer_id=?,
+         lemon_subscription_id=?,
+         billing_status=?,
+         billing_seats=?,
+         billing_renews_at=?,
+         billing_cancelled=?,
+         billing_portal_url=?
+     WHERE id=?`,
+  ),
   setUserActive: db.prepare(`UPDATE users SET is_active=? WHERE id=?`),
   deleteUser: db.prepare(`DELETE FROM users WHERE id=?`),
 

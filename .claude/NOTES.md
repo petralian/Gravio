@@ -177,6 +177,14 @@ node gravio.mjs --logout --target . # remove local .gravio/auth.json
 - `/api/publish` appends run history rows (no longer overwrites one row per project)
 - `/api/me` returns `plan` field so the frontend can gate features
 
+## Billing Lifecycle (Lemon Squeezy)
+
+- Team checkout is created server-side via `POST /api/billing/team-checkout` using Lemon API custom pricing by seats.
+- Webhook endpoint: `POST /api/webhooks/lemonsqueezy` with HMAC verification using `LEMON_WEBHOOK_SECRET` and `X-Signature` header.
+- Lifecycle events now sync into `users` table billing fields: provider, customer/subscription IDs, status, seats, renews_at, cancelled flag, and portal URL.
+- `GET /api/billing/status` exposes the authenticated user's billing snapshot for Settings UI.
+- Settings (`/settings`) now includes a Billing section that displays plan/status/seats/renewal and a manage-billing portal action.
+
 ---
 
 ## Planned Next Steps
@@ -212,9 +220,13 @@ node gravio.mjs --logout --target . # remove local .gravio/auth.json
 
 ## Environment Variables
 
-None required for local development.
+None required for local development unless testing billing webhooks.
 
-For future cloud deployment:
+For cloud deployment:
 | Var | Purpose |
 |---|---|
 | `PORT` | HTTP port (default 3000) |
+| `LEMON_API_KEY` | Lemon Squeezy API key (server-side checkout creation) |
+| `LEMON_STORE_ID` | Lemon store ID used for checkout creation |
+| `LEMON_TEAM_VARIANT_ID` | Lemon Team variant ID used for dynamic seat pricing |
+| `LEMON_WEBHOOK_SECRET` | HMAC secret for validating Lemon webhook signatures |

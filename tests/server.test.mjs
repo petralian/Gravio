@@ -695,10 +695,19 @@ describe("Admin — user plan management", () => {
 describe("POST /api/webhooks/lemonsqueezy", () => {
   const WEBHOOK_SECRET = "test-webhook-secret-abc123";
 
-  function makeBody(eventName, email, plan) {
+  function makeBody(eventName, email, plan, extraAttrs = {}) {
     return JSON.stringify({
       meta: { event_name: eventName, custom_data: { plan } },
-      data: { attributes: { user_email: email } },
+      data: {
+        attributes: {
+          user_email: email,
+          status: "active",
+          quantity: 2,
+          renews_at: "2026-12-31T00:00:00Z",
+          urls: { customer_portal: "https://app.lemonsqueezy.com/my-orders/test" },
+          ...extraAttrs,
+        },
+      },
     });
   }
 
@@ -770,6 +779,14 @@ describe("POST /api/webhooks/lemonsqueezy", () => {
 
     const meAfter = JSON.parse((await httpGet(`http://localhost:${TEST_PORT}/api/me`, { Cookie: cookie })).body);
     assert.strictEqual(meAfter.plan, "pro", "user plan upgraded to pro");
+
+    const billingRes = await httpGet(`http://localhost:${TEST_PORT}/api/billing/status`, { Cookie: cookie });
+    assert.strictEqual(billingRes.status, 200);
+    const billing = JSON.parse(billingRes.body);
+    assert.strictEqual(billing.provider, "lemonsqueezy");
+    assert.strictEqual(billing.status, "active");
+    assert.strictEqual(billing.seats, 2);
+    assert.strictEqual(billing.cancelled, false);
   });
 
   it("upgrades plan for subscription_payment_success", async () => {
@@ -798,5 +815,43 @@ describe("POST /api/webhooks/lemonsqueezy", () => {
     const sig = sign(body, WEBHOOK_SECRET);
     const res = await webhookPost(body, sig);
     assert.strictEqual(res.status, 200);
+  });
+
+  it("marks billing cancelled on subscription_cancelled", async () => {
+    const email = `webhook-cancel-${Date.now()}@gravio.test`;
+    const cookie = await registerAndGetCookie(email, "pass1234");
+
+    const activateBody = makeBody("subscription_created", email, "team");
+    const activateSig = sign(activateBody, WEBHOOK_SECRET);
+    await webhookPost(activateBody, activateSig);
+
+    const cancelBody = makeBody("subscription_cancelled", email, "team", { status: "cancelled" });
+    const cancelSig = sign(cancelBody, WEBHOOK_SECRET);
+    const cancelRes = await webhookPost(cancelBody, cancelSig);
+    assert.strictEqual(cancelRes.status, 200);
+
+    const billingRes = await httpGet(`http://localhost:${TEST_PORT}/api/billing/status`, { Cookie: cookie });
+    assert.strictEqual(billingRes.status, 200);
+    const billing = JSON.parse(billingRes.body);
+    assert.strictEqual(billing.plan, "team");
+    assert.strictEqual(billing.status, "cancelled");
+    assert.strictEqual(billing.cancelled, true);
+  });
+
+  it("downgrades to free on subscription_expired", async () => {
+    const email = `webhook-expired-${Date.now()}@gravio.test`;
+    const cookie = await registerAndGetCookie(email, "pass1234");
+
+    const activateBody = makeBody("subscription_created", email, "pro");
+    const activateSig = sign(activateBody, WEBHOOK_SECRET);
+    await webhookPost(activateBody, activateSig);
+
+    const expireBody = makeBody("subscription_expired", email, "pro", { status: "expired" });
+    const expireSig = sign(expireBody, WEBHOOK_SECRET);
+    const expireRes = await webhookPost(expireBody, expireSig);
+    assert.strictEqual(expireRes.status, 200);
+
+    const meAfter = JSON.parse((await httpGet(`http://localhost:${TEST_PORT}/api/me`, { Cookie: cookie })).body);
+    assert.strictEqual(meAfter.plan, "free");
   });
 });

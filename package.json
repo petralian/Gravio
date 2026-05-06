@@ -8,6 +8,7 @@
     "test": "node --test tests/evaluate.test.mjs tests/scanner.test.mjs tests/crypto-e2ee.test.mjs tests/server.test.mjs",
     "test:unit": "node --test tests/evaluate.test.mjs",
     "scorecard:check": "node scripts/scorecard-gate.mjs",
+    "scorecard:ship-ready": "node scripts/scorecard-gate.mjs --ship-ready",
     "scorecard:new-run": "node scripts/new-run.mjs",
     "scorecard:scan": "node scripts/gravio-scan.mjs --once",
     "scorecard:scan:watch": "node scripts/gravio-scan.mjs",

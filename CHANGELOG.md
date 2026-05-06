@@ -14,6 +14,9 @@ All notable changes to this project will be documented in this file.
 - `POST /api/projects/rename` to rename project IDs per user.
 - `POST /api/projects/merge` to combine one project into another selected destination.
 - 7 new server tests covering onboarding key rotation plus project list/rename/merge flows.
+- `GET /api/billing/status` authenticated endpoint for current plan, status, seats, renewal timestamp, and portal URL.
+- Settings page billing card showing live Lemon-synced subscription details and a manage billing action.
+- Ship-ready CLI gate mode: `npm run scorecard:ship-ready` enforces required billing env vars (`LEMON_API_KEY`, `LEMON_STORE_ID`, `LEMON_TEAM_VARIANT_ID`, `LEMON_WEBHOOK_SECRET`).
 
 ### Changed
 - Shared header and homepage hero now link directly to `/why-gravio.html` as an educational conversion path for new prospects.
@@ -62,6 +65,7 @@ All notable changes to this project will be documented in this file.
 - Free tier publish policy changed: scans are always accepted, but only the latest 3 cloud records are retained.
 - Free tier dashboard payloads now return generic rating summaries only; remediation details require Pro or Team.
 - Scanner CLI is now cloud-only for scan output (no local `agent-quality/runs/latest.json` artifact is written).
+- Lemon webhook handling now persists subscription lifecycle state to the `users` table (status, seats, renewal, cancellation flag, Lemon IDs, portal URL) and processes lifecycle events (`subscription_updated`, `subscription_cancelled`, `subscription_expired`, payment fail/recover, plan changed).
 
 ## [0.4.0] — 2026-05-05
 

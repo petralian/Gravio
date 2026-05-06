@@ -550,6 +550,15 @@ const TEAM_INCLUDED_SEATS = 2;
 const TEAM_ADDITIONAL_SEAT_CENTS = 1900;
 const TEAM_MAX_SEATS = 10;
 
+function parseMaybeInt(value, fallback) {
+  const n = Number(value);
+  return Number.isInteger(n) ? n : fallback;
+}
+
+function boolToInt(value) {
+  return value ? 1 : 0;
+}
+
 /** Current platform version, served to CLI for auto-update checks. */
 const APP_VERSION = (() => {
   try {
@@ -672,6 +681,31 @@ const server = http.createServer(async (req, res) => {
     }
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ id: user.uid ?? user.id, email: user.email, role: user.role, plan: user.plan ?? "free" }));
+    return;
+  }
+
+  // ── GET /api/billing/status ──────────────────────────────────────────────
+  if (req.method === "GET" && req.url === "/api/billing/status") {
+    const user = getAuthUser(req);
+    if (!user) {
+      res.writeHead(401, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Not authenticated" }));
+      return;
+    }
+    const uid = user.uid ?? user.id;
+    const billing = stmts.getBillingForUser.get(uid);
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({
+      plan: billing?.plan ?? "free",
+      provider: billing?.billing_provider ?? null,
+      status: billing?.billing_status ?? "none",
+      seats: Number(billing?.billing_seats ?? 1),
+      renewsAt: billing?.billing_renews_at ?? null,
+      cancelled: Boolean(billing?.billing_cancelled ?? 0),
+      portalUrl: billing?.billing_portal_url ?? null,
+      customerId: billing?.lemon_customer_id ?? null,
+      subscriptionId: billing?.lemon_subscription_id ?? null,
+    }));
     return;
   }
 
@@ -1292,21 +1326,66 @@ const server = http.createServer(async (req, res) => {
     }
 
     const eventName = event?.meta?.event_name ?? "";
-    const upgradableEvents = ["order_created", "subscription_created", "subscription_payment_success"];
+    const attrs = event?.data?.attributes ?? {};
+    const email = String(attrs.user_email ?? "").trim();
+    const rawPlan = String(event?.meta?.custom_data?.plan ?? "").trim();
+    const mappedPlan = ["free", "pro", "team"].includes(rawPlan) ? rawPlan : null;
+    const lemonCustomerId = String(attrs.customer_id ?? attrs.customer?.id ?? "").trim() || null;
+    const lemonSubscriptionId = String(attrs.subscription_id ?? attrs.id ?? "").trim() || null;
+    const renewsAt = attrs.renews_at ?? attrs.ends_at ?? attrs.billing_anchor ?? null;
+    const rawStatus = String(attrs.status ?? "").trim().toLowerCase();
+    const billingStatus = rawStatus || (eventName === "order_created" ? "active" : "none");
+    const qtyFromCustom = parseMaybeInt(event?.meta?.custom_data?.seats, NaN);
+    const qtyFromAttrs = parseMaybeInt(attrs.quantity ?? attrs.seats ?? attrs.subscription_quantity, NaN);
+    const seats = Number.isInteger(qtyFromCustom)
+      ? qtyFromCustom
+      : (Number.isInteger(qtyFromAttrs) ? qtyFromAttrs : 1);
+    const portalUrl = attrs.urls?.customer_portal
+      ?? attrs.urls?.customer_portal_update_subscription
+      ?? attrs.urls?.update_payment_method
+      ?? null;
 
-    if (upgradableEvents.includes(eventName)) {
-      const email = event?.data?.attributes?.user_email ?? "";
-      const rawPlan = event?.meta?.custom_data?.plan ?? "";
-      const plan = ["pro", "team"].includes(rawPlan) ? rawPlan : null;
+    const upgradableEvents = [
+      "order_created",
+      "subscription_created",
+      "subscription_payment_success",
+      "subscription_payment_recovered",
+      "subscription_plan_changed",
+      "subscription_resumed",
+      "subscription_updated",
+    ];
+    const statusOnlyEvents = ["subscription_cancelled", "subscription_payment_failed", "subscription_paused", "subscription_unpaused"];
+    const downgradeEvents = ["subscription_expired", "order_refunded", "subscription_payment_refunded"];
 
-      if (email && plan) {
-        const dbUser = stmts.getUserByEmail.get(email);
-        if (dbUser) {
-          stmts.setUserPlan.run(plan, dbUser.id);
+    if (email && (upgradableEvents.includes(eventName) || statusOnlyEvents.includes(eventName) || downgradeEvents.includes(eventName))) {
+      const dbUser = stmts.getUserByEmail.get(email);
+      if (dbUser) {
+        const existingPlan = dbUser.plan ?? "free";
+        let nextPlan = existingPlan;
+        if (upgradableEvents.includes(eventName)) {
+          if (mappedPlan === "pro" || mappedPlan === "team") nextPlan = mappedPlan;
         }
-        // If user not found (not yet registered) we silently accept —
-        // they'll get the plan assigned when they sign up (future work).
+        if (downgradeEvents.includes(eventName)) {
+          nextPlan = "free";
+        }
+
+        const cancelled = eventName === "subscription_cancelled"
+          ? true
+          : Boolean(attrs.cancelled ?? attrs.is_cancelled ?? dbUser.billing_cancelled);
+
+        stmts.setUserBillingState.run(
+          nextPlan,
+          lemonCustomerId ?? dbUser.lemon_customer_id ?? null,
+          lemonSubscriptionId ?? dbUser.lemon_subscription_id ?? null,
+          billingStatus,
+          seats,
+          renewsAt,
+          boolToInt(cancelled),
+          portalUrl ?? dbUser.billing_portal_url ?? null,
+          dbUser.id,
+        );
       }
+      // If user is not found we still return 200 to avoid endless retries.
     }
 
     // Always return 200 so Lemon doesn't retry for unrecognised event types

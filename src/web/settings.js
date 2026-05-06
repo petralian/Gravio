@@ -32,6 +32,47 @@ function clearError() {
   el.setAttribute("hidden", "");
 }
 
+function showBillingError(msg) {
+  const el = $("st-billing-error");
+  if (!el) return;
+  el.textContent = msg;
+  el.removeAttribute("hidden");
+}
+
+function clearBillingError() {
+  const el = $("st-billing-error");
+  if (!el) return;
+  el.textContent = "";
+  el.setAttribute("hidden", "");
+}
+
+function fmtDate(iso) {
+  if (!iso) return "-";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "-";
+  return d.toLocaleString([], { dateStyle: "medium", timeStyle: "short" });
+}
+
+async function loadBillingStatus() {
+  clearBillingError();
+  const res = await fetch("/api/billing/status");
+  const data = await res.json();
+  if (!res.ok) {
+    showBillingError(data.error ?? "Failed to load billing status.");
+    return;
+  }
+
+  $("st-billing-plan").textContent = String(data.plan ?? "free").toUpperCase();
+  $("st-billing-status").textContent = String(data.status ?? "none");
+  $("st-billing-seats").textContent = String(data.seats ?? 1);
+  $("st-billing-renews").textContent = fmtDate(data.renewsAt);
+
+  const manage = $("st-billing-manage");
+  if (manage && data.portalUrl) {
+    manage.setAttribute("href", data.portalUrl);
+  }
+}
+
 // ─── API Keys ───
 
 async function loadApiKeys() {
@@ -204,6 +245,7 @@ async function init() {
       $("st-e2ee-section")?.removeAttribute("hidden");
     }
 
+    await loadBillingStatus();
     await loadApiKeys();
 
     $("st-gen-key")?.addEventListener("click", onGenerateKey);

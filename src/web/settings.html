@@ -28,6 +28,29 @@
 
     <div class="db-settings-sections">
 
+      <!-- Billing -->
+      <section class="db-settings-section" id="st-billing-section">
+        <div class="db-settings-section-head">
+          <h2 class="db-settings-h2">Billing</h2>
+          <p class="db-settings-desc">
+            Subscription status synced from Lemon Squeezy webhooks. Manage payment method, plan changes,
+            and cancellations in the Lemon customer portal.
+          </p>
+        </div>
+        <div class="db-form-card">
+          <div class="st-billing-grid">
+            <div class="st-billing-item"><span class="st-billing-k">Plan</span><span class="st-billing-v" id="st-billing-plan">free</span></div>
+            <div class="st-billing-item"><span class="st-billing-k">Status</span><span class="st-billing-v" id="st-billing-status">none</span></div>
+            <div class="st-billing-item"><span class="st-billing-k">Seats</span><span class="st-billing-v" id="st-billing-seats">1</span></div>
+            <div class="st-billing-item"><span class="st-billing-k">Renews</span><span class="st-billing-v" id="st-billing-renews">-</span></div>
+          </div>
+          <div class="st-billing-actions">
+            <a class="m-btn m-btn-outline" id="st-billing-manage" href="https://app.lemonsqueezy.com/my-orders" target="_blank" rel="noopener noreferrer">Manage billing</a>
+          </div>
+          <p class="db-error" id="st-billing-error" hidden></p>
+        </div>
+      </section>
+
       <!-- API Keys -->
       <section class="db-settings-section" id="st-apikeys-section">
         <div class="db-settings-section-head">

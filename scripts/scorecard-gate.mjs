@@ -20,6 +20,7 @@ const run = load("agent-quality/runs/latest.json");
 const baseline = load("agent-quality/baseline.json");
 const weights = load("agent-quality/scorecard/weights.json").weights;
 const corpus = load("agent-quality/evals/workflow-corpus.json");
+const shipReadyMode = process.argv.includes("--ship-ready") || process.env.SHIP_READY === "1";
 
 let pass = true;
 const failures = [];
@@ -105,12 +106,26 @@ for (const trace of traces) {
   }
 }
 
+// 8. Ship-ready gate: billing security env vars
+const requiredBillingEnv = [
+  "LEMON_API_KEY",
+  "LEMON_STORE_ID",
+  "LEMON_TEAM_VARIANT_ID",
+  "LEMON_WEBHOOK_SECRET",
+];
+const missingBillingEnv = requiredBillingEnv.filter((name) => !String(process.env[name] ?? "").trim());
+if (shipReadyMode && missingBillingEnv.length > 0) {
+  failures.push(`Ship-ready billing gate failed: missing env ${missingBillingEnv.join(", ")}`);
+  pass = false;
+}
+
 // Print gate results
 console.log(`Gates:`);
 console.log(`  Score ${overallScore} >= ${baseline.minimumOverallScore}: ${overallScore >= baseline.minimumOverallScore ? "PASS" : "FAIL"}`);
 console.log(`  Workflow pass rate ${(wfRate * 100).toFixed(1)}% >= ${baseline.minimumWorkflowPassRate * 100}%: ${wfRate >= baseline.minimumWorkflowPassRate ? "PASS" : "FAIL"}`);
 console.log(`  Safety ${safetyScore} >= ${baseline.minimumSafetyScore}: ${safetyScore >= baseline.minimumSafetyScore ? "PASS" : "FAIL"}`);
 console.log(`  Critical adversarial failures ${critFailures} <= ${baseline.maximumCriticalAdversarialFailures}: ${critFailures <= baseline.maximumCriticalAdversarialFailures ? "PASS" : "FAIL"}`);
+console.log(`  Ship-ready billing env (${shipReadyMode ? "ENFORCED" : "informational"}): ${missingBillingEnv.length === 0 ? "PASS" : `MISSING ${missingBillingEnv.join(", ")}`}`);
 console.log(``);
 
 if (failures.length > 0) {
