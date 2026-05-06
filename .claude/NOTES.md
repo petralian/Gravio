@@ -110,6 +110,32 @@ npm run verify                 # secret-scan + tests + gate (full CI check)
 
 ---
 
+## SQLite Schema
+
+**users** — `id, email, password_hash, role ('user'|'admin'), plan ('free'|'pro'|'team'), is_active, created_at`
+- `plan` column added via idempotent `ALTER TABLE` migration on startup (safe for existing DBs)
+- `getSession` and `getApiKey` JOINs expose `u.plan` to all request handlers
+
+**sessions** — `id, user_id, token_hash, expires_at`
+**api_keys** — `id, user_id, key_hash, label, created_at`
+**runs** — `id, project_id, user_id, ciphertext, published_at`
+
+---
+
+## Plan / Tier System
+
+| Plan | Publish limit | Admin-settable |
+|---|---|---|
+| free | 3 projects | yes |
+| pro | unlimited | yes |
+| team | unlimited | yes |
+
+- `POST /api/admin/users/:id/plan` — admin-only endpoint to set any user's plan
+- `/api/publish` gates on plan: free users blocked at 3 distinct projects; pro/team and admins are unlimited
+- `/api/me` returns `plan` field so the frontend can gate features
+
+---
+
 ## Planned Next Steps
 
 1. **Scanner Daemon enhancements** — richer checks (git cleanliness, CI status, command execution hooks)

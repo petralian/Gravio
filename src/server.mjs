@@ -158,7 +158,7 @@ const server = http.createServer(async (req, res) => {
       return;
     }
     res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ id: user.uid ?? user.id, email: user.email, role: user.role }));
+    res.end(JSON.stringify({ id: user.uid ?? user.id, email: user.email, role: user.role, plan: user.plan ?? "free" }));
     return;
   }
 
@@ -261,10 +261,11 @@ const server = http.createServer(async (req, res) => {
       const uid = user.uid ?? user.id;
       const existing = stmts.getRun.get(projectId, uid);
       const runCount = stmts.listRunsForUser.all(uid).length;
-      if (!existing && user.role !== "admin" && runCount >= 3) {
+      const isPaidOrAdmin = user.role === "admin" || user.plan === "pro" || user.plan === "team";
+      if (!existing && !isPaidOrAdmin && runCount >= 3) {
         res.writeHead(403, { "Content-Type": "application/json" });
         res.end(JSON.stringify({
-          error: "Free plan limit reached (3 scans). Sign in to your dashboard to manage projects or upgrade.",
+          error: "Free plan limit reached (3 projects). Upgrade to Pro or Team in your dashboard to publish more.",
         }));
         return;
       }
@@ -325,6 +326,35 @@ const server = http.createServer(async (req, res) => {
     const allRuns = stmts.listAllRuns.all();
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ users, runCounts, recentRuns: allRuns.slice(0, 50) }));
+    return;
+  }
+
+  // ── Admin: POST /api/admin/users/:id/plan ───────────────────────────────────
+  const adminSetPlanMatch = req.method === "POST" &&
+    /^\/api\/admin\/users\/(\d+)\/plan$/.exec(req.url);
+  if (adminSetPlanMatch) {
+    const user = getAuthUser(req);
+    if (!user || user.role !== "admin") {
+      res.writeHead(403, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Forbidden" }));
+      return;
+    }
+    const targetId = Number(adminSetPlanMatch[1]);
+    let planBody;
+    try { planBody = JSON.parse(await readBody(req)); } catch {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Invalid JSON" }));
+      return;
+    }
+    const { plan } = planBody;
+    if (!plan || !["free", "pro", "team"].includes(plan)) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "plan must be free, pro, or team" }));
+      return;
+    }
+    stmts.setUserPlan.run(plan, targetId);
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ ok: true }));
     return;
   }
 

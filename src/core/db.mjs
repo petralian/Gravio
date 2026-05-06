@@ -42,6 +42,7 @@ db.exec(`
     email       TEXT    NOT NULL UNIQUE COLLATE NOCASE,
     password_hash TEXT  NOT NULL,
     role        TEXT    NOT NULL DEFAULT 'user' CHECK (role IN ('user','admin')),
+    plan        TEXT    NOT NULL DEFAULT 'free' CHECK (plan IN ('free','pro','team')),
     is_active   INTEGER NOT NULL DEFAULT 1,
     created_at  TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
   );
@@ -72,6 +73,15 @@ db.exec(`
   );
 `);
 
+// ─── Migrations (idempotent — run on every start) ───────────────────────────
+
+// Add plan column if upgrading from a pre-plan schema
+try {
+  db.exec(`ALTER TABLE users ADD COLUMN plan TEXT NOT NULL DEFAULT 'free' CHECK (plan IN ('free','pro','team'))`);
+} catch {
+  // Column already exists — ignore
+}
+
 // Promote first registered user (or ADMIN_EMAIL) to admin if no admin exists yet
 function ensureAdminRole() {
   const adminCount = db.prepare(`SELECT COUNT(*) as c FROM users WHERE role='admin'`).get().c;
@@ -95,7 +105,8 @@ export const stmts = {
   ),
   getUserByEmail: db.prepare(`SELECT * FROM users WHERE email=? COLLATE NOCASE`),
   getUserById: db.prepare(`SELECT * FROM users WHERE id=?`),
-  listUsers: db.prepare(`SELECT id, email, role, is_active, created_at FROM users ORDER BY id ASC`),
+  listUsers: db.prepare(`SELECT id, email, role, plan, is_active, created_at FROM users ORDER BY id ASC`),
+  setUserPlan: db.prepare(`UPDATE users SET plan=? WHERE id=?`),
   setUserActive: db.prepare(`UPDATE users SET is_active=? WHERE id=?`),
   deleteUser: db.prepare(`DELETE FROM users WHERE id=?`),
 
@@ -104,7 +115,7 @@ export const stmts = {
     `INSERT INTO sessions (token_hash, user_id, expires_at) VALUES (?, ?, ?)`,
   ),
   getSession: db.prepare(
-    `SELECT s.*, u.id as uid, u.email, u.role, u.is_active
+    `SELECT s.*, u.id as uid, u.email, u.role, u.plan, u.is_active
      FROM sessions s JOIN users u ON s.user_id = u.id
      WHERE s.token_hash=? AND s.expires_at > strftime('%Y-%m-%dT%H:%M:%SZ','now')`,
   ),
@@ -118,7 +129,7 @@ export const stmts = {
     `INSERT INTO api_keys (key_hash, user_id, label) VALUES (?, ?, ?)`,
   ),
   getApiKey: db.prepare(
-    `SELECT k.*, u.id as uid, u.email, u.role, u.is_active
+    `SELECT k.*, u.id as uid, u.email, u.role, u.plan, u.is_active
      FROM api_keys k JOIN users u ON k.user_id = u.id
      WHERE k.key_hash=?`,
   ),

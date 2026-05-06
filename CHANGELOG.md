@@ -6,6 +6,13 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+- Plan/tier system: `free`, `pro`, `team` tiers per user stored in the `users` table (`plan` column, idempotent `ALTER TABLE` migration on startup).
+- `POST /api/admin/users/:id/plan` — admin-only endpoint to upgrade or downgrade any user's plan.
+- Admin dashboard: new Plan column with inline `<select>` dropdown; free users show scan count as `used / 3`, paid users show bare count.
+- `/api/me` now returns `plan` field so frontends can gate features by tier.
+- Pro and Team plan users bypass the 3-project publish limit (only Free users are gated).
+
 ### Changed
 - Marketing copy now requires registration before cloud scoring and replaces misleading global `agentscored` install examples with real project commands.
 - Public "Try the tool" CTAs replaced with registration-first messaging ("3 free scans") and onboarding links.

@@ -928,6 +928,20 @@ body.admin-page { padding-top: 0; }
 .adm-act-warn:hover { background: rgba(255,179,71,0.08); }
 .adm-act-danger { color: #ff4466; border-color: rgba(255,68,102,0.2); }
 .adm-act-danger:hover { background: rgba(255,68,102,0.08); }
+.adm-plan-select {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-1);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 8px;
+  cursor: pointer;
+  transition: border-color 0.12s;
+}
+.adm-plan-select:focus { border-color: var(--accent); outline: none; }
+.adm-plan-select:disabled { opacity: 0.4; cursor: not-allowed; }
 
 /* dashboard user pill + extra sections */
 .db-user-pill {

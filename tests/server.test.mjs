@@ -368,4 +368,72 @@ describe("POST /api/publish + GET /api/runs/:projectId (authenticated)", () => {
   });
 });
 
+describe("Admin — user plan management", () => {
+  let adminCookie;
+  let targetId;
+  let targetCookie;
 
+  before(async () => {
+    // Register a user then directly promote them to admin via the shared DB instance
+    const adminEmail = `plan-admin-${Date.now()}@gravio.test`;
+    adminCookie = await registerAndGetCookie(adminEmail, "password123");
+    const { db } = await import(pathToFileURL(path.join(ROOT, "src", "core", "db.mjs")).href);
+    db.prepare("UPDATE users SET role='admin' WHERE email=?").run(adminEmail);
+
+    // Register the target user whose plan we'll manage
+    const targetEmail = `plan-target-${Date.now()}@gravio.test`;
+    targetCookie = await registerAndGetCookie(targetEmail, "password123");
+    const meRes = await httpGet(`http://localhost:${TEST_PORT}/api/me`, { Cookie: targetCookie });
+    targetId = JSON.parse(meRes.body).id;
+  });
+
+  it("GET /api/me includes plan field", async () => {
+    const res = await httpGet(`http://localhost:${TEST_PORT}/api/me`, { Cookie: targetCookie });
+    assert.strictEqual(res.status, 200);
+    const data = JSON.parse(res.body);
+    assert.ok(["free", "pro", "team"].includes(data.plan), "plan must be a valid tier");
+  });
+
+  it("admin can upgrade a user plan to pro", async () => {
+    const res = await httpPost(
+      `http://localhost:${TEST_PORT}/api/admin/users/${targetId}/plan`,
+      { plan: "pro" },
+      { Cookie: adminCookie },
+    );
+    assert.strictEqual(res.status, 200);
+    assert.deepStrictEqual(JSON.parse(res.body), { ok: true });
+  });
+
+  it("rejects invalid plan value with 400", async () => {
+    const res = await httpPost(
+      `http://localhost:${TEST_PORT}/api/admin/users/${targetId}/plan`,
+      { plan: "enterprise" },
+      { Cookie: adminCookie },
+    );
+    assert.strictEqual(res.status, 400);
+  });
+
+  it("rejects non-admin caller with 403", async () => {
+    const res = await httpPost(
+      `http://localhost:${TEST_PORT}/api/admin/users/${targetId}/plan`,
+      { plan: "team" },
+      { Cookie: targetCookie },
+    );
+    assert.strictEqual(res.status, 403);
+  });
+
+  it("pro user is not blocked after 3 published projects", async () => {
+    // targetId user is already on pro plan from the earlier test in this suite
+    const keyRes = await httpPost(`http://localhost:${TEST_PORT}/api/keys`, { label: "pro-test" }, { Cookie: targetCookie });
+    const proKey = JSON.parse(keyRes.body).key;
+
+    for (const pid of ["pro-p1", "pro-p2", "pro-p3", "pro-p4"]) {
+      const r = await httpPost(
+        `http://localhost:${TEST_PORT}/api/publish`,
+        { projectId: pid, run: { runId: pid } },
+        { Authorization: `Bearer ${proKey}` },
+      );
+      assert.strictEqual(r.status, 200, `Project ${pid} should succeed for pro user`);
+    }
+  });
+});

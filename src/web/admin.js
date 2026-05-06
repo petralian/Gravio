@@ -47,14 +47,24 @@ async function loadAdminData() {
     // Users table
     const tbody = document.getElementById("adm-users-body");
     if (users.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="7" class="adm-empty">No users yet.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="8" class="adm-empty">No users yet.</td></tr>`;
     } else {
-      tbody.innerHTML = users.map((u) => `
+      tbody.innerHTML = users.map((u) => {
+        const scans     = runCounts[u.id] ?? 0;
+        const scanLabel = u.plan === "free" ? `${scans} / 3` : `${scans}`;
+        return `
         <tr data-user-id="${u.id}" class="${u.is_active ? "" : "adm-row-disabled"}">
           <td class="adm-mono">${u.id}</td>
           <td>${esc(u.email)}</td>
           <td><span class="adm-role-badge adm-role-${esc(u.role)}">${esc(u.role)}</span></td>
-          <td>${runCounts[u.id] ?? 0}</td>
+          <td>
+            <select class="adm-plan-select" data-action="set-plan" data-id="${u.id}" aria-label="Plan for ${esc(u.email)}">
+              <option value="free"  ${u.plan === "free"  ? "selected" : ""}>Free</option>
+              <option value="pro"   ${u.plan === "pro"   ? "selected" : ""}>Pro</option>
+              <option value="team"  ${u.plan === "team"  ? "selected" : ""}>Team</option>
+            </select>
+          </td>
+          <td>${scanLabel}</td>
           <td><span class="adm-status ${u.is_active ? "adm-status-active" : "adm-status-disabled"}">${u.is_active ? "Active" : "Disabled"}</span></td>
           <td class="adm-mono">${fmtDate(u.created_at)}</td>
           <td class="adm-actions">
@@ -64,7 +74,8 @@ async function loadAdminData() {
             <button class="adm-act-btn adm-act-danger" data-action="delete" data-id="${u.id}" type="button">Delete</button>
           </td>
         </tr>
-      `).join("");
+      `;
+      }).join("");
     }
 
     // Recent runs table
@@ -81,10 +92,10 @@ async function loadAdminData() {
       `).join("");
     }
 
-    // Action handlers
+    // Action handlers (buttons)
     document.getElementById("adm-users-body").addEventListener("click", async (e) => {
       const btn = e.target.closest("[data-action]");
-      if (!btn) return;
+      if (!btn || btn.tagName === "SELECT") return;
       const { action, id } = btn.dataset;
 
       if (action === "delete") {
@@ -102,8 +113,36 @@ async function loadAdminData() {
       }
     });
 
+    // Plan selector handler
+    document.getElementById("adm-users-body").addEventListener("change", async (e) => {
+      const sel = e.target.closest("select[data-action='set-plan']");
+      if (!sel) return;
+      const { id } = sel.dataset;
+      const plan = sel.value;
+      sel.disabled = true;
+      try {
+        const r = await fetch(`/api/admin/users/${id}/plan`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ plan }),
+        });
+        if (!r.ok) throw new Error("Failed to update plan");
+        // Update scan count cell to reflect new plan limits without full reload
+        const row = sel.closest("tr");
+        const scansCell = row.querySelectorAll("td")[4];
+        const currentScans = parseInt(scansCell.textContent, 10) || 0;
+        scansCell.textContent = plan === "free" ? `${currentScans} / 3` : `${currentScans}`;
+      } catch (err) {
+        alert(err.message);
+        // Revert selector
+        loadAdminData();
+      } finally {
+        sel.disabled = false;
+      }
+    });
+
   } catch (err) {
     document.getElementById("adm-users-body").innerHTML =
-      `<tr><td colspan="7" class="adm-error">${esc(err.message)}</td></tr>`;
+      `<tr><td colspan="8" class="adm-error">${esc(err.message)}</td></tr>`;
   }
 }
