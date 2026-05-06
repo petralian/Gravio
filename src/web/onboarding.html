@@ -36,6 +36,14 @@
         <input id="ob-project-id" class="ob-project-input" type="text" value="my-first-project" autocomplete="off" spellcheck="false" />
       </article>
 
+      <div class="ob-unlock-banner" data-anon-only hidden>
+        <div class="ob-unlock-text">
+          <strong>Steps 2–4 include exact CLI commands.</strong>
+          <span>Create a free account or sign in once to unlock copy-ready commands tailored to your setup.</span>
+        </div>
+        <button class="m-btn m-btn-neon ob-open-auth" type="button">Create account or sign in</button>
+      </div>
+
       <article class="ob-step-card">
         <p class="ob-step-num">Step 2</p>
         <h2>Download the Gravio CLI</h2>
@@ -51,9 +59,9 @@
           <pre class="ob-code" id="cmd-setup">node gravio.mjs --setup --target .</pre>
           <button class="m-btn m-btn-outline ob-copy" type="button" data-copy-id="cmd-setup">Copy command</button>
         </div>
-        <div data-anon-only hidden>
-          <p class="ob-step-foot">Create an account or sign in to unlock exact download and setup commands for your environment.</p>
-          <button class="m-btn m-btn-outline ob-open-auth" type="button">Create account or sign in</button>
+        <div class="ob-locked-cmd ob-open-auth" data-anon-only hidden role="button" tabindex="0" aria-label="Sign in to unlock download commands">
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true"><rect x="2" y="6" width="9" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.2"/><path d="M4.5 6V4a2 2 0 0 1 4 0v2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+          Sign in to reveal commands
         </div>
       </article>
 
@@ -65,9 +73,9 @@
           <pre class="ob-code" id="cmd-authorize">node gravio.mjs --authorize --target . --project my-first-project --server https://gravio.dev --api-key gv_sign_in_to_auto_fill_token</pre>
           <button class="m-btn m-btn-outline ob-copy" type="button" data-copy-id="cmd-authorize">Copy command</button>
         </div>
-        <div data-anon-only hidden>
-          <p class="ob-step-foot">Sign in to unlock your exact authorize command with your chosen project name.</p>
-          <button class="m-btn m-btn-outline ob-open-auth" type="button">Create account or sign in</button>
+        <div class="ob-locked-cmd ob-open-auth" data-anon-only hidden role="button" tabindex="0" aria-label="Sign in to unlock authorize command">
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true"><rect x="2" y="6" width="9" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.2"/><path d="M4.5 6V4a2 2 0 0 1 4 0v2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+          Sign in to reveal command
         </div>
         <p class="ob-step-foot">Scanning is blocked until this is done. Authorization is saved locally for this folder. Reopening this page while signed in rotates the onboarding token.</p>
       </article>
@@ -80,9 +88,9 @@
           <pre class="ob-code" id="cmd-local">node gravio.mjs --once --target .</pre>
           <button class="m-btn m-btn-outline ob-copy" type="button" data-copy-id="cmd-local">Copy command</button>
         </div>
-        <div data-anon-only hidden>
-          <p class="ob-step-foot">Sign in to unlock the first-scan command and copy it directly.</p>
-          <button class="m-btn m-btn-outline ob-open-auth" type="button">Create account or sign in</button>
+        <div class="ob-locked-cmd ob-open-auth" data-anon-only hidden role="button" tabindex="0" aria-label="Sign in to unlock scan command">
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true"><rect x="2" y="6" width="9" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.2"/><path d="M4.5 6V4a2 2 0 0 1 4 0v2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+          Sign in to reveal command
         </div>
         <p class="ob-step-foot">Cloud-only mode: scans are encrypted and auto-published securely. No local JSON scorecard is written.</p>
       </article>

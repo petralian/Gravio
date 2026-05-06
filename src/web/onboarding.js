@@ -150,6 +150,9 @@ document.querySelectorAll(".ob-open-auth").forEach((btn) => {
     }
     openAuthModal();
   });
+  btn.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); btn.click(); }
+  });
 });
 
 elModalBackdrop?.addEventListener("click", closeAuthModal);
