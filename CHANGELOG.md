@@ -17,6 +17,7 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 - Shared header and homepage hero now link directly to `/why-gravio.html` as an educational conversion path for new prospects.
+- Dashboard Recommendations now returns and renders a structured remediation playbook (priority actions, per-dimension target gaps, and ready-to-ship checklist) instead of short flat recommendation strings.
 - Onboarding is now a true 3-step flow: (1) download CLI, (2) run one smart command, (3) open dashboard.
 - Onboarding no longer asks for manual project naming; the CLI now auto-generates and persists project identity.
 - Step 2 now uses a single command: `node gravio.mjs --token <gv_...>`.

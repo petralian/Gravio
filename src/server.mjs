@@ -6,6 +6,7 @@ import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import crypto from "node:crypto";
 import { evaluate } from "./core/evaluate.mjs";
 import {
   registerUser, loginUser, createSession,
@@ -1260,6 +1261,57 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(502, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ error: err.message }));
     }
+    return;
+  }
+
+  // ── API: POST /api/webhooks/lemonsqueezy — upgrade plan on payment ───────
+  if (req.method === "POST" && req.url === "/api/webhooks/lemonsqueezy") {
+    const webhookSecret = process.env.LEMON_WEBHOOK_SECRET;
+    const rawBody = await readBody(req);
+
+    // Always verify signature when secret is configured
+    if (webhookSecret) {
+      const sig = req.headers["x-signature"] ?? "";
+      const expected = crypto.createHmac("sha256", webhookSecret).update(rawBody).digest("hex");
+      const sigBuf = Buffer.from(sig, "hex");
+      const expBuf = Buffer.from(expected, "hex");
+      const valid = sigBuf.length > 0 && sigBuf.length === expBuf.length &&
+        crypto.timingSafeEqual(sigBuf, expBuf);
+      if (!valid) {
+        res.writeHead(401, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Invalid signature" }));
+        return;
+      }
+    }
+
+    let event;
+    try { event = JSON.parse(rawBody); } catch {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Invalid JSON" }));
+      return;
+    }
+
+    const eventName = event?.meta?.event_name ?? "";
+    const upgradableEvents = ["order_created", "subscription_created", "subscription_payment_success"];
+
+    if (upgradableEvents.includes(eventName)) {
+      const email = event?.data?.attributes?.user_email ?? "";
+      const rawPlan = event?.meta?.custom_data?.plan ?? "";
+      const plan = ["pro", "team"].includes(rawPlan) ? rawPlan : null;
+
+      if (email && plan) {
+        const dbUser = stmts.getUserByEmail.get(email);
+        if (dbUser) {
+          stmts.setUserPlan.run(plan, dbUser.id);
+        }
+        // If user not found (not yet registered) we silently accept —
+        // they'll get the plan assigned when they sign up (future work).
+      }
+    }
+
+    // Always return 200 so Lemon doesn't retry for unrecognised event types
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ ok: true }));
     return;
   }
 

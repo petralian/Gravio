@@ -144,7 +144,7 @@ node gravio.mjs --logout --target . # remove local .gravio/auth.json
 - Free scans are always accepted and published to cloud.
 - Cloud retention for free users is capped to latest 3 records (older records auto-pruned).
 - `/api/runs/:projectId` returns generic rating-only payloads for free users (no detailed remediation/check data).
-- `/api/runs/:projectId/history` returns project scan timelines and trend summary, with generic-only details on free tier.
+- `/api/runs/:projectId/history` returns project scan timelines, trend summary, and structured recommendations (`version: 2`) including action plan, dimension roadmap, and ready-to-ship checklist (free tier remains generic-only guidance).
 - Pro/Team/admin users receive full run detail payloads.
 - CLI scan flow is cloud-only (no local run JSON artifact persisted).
 
@@ -152,13 +152,13 @@ node gravio.mjs --logout --target . # remove local .gravio/auth.json
 
 - Dashboard is a **two-view SPA** (`dashboard.html` + `dashboard.js`):
   - **View 1 — Projects home**: card grid of all user projects with score, trend badge, rating badge, scan count, relative last-scan time. Supports search and sort (recent / score asc/desc / name).
-  - **View 2 — Project workspace**: breadcrumb back nav + hero header (project name, score, rating, trend) + three-tab panel: Overview, Scans, Recommendations.
+  - **View 2 — Project workspace**: breadcrumb back nav + hero header (project name, score, rating, trend) + four-tab panel: Overview, Scans, Recommendations, Commands.
 - API keys and E2EE decrypt tool are **no longer on the dashboard**; they live at `/settings` (`settings.html` + `settings.js`).
 - E2EE decrypt module shown only for Pro/Team/admin users; lives under Settings > Advanced.
 - Project drill-down tabs:
   - **Overview** — stat chips (total scans, best, avg) + latest summary + recent 5 scans mini-table
   - **Scans** — full paginated scan table with multi-select delete (inline two-step confirmation)
-  - **Recommendations** — deduplicated recs from last 10 scans, sorted by frequency
+  - **Recommendations** — latest-scan remediation workspace with quick wins, priority action cards, per-dimension target roadmap, and ready-to-ship checklist
 - URL param `?project=<id>` still works — jumps directly into project workspace on load.
 - Browser back/forward (popstate) returns to projects home.
 
