@@ -37,6 +37,13 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const WEB_DIR = path.join(__dirname, "web");
 const PORT = process.env.PORT ?? 3000;
 
+/** Current platform version, served to CLI for auto-update checks. */
+const APP_VERSION = (() => {
+  try {
+    return JSON.parse(fs.readFileSync(path.join(__dirname, "..", "package.json"), "utf8")).version ?? "0.0.0";
+  } catch { return "0.0.0"; }
+})();
+
 const MIME = {
   ".html": "text/html; charset=utf-8",
   ".css": "text/css; charset=utf-8",
@@ -355,6 +362,13 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(400, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ error: err.message }));
     }
+    return;
+  }
+
+  // ── CLI version check (unauthenticated — used by self-update) ─────────
+  if (req.method === "GET" && req.url === "/api/cli/version") {
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ version: APP_VERSION }));
     return;
   }
 

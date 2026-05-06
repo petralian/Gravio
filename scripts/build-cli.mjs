@@ -27,6 +27,10 @@ const OUT_FILE = path.join(OUT_DIR, "gravio.mjs");
 
 fs.mkdirSync(OUT_DIR, { recursive: true });
 
+/** Inject the version at build time so the CLI can self-update. */
+const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8"));
+const CLI_VERSION_STRING = pkg.version ?? "0.0.0";
+
 const BANNER = `// Gravio CLI — bundled distribution.
 // Source: https://github.com/your-org/gravio · https://gravio.dev
 // Run:    node gravio.mjs --once
@@ -42,6 +46,8 @@ await build({
   // Keep Node built-ins external — they're available wherever Node runs.
   external: ["node:*"],
   banner: { js: BANNER },
+  // Inject the version constant so the CLI knows its own version at runtime.
+  define: { GRAVIO_CLI_VERSION: JSON.stringify(CLI_VERSION_STRING) },
   legalComments: "none",
   minify: false,
   sourcemap: false,

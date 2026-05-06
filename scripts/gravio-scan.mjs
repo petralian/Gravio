@@ -16,10 +16,16 @@
 import path from "node:path";
 import http from "node:http";
 import https from "node:https";
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync, chmodSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { spawn } from "node:child_process";
 import { runScannerOnce, startScannerWatcher } from "../src/core/scanner.mjs";
 import { printScanReport, printWatchUpdate, printPublishResult } from "../src/core/reporter.mjs";
+
+/* Version injected by esbuild at bundle time. Falls back to "dev" when
+ * running directly from source (scripts/gravio-scan.mjs). */
+// eslint-disable-next-line no-undef
+const CLI_VERSION = typeof GRAVIO_CLI_VERSION !== "undefined" ? GRAVIO_CLI_VERSION : "dev";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
@@ -41,6 +47,7 @@ function parseArgs(argv) {
     project: null,
     server: "http://localhost:3000",
     apiKey: null,
+    noUpdate: false,
   };
 
   for (let i = 0; i < argv.length; i++) {
@@ -86,6 +93,10 @@ function parseArgs(argv) {
       i += 1;
       continue;
     }
+    if (token === "--no-update") {
+      args.noUpdate = true;
+      continue;
+    }
   }
 
   return args;
@@ -127,7 +138,104 @@ function httpPost(url, payload, headers = {}) {
 });
 }
 
+/**
+ * GET a URL, returns { status, body } where body is a UTF-8 string.
+ */
+function httpGet(url, headers = {}) {
+  return new Promise((resolve, reject) => {
+    const parsed = new URL(url);
+    const lib = parsed.protocol === "https:" ? https : http;
+    const req = lib.request(
+      {
+        hostname: parsed.hostname,
+        port: parsed.port || (parsed.protocol === "https:" ? 443 : 80),
+        path: parsed.pathname + parsed.search,
+        method: "GET",
+        headers,
+      },
+      (res) => {
+        const chunks = [];
+        res.on("data", (c) => chunks.push(c));
+        res.on("end", () => resolve({ status: res.statusCode, body: Buffer.concat(chunks).toString("utf8") }));
+      }
+    );
+    req.setTimeout(10_000, () => { req.destroy(); reject(new Error("timeout")); });
+    req.on("error", reject);
+    req.end();
+  });
+}
+
+/**
+ * Return true if `remote` is a higher semver than `local`.
+ */
+function isNewer(remote, local) {
+  if (!remote || remote === local || local === "dev") return false;
+  const parse = (v) => String(v).split(".").map(Number);
+  const [rA, rB, rC] = parse(remote);
+  const [lA, lB, lC] = parse(local);
+  if (rA !== lA) return rA > lA;
+  if (rB !== lB) return rB > lB;
+  return rC > lC;
+}
+
+/**
+ * Check the server for a newer CLI version and, if found, download it over
+ * the current file then re-exec so the user always runs the latest build.
+ *
+ * Skips automatically when running directly from source (gravio-scan.mjs).
+ * Skips silently on any network error so offline users are not blocked.
+ */
+async function checkAndUpdate(serverBase) {
+  // Don’t self-update when running from source in development.
+  const isBundled = !path.basename(process.argv[1]).includes("gravio-scan");
+  if (!isBundled) return;
+
+  const c = { cyan: "\x1b[36m", green: "\x1b[32m", dim: "\x1b[2m", bold: "\x1b[1m", reset: "\x1b[0m" };
+
+  try {
+    const versionUrl = new URL("/api/cli/version", serverBase).toString();
+    const res = await httpGet(versionUrl);
+    if (res.status !== 200) return;
+
+    let remoteVersion;
+    try { remoteVersion = JSON.parse(res.body).version; } catch { return; }
+    if (!isNewer(remoteVersion, CLI_VERSION)) return;
+
+    console.log(`\n  ${c.cyan}[↑]${c.reset}  ${c.bold}Gravio CLI update available${c.reset}: ${c.dim}${CLI_VERSION}${c.reset} → ${c.bold}${c.green}${remoteVersion}${c.reset}`);
+    console.log(`  ${c.dim}Downloading...${c.reset}`);
+
+    const downloadUrl = new URL("/cli/gravio.mjs", serverBase).toString();
+    const dlRes = await httpGet(downloadUrl);
+    if (dlRes.status !== 200) {
+      console.log(`  ${c.dim}[!] Update download failed (HTTP ${dlRes.status}) — continuing with current version\n${c.reset}`);
+      return;
+    }
+
+    const currentFile = path.resolve(process.argv[1]);
+    writeFileSync(currentFile, dlRes.body, "utf8");
+    try { chmodSync(currentFile, 0o755); } catch { /* ignore on Windows */ }
+
+    console.log(`  ${c.green}[✓]${c.reset}  Updated to ${c.bold}${c.green}${remoteVersion}${c.reset}. Restarting...\n`);
+
+    // Re-exec: spawn updated script with same args then exit this process.
+    await new Promise((resolve) => {
+      const child = spawn(process.execPath, [currentFile, "--no-update", ...process.argv.slice(2)], {
+        stdio: "inherit",
+      });
+      child.on("close", (code) => { resolve(); process.exit(code ?? 0); });
+    });
+  } catch {
+    // Network or write failure — silently continue with current version.
+  }
+}
+
 const args = parseArgs(process.argv.slice(2));
+
+// Auto-update: check server for a newer CLI version before doing anything else.
+// Skips silently if offline or running from source. Pass --no-update to opt out.
+if (!args.noUpdate) {
+  await checkAndUpdate(args.server);
+}
 
 // Validate publish prerequisites
 if (args.publish && !args.project) {

@@ -8,8 +8,9 @@
 import path2 from "node:path";
 import http from "node:http";
 import https from "node:https";
-import { readFileSync as readFileSync2 } from "node:fs";
+import { readFileSync as readFileSync2, writeFileSync as writeFileSync2, chmodSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { spawn } from "node:child_process";
 
 // src/core/scanner.mjs
 import crypto from "node:crypto";
@@ -858,6 +859,7 @@ function printPublishResult({ server, project, success, error }) {
 }
 
 // scripts/gravio-scan.mjs
+var CLI_VERSION = true ? "0.4.0" : "dev";
 var __dirname = path2.dirname(fileURLToPath(import.meta.url));
 var ROOT = path2.resolve(__dirname, "..");
 function readVersion() {
@@ -877,7 +879,8 @@ function parseArgs(argv) {
     publish: false,
     project: null,
     server: "http://localhost:3000",
-    apiKey: null
+    apiKey: null,
+    noUpdate: false
   };
   for (let i = 0; i < argv.length; i++) {
     const token = argv[i];
@@ -922,6 +925,10 @@ function parseArgs(argv) {
       i += 1;
       continue;
     }
+    if (token === "--no-update") {
+      args2.noUpdate = true;
+      continue;
+    }
   }
   return args2;
 }
@@ -959,7 +966,90 @@ function httpPost(url, payload, headers = {}) {
     req.end();
   });
 }
+function httpGet(url, headers = {}) {
+  return new Promise((resolve, reject) => {
+    const parsed = new URL(url);
+    const lib = parsed.protocol === "https:" ? https : http;
+    const req = lib.request(
+      {
+        hostname: parsed.hostname,
+        port: parsed.port || (parsed.protocol === "https:" ? 443 : 80),
+        path: parsed.pathname + parsed.search,
+        method: "GET",
+        headers
+      },
+      (res) => {
+        const chunks = [];
+        res.on("data", (c2) => chunks.push(c2));
+        res.on("end", () => resolve({ status: res.statusCode, body: Buffer.concat(chunks).toString("utf8") }));
+      }
+    );
+    req.setTimeout(1e4, () => {
+      req.destroy();
+      reject(new Error("timeout"));
+    });
+    req.on("error", reject);
+    req.end();
+  });
+}
+function isNewer(remote, local) {
+  if (!remote || remote === local || local === "dev") return false;
+  const parse = (v) => String(v).split(".").map(Number);
+  const [rA, rB, rC] = parse(remote);
+  const [lA, lB, lC] = parse(local);
+  if (rA !== lA) return rA > lA;
+  if (rB !== lB) return rB > lB;
+  return rC > lC;
+}
+async function checkAndUpdate(serverBase) {
+  const isBundled = !path2.basename(process.argv[1]).includes("gravio-scan");
+  if (!isBundled) return;
+  const c2 = { cyan: "\x1B[36m", green: "\x1B[32m", dim: "\x1B[2m", bold: "\x1B[1m", reset: "\x1B[0m" };
+  try {
+    const versionUrl = new URL("/api/cli/version", serverBase).toString();
+    const res = await httpGet(versionUrl);
+    if (res.status !== 200) return;
+    let remoteVersion;
+    try {
+      remoteVersion = JSON.parse(res.body).version;
+    } catch {
+      return;
+    }
+    if (!isNewer(remoteVersion, CLI_VERSION)) return;
+    console.log(`
+  ${c2.cyan}[\u2191]${c2.reset}  ${c2.bold}Gravio CLI update available${c2.reset}: ${c2.dim}${CLI_VERSION}${c2.reset} \u2192 ${c2.bold}${c2.green}${remoteVersion}${c2.reset}`);
+    console.log(`  ${c2.dim}Downloading...${c2.reset}`);
+    const downloadUrl = new URL("/cli/gravio.mjs", serverBase).toString();
+    const dlRes = await httpGet(downloadUrl);
+    if (dlRes.status !== 200) {
+      console.log(`  ${c2.dim}[!] Update download failed (HTTP ${dlRes.status}) \u2014 continuing with current version
+${c2.reset}`);
+      return;
+    }
+    const currentFile = path2.resolve(process.argv[1]);
+    writeFileSync2(currentFile, dlRes.body, "utf8");
+    try {
+      chmodSync(currentFile, 493);
+    } catch {
+    }
+    console.log(`  ${c2.green}[\u2713]${c2.reset}  Updated to ${c2.bold}${c2.green}${remoteVersion}${c2.reset}. Restarting...
+`);
+    await new Promise((resolve) => {
+      const child = spawn(process.execPath, [currentFile, "--no-update", ...process.argv.slice(2)], {
+        stdio: "inherit"
+      });
+      child.on("close", (code) => {
+        resolve();
+        process.exit(code ?? 0);
+      });
+    });
+  } catch {
+  }
+}
 var args = parseArgs(process.argv.slice(2));
+if (!args.noUpdate) {
+  await checkAndUpdate(args.server);
+}
 if (args.publish && !args.project) {
   console.error("error: --publish requires --project <id>");
   process.exit(1);
