@@ -65,7 +65,6 @@
   --project my-project \
   --server https://gravio.dev \
   --api-key gv_your_key_here</pre>
-          Your encryption key is generated locally and never sent to the server.
         </li>
         <li>
           <strong>Watch mode</strong> — re-scan on every file change:
@@ -88,11 +87,13 @@
       </ul>
     </section>
 
-    <!-- ZERO KNOWLEDGE -->
+    <!-- PRIVACY & ACCESS CONTROL -->
     <section class="dl-card">
-      <h2>Zero-knowledge design</h2>
-      <p>When you publish results, <strong>Gravio never sees your run data in plaintext</strong>. Everything is encrypted in your browser (or by the CLI) before it leaves your machine. Your passphrase or key is never transmitted — not even a hash.</p>
-      <p>The scanner itself is <a href="https://github.com" target="_blank" rel="noopener">open source</a>. Inspect <code>gravio.mjs</code> — it's a readable JavaScript bundle.</p>
+      <h2>Privacy &amp; access control</h2>
+      <p>The scanner only reads <strong>file structure and git metadata</strong> — it never reads the content of your source files, environment variables, or secrets. Your raw code stays on your machine.</p>
+      <p>When you publish results, access is controlled by your account and API key. Only authenticated sessions can retrieve your project's scorecard data.</p>
+      <p>Need stronger guarantees? <strong>End-to-end encryption (E2EE)</strong> is available as an optional feature on Pro and Team plans — your key is generated locally and the server stores only ciphertext it cannot read.</p>
+      <p>The scanner itself is <a href="https://github.com/petralian/Agent-Scorecard" target="_blank" rel="noopener">open source</a>. Inspect <code>gravio.mjs</code> — it's a readable JavaScript bundle.</p>
     </section>
 
     <!-- FUTURE BINARIES -->
