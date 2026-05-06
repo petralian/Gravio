@@ -1,6 +1,6 @@
 /**
- * tests/scanner-daemon.test.mjs
- * Unit tests for Scanner Daemon v1 core behavior.
+ * tests/scanner.test.mjs
+ * Unit tests for Gravio Scanner core behavior.
  */
 import { afterEach, describe, it } from "node:test";
 import assert from "node:assert/strict";
@@ -9,7 +9,7 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync } from "nod
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { runScannerOnce } from "../src/core/scanner-daemon.mjs";
+import { runScannerOnce } from "../src/core/scanner.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
@@ -49,7 +49,7 @@ afterEach(() => {
   }
 });
 
-describe("scanner daemon v1", () => {
+describe("gravio scanner", () => {
   it("writes evaluator-compatible latest run JSON", () => {
     const projectDir = makeTempProject();
     createBasicProject(projectDir);

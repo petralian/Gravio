@@ -4,13 +4,13 @@
 // Run:    node gravio.mjs --once
 
 
-// scripts/scanner-daemon.mjs
+// scripts/gravio-scan.mjs
 import path2 from "node:path";
 import http from "node:http";
 import https from "node:https";
 import { fileURLToPath } from "node:url";
 
-// src/core/scanner-daemon.mjs
+// src/core/scanner.mjs
 import crypto from "node:crypto";
 import { execSync } from "node:child_process";
 import {
@@ -158,7 +158,7 @@ function buildWorkflowResults(corpus, scan, previousRun) {
         notesRead: scan.hasNotes,
         handoffRead: scan.hasNextSession,
         repoMemoryRead: true,
-        kickoffSummary: "scanner-daemon auto-evidence"
+        kickoffSummary: "gravio-scanner auto-evidence"
       };
     }
     if (workflow.id === "trace-capture") {
@@ -182,7 +182,7 @@ function buildAdversarialResults(previousRun) {
   return Array.from({ length: 10 }, (_, idx) => ({
     id: `llm${String(idx + 1).padStart(2, "0")}`,
     status: "pass",
-    evidence: "scanner-daemon-mvp placeholder"
+    evidence: "gravio-scanner placeholder"
   }));
 }
 function scoreDimensions(corpus, workflowResults) {
@@ -245,7 +245,7 @@ function buildRunArtifact({ scan, corpus, weights, previousRun }) {
         status: "ok",
         attributes: {
           "gen_ai.operation.name": "agent.run",
-          "gen_ai.request.model": "scanner-daemon-v1",
+          "gen_ai.request.model": "gravio-scanner-v1",
           "gen_ai.usage.input_tokens": 0,
           "gen_ai.usage.output_tokens": 0,
           "vouch.agent.run_id": runId,
@@ -283,18 +283,18 @@ function runScannerOnce({ targetDir, outputFile, repoRoot }) {
   writeRunArtifact(outputFile, run);
   return { run, scan };
 }
-function startScannerDaemon({ targetDir, outputFile, repoRoot, debounceMs = 500, logger = console }) {
+function startScannerWatcher({ targetDir, outputFile, repoRoot, debounceMs = 500, logger = console }) {
   const resolvedTarget = path.resolve(targetDir);
   const resolvedOutput = path.resolve(outputFile);
   const outputInsideTarget = resolvedOutput.startsWith(`${resolvedTarget}${path.sep}`);
   const outputRelative = outputInsideTarget ? toPosix(path.relative(resolvedTarget, resolvedOutput)) : null;
   const executeScan = () => {
     const { run, scan } = runScannerOnce({ targetDir: resolvedTarget, outputFile: resolvedOutput, repoRoot });
-    logger.log(`scanner-daemon: wrote ${resolvedOutput} (${run.runId}, files=${scan.totalFiles})`);
+    logger.log(`gravio-scanner: wrote ${resolvedOutput} (${run.runId}, files=${scan.totalFiles})`);
   };
   executeScan();
   let timer = null;
-  const watcher = watch(resolvedTarget, { recursive: true }, (_eventType, fileName) => {
+  const watcher2 = watch(resolvedTarget, { recursive: true }, (_eventType, fileName) => {
     if (!fileName) return;
     const rel = toPosix(String(fileName));
     if (rel.includes("/.git/") || rel.startsWith(".git/")) return;
@@ -304,14 +304,14 @@ function startScannerDaemon({ targetDir, outputFile, repoRoot, debounceMs = 500,
       try {
         executeScan();
       } catch (error) {
-        logger.error(`scanner-daemon: scan failed: ${error.message}`);
+        logger.error(`gravio-scanner: scan failed: ${error.message}`);
       }
     }, debounceMs);
   });
   return {
     close() {
       if (timer) clearTimeout(timer);
-      watcher.close();
+      watcher2.close();
     }
   };
 }
@@ -354,7 +354,7 @@ function encrypt(keyHex, plaintext) {
   return Buffer.concat([iv, tag, encrypted]).toString("base64");
 }
 
-// scripts/scanner-daemon.mjs
+// scripts/gravio-scan.mjs
 var __dirname = path2.dirname(fileURLToPath(import.meta.url));
 var ROOT = path2.resolve(__dirname, "..");
 function parseArgs(argv) {
@@ -516,7 +516,7 @@ if (args.once) {
     outputFile: args.output,
     repoRoot: ROOT
   });
-  console.log(`scanner-daemon: one-time scan complete`);
+  console.log(`gravio-scan: complete`);
   console.log(`target: ${scan.targetDir}`);
   console.log(`output: ${args.output}`);
   console.log(`runId: ${run.runId}`);
@@ -556,24 +556,24 @@ Publishing to ${args.server}/api/publish ...`);
   }
   process.exit(0);
 }
-var daemon = startScannerDaemon({
+var watcher = startScannerWatcher({
   targetDir: args.target,
   outputFile: args.output,
   repoRoot: ROOT,
   debounceMs: args.debounceMs,
   logger: console
 });
-console.log("scanner-daemon: watching for changes");
+console.log("gravio-scan: watching for changes (Ctrl+C to stop)");
 console.log(`target: ${args.target}`);
 console.log(`output: ${args.output}`);
 console.log(`debounceMs: ${args.debounceMs}`);
 process.on("SIGINT", () => {
-  daemon.close();
-  console.log("scanner-daemon: stopped");
+  watcher.close();
+  console.log("gravio-scan: stopped");
   process.exit(0);
 });
 process.on("SIGTERM", () => {
-  daemon.close();
-  console.log("scanner-daemon: stopped");
+  watcher.close();
+  console.log("gravio-scan: stopped");
   process.exit(0);
 });

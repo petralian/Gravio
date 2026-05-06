@@ -1,23 +1,23 @@
 #!/usr/bin/env node
 /**
- * scanner-daemon.mjs
+ * gravio-scan.mjs
  *
- * Scanner Daemon v1 CLI.
+ * Gravio Scanner CLI — entry point.
  * Usage:
- *   node scripts/scanner-daemon.mjs --once
- *   node scripts/scanner-daemon.mjs --target ../some-project --output agent-quality/runs/latest.json
+ *   node scripts/gravio-scan.mjs --once
+ *   node scripts/gravio-scan.mjs --target ../some-project --output agent-quality/runs/latest.json
  *
- * Phase 2 — Publish encrypted results to cloud:
- *   node scripts/scanner-daemon.mjs --once --publish --project my-saas --api-key gv_xxx
- *   node scripts/scanner-daemon.mjs --once --publish --project my-saas --api-key gv_xxx --passphrase "my secret"
- *   node scripts/scanner-daemon.mjs --once --publish --project my-saas --api-key gv_xxx --key <64-char-hex>
- *   node scripts/scanner-daemon.mjs --once --publish --project my-saas --api-key gv_xxx --passphrase "x" --salt <hex>
+ * Publish encrypted results:
+ *   node scripts/gravio-scan.mjs --once --publish --project my-saas --api-key gv_xxx
+ *   node scripts/gravio-scan.mjs --once --publish --project my-saas --api-key gv_xxx --passphrase "my secret"
+ *   node scripts/gravio-scan.mjs --once --publish --project my-saas --api-key gv_xxx --key <64-char-hex>
+ *   node scripts/gravio-scan.mjs --once --publish --project my-saas --api-key gv_xxx --passphrase "x" --salt <hex>
  */
 import path from "node:path";
 import http from "node:http";
 import https from "node:https";
 import { fileURLToPath } from "node:url";
-import { runScannerOnce, startScannerDaemon } from "../src/core/scanner-daemon.mjs";
+import { runScannerOnce, startScannerWatcher } from "../src/core/scanner.mjs";
 import { generateKey, generateSalt, deriveKey, encrypt } from "../src/core/crypto-e2ee.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -193,7 +193,7 @@ if (args.once) {
     repoRoot: ROOT,
   });
 
-  console.log(`scanner-daemon: one-time scan complete`);
+  console.log(`gravio-scan: complete`);
   console.log(`target: ${scan.targetDir}`);
   console.log(`output: ${args.output}`);
   console.log(`runId: ${run.runId}`);
@@ -235,7 +235,7 @@ if (args.once) {
   process.exit(0);
 }
 
-const daemon = startScannerDaemon({
+const watcher = startScannerWatcher({
   targetDir: args.target,
   outputFile: args.output,
   repoRoot: ROOT,
@@ -243,19 +243,19 @@ const daemon = startScannerDaemon({
   logger: console,
 });
 
-console.log("scanner-daemon: watching for changes");
+console.log("gravio-scan: watching for changes (Ctrl+C to stop)");
 console.log(`target: ${args.target}`);
 console.log(`output: ${args.output}`);
 console.log(`debounceMs: ${args.debounceMs}`);
 
 process.on("SIGINT", () => {
-  daemon.close();
-  console.log("scanner-daemon: stopped");
+  watcher.close();
+  console.log("gravio-scan: stopped");
   process.exit(0);
 });
 
 process.on("SIGTERM", () => {
-  daemon.close();
-  console.log("scanner-daemon: stopped");
+  watcher.close();
+  console.log("gravio-scan: stopped");
   process.exit(0);
 });

@@ -5,12 +5,12 @@
   "description": "Standalone AI agent quality scorecard platform — scan, score, and improve AI-assisted development workflows",
   "scripts": {
     "start": "node src/server.mjs",
-    "test": "node --test tests/evaluate.test.mjs tests/scanner-daemon.test.mjs tests/crypto-e2ee.test.mjs tests/server.test.mjs",
+    "test": "node --test tests/evaluate.test.mjs tests/scanner.test.mjs tests/crypto-e2ee.test.mjs tests/server.test.mjs",
     "test:unit": "node --test tests/evaluate.test.mjs",
     "scorecard:check": "node scripts/scorecard-gate.mjs",
     "scorecard:new-run": "node scripts/new-run.mjs",
-    "scorecard:scan": "node scripts/scanner-daemon.mjs --once",
-    "scorecard:scan:watch": "node scripts/scanner-daemon.mjs",
+    "scorecard:scan": "node scripts/gravio-scan.mjs --once",
+    "scorecard:scan:watch": "node scripts/gravio-scan.mjs",
     "build:cli": "node scripts/build-cli.mjs",
     "secret-scan": "node scripts/secret-scan.mjs",
     "verify": "npm run secret-scan && npm test && npm run scorecard:check"

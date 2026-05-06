@@ -17,7 +17,7 @@
 			"args": [
 				"--test",
 				"tests/evaluate.test.mjs",
-				"tests/scanner-daemon.test.mjs",
+				"tests/scanner.test.mjs",
 				"tests/crypto-e2ee.test.mjs",
 				"tests/server.test.mjs"
 			]
@@ -114,7 +114,7 @@
 			"args": [
 				"--test",
 				"tests/evaluate.test.mjs",
-				"tests/scanner-daemon.test.mjs",
+				"tests/scanner.test.mjs",
 				"tests/crypto-e2ee.test.mjs",
 				"tests/server.test.mjs"
 			]
@@ -210,7 +210,7 @@
 			"args": [
 				"--test",
 				"tests/evaluate.test.mjs",
-				"tests/scanner-daemon.test.mjs",
+				"tests/scanner.test.mjs",
 				"tests/crypto-e2ee.test.mjs",
 				"tests/server.test.mjs"
 			]
@@ -230,7 +230,7 @@
 			"command": "git",
 			"args": [
 				"add",
-				"scripts/scanner-daemon.mjs",
+				"scripts/gravio-scan.mjs",
 				"src/server.mjs",
 				"src/web/dashboard.html",
 				"src/web/index.html",
@@ -469,7 +469,7 @@
 			"args": [
 				"--test",
 				"tests/evaluate.test.mjs",
-				"tests/scanner-daemon.test.mjs",
+				"tests/scanner.test.mjs",
 				"tests/crypto-e2ee.test.mjs",
 				"tests/server.test.mjs"
 			],
@@ -704,7 +704,7 @@
 			"args": [
 				"--test",
 				"tests/evaluate.test.mjs",
-				"tests/scanner-daemon.test.mjs",
+				"tests/scanner.test.mjs",
 				"tests/crypto-e2ee.test.mjs",
 				"tests/server.test.mjs"
 			],

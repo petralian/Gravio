@@ -58,7 +58,7 @@ async function loadProjects() {
     const section = $("db-projects-section");
     const list = $("db-projects-list");
     if (runs.length === 0) {
-      list.innerHTML = `<li class="db-project-empty">No runs published yet. Run the daemon with <code>--publish</code> to see your projects here.</li>`;
+      list.innerHTML = `<li class="db-project-empty">No runs published yet. Run <code>node gravio.mjs --once --publish ...</code> to see your projects here.</li>`;
     } else {
       list.innerHTML = runs.map((r) => `
         <li class="db-project-item">

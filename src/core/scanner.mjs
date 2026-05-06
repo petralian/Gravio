@@ -1,6 +1,6 @@
 /**
- * scanner-daemon.mjs
- * Scanner Daemon v1 core logic.
+ * scanner.mjs
+ * Gravio Scanner core logic.
  *
  * Scans a target project directory and writes evaluator-compatible run evidence.
  * Constraint: never read .env file contents. We only detect file presence/tracking status.
@@ -180,7 +180,7 @@ function buildWorkflowResults(corpus, scan, previousRun) {
         notesRead: scan.hasNotes,
         handoffRead: scan.hasNextSession,
         repoMemoryRead: true,
-        kickoffSummary: "scanner-daemon auto-evidence",
+        kickoffSummary: "gravio-scanner auto-evidence",
       };
     }
 
@@ -208,7 +208,7 @@ function buildAdversarialResults(previousRun) {
   return Array.from({ length: 10 }, (_, idx) => ({
     id: `llm${String(idx + 1).padStart(2, "0")}`,
     status: "pass",
-    evidence: "scanner-daemon-mvp placeholder",
+    evidence: "gravio-scanner placeholder",
   }));
 }
 
@@ -281,7 +281,7 @@ export function buildRunArtifact({ scan, corpus, weights, previousRun }) {
         status: "ok",
         attributes: {
           "gen_ai.operation.name": "agent.run",
-          "gen_ai.request.model": "scanner-daemon-v1",
+          "gen_ai.request.model": "gravio-scanner-v1",
           "gen_ai.usage.input_tokens": 0,
           "gen_ai.usage.output_tokens": 0,
           "vouch.agent.run_id": runId,
@@ -323,7 +323,7 @@ export function runScannerOnce({ targetDir, outputFile, repoRoot }) {
   return { run, scan };
 }
 
-export function startScannerDaemon({ targetDir, outputFile, repoRoot, debounceMs = 500, logger = console }) {
+export function startScannerWatcher({ targetDir, outputFile, repoRoot, debounceMs = 500, logger = console }) {
   const resolvedTarget = path.resolve(targetDir);
   const resolvedOutput = path.resolve(outputFile);
   const outputInsideTarget = resolvedOutput.startsWith(`${resolvedTarget}${path.sep}`);
@@ -333,7 +333,7 @@ export function startScannerDaemon({ targetDir, outputFile, repoRoot, debounceMs
 
   const executeScan = () => {
     const { run, scan } = runScannerOnce({ targetDir: resolvedTarget, outputFile: resolvedOutput, repoRoot });
-    logger.log(`scanner-daemon: wrote ${resolvedOutput} (${run.runId}, files=${scan.totalFiles})`);
+    logger.log(`gravio-scanner: wrote ${resolvedOutput} (${run.runId}, files=${scan.totalFiles})`);  
   };
 
   executeScan();
@@ -350,7 +350,7 @@ export function startScannerDaemon({ targetDir, outputFile, repoRoot, debounceMs
       try {
         executeScan();
       } catch (error) {
-        logger.error(`scanner-daemon: scan failed: ${error.message}`);
+        logger.error(`gravio-scanner: scan failed: ${error.message}`);
       }
     }, debounceMs);
   });

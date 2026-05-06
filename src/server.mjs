@@ -392,6 +392,11 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  if (req.method === "GET" && urlPath === "/download") {
+    serveStatic(res, path.join(WEB_DIR, "download.html"));
+    return;
+  }
+
   if (req.method === "GET" && urlPath === "/dp") {
     serveStatic(res, path.join(WEB_DIR, "admin.html"));
     return;
