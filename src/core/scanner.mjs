@@ -47,20 +47,45 @@ const DEFAULT_WEIGHTS = {
  */
 const DEFAULT_CORPUS = {
   workflows: [
-    { id: "secret-scan",          category: "safety",        critical: true,  description: "No secrets or .env files committed to git." },
-    { id: "gitignore-guard",      category: "safety",        critical: true,  description: ".gitignore exists and covers .env / secret files." },
-    { id: "test-coverage",        category: "reliability",   critical: true,  description: "Test files or test suite detected in the project." },
-    { id: "ci-pipeline",          category: "reliability",   critical: false, description: "CI/CD pipeline configuration found." },
-    { id: "type-safety",          category: "reliability",   critical: false, description: "Static type system or type-checking tooling detected." },
-    { id: "eval-suite",           category: "evaluation",    critical: false, description: "Evaluation corpus, benchmark directory, or eval framework present." },
-    { id: "baseline-tracking",    category: "evaluation",    critical: false, description: "Regression baseline file or run artifact directory found." },
-    { id: "observability-config", category: "observability", critical: false, description: "OpenTelemetry, structured logging, or monitoring config detected." },
-    { id: "run-artifacts",        category: "observability", critical: false, description: "Agent run output / trace artifacts are being persisted." },
-    { id: "readme-docs",          category: "governance",    critical: false, description: "README.md exists." },
-    { id: "changelog-hygiene",    category: "governance",    critical: false, description: "CHANGELOG or release notes maintained." },
-    { id: "agent-instructions",   category: "governance",    critical: true,  description: "Agent behaviour instructions file found (AGENTS.md, copilot-instructions, .cursorrules, etc.)." },
-    { id: "agent-skill-catalog",  category: "agentic",       critical: false, description: "Agent skill catalog or reusable prompt assets found." },
-    { id: "agent-orchestration",  category: "agentic",       critical: false, description: "Multi-agent orchestration configuration detected." },
+    // ── Safety ──────────────────────────────────────────────────────────────
+    { id: "secret-scan",              category: "safety",        critical: true,  description: "No secrets or .env files committed to git." },
+    { id: "gitignore-guard",          category: "safety",        critical: true,  description: ".gitignore exists and covers .env / secret files." },
+    { id: "dep-vuln-check",           category: "safety",        critical: false, description: "Dependency vulnerability scanning tooling configured." },
+    { id: "cloud-credential-files",   category: "safety",        critical: true,  description: "No cloud credential files (.aws, .gcloud) committed." },
+    // ── Reliability ─────────────────────────────────────────────────────────
+    { id: "test-coverage",            category: "reliability",   critical: true,  description: "Test files or test suite detected in the project." },
+    { id: "ci-pipeline",              category: "reliability",   critical: false, description: "CI/CD pipeline configuration found." },
+    { id: "type-safety",              category: "reliability",   critical: false, description: "Static type system or type-checking tooling detected." },
+    { id: "test-coverage-config",     category: "reliability",   critical: false, description: "Coverage thresholds or coverage tooling configured." },
+    { id: "integration-tests",        category: "reliability",   critical: false, description: "Integration or E2E test suite detected." },
+    { id: "health-check",             category: "reliability",   critical: false, description: "Health check endpoint or Dockerfile HEALTHCHECK defined." },
+    { id: "lock-file",                category: "reliability",   critical: false, description: "Dependency lock file ensures reproducible builds." },
+    { id: "lint-config",              category: "reliability",   critical: false, description: "Linting / static analysis tooling configured." },
+    { id: "pre-commit-hooks",         category: "reliability",   critical: false, description: "Pre-commit hooks guard local code quality." },
+    // ── Evaluation ──────────────────────────────────────────────────────────
+    { id: "eval-suite",               category: "evaluation",    critical: false, description: "Evaluation corpus, benchmark directory, or eval framework present." },
+    { id: "baseline-tracking",        category: "evaluation",    critical: false, description: "Regression baseline file or run artifact directory found." },
+    { id: "adversarial-tests",        category: "evaluation",    critical: false, description: "Adversarial / jailbreak / prompt injection test cases present." },
+    { id: "golden-datasets",          category: "evaluation",    critical: false, description: "Golden test data or fixture datasets for regression." },
+    { id: "eval-script",              category: "evaluation",    critical: false, description: "Eval is runnable via a script or CI command." },
+    // ── Observability ───────────────────────────────────────────────────────
+    { id: "observability-config",     category: "observability", critical: false, description: "OpenTelemetry, structured logging, or monitoring config detected." },
+    { id: "run-artifacts",            category: "observability", critical: false, description: "Agent run output / trace artifacts are being persisted." },
+    { id: "monitoring-config",        category: "observability", critical: false, description: "Monitoring dashboard or alerting config present." },
+    { id: "slo-definition",           category: "observability", critical: false, description: "Service Level Objective (SLO) definition documented." },
+    // ── Governance ──────────────────────────────────────────────────────────
+    { id: "readme-docs",              category: "governance",    critical: false, description: "README.md exists." },
+    { id: "changelog-hygiene",        category: "governance",    critical: false, description: "CHANGELOG or release notes maintained." },
+    { id: "agent-instructions",       category: "governance",    critical: true,  description: "Agent behaviour instructions file found (AGENTS.md, copilot-instructions, .cursorrules, etc.)." },
+    { id: "api-documentation",        category: "governance",    critical: false, description: "OpenAPI / Swagger spec or API docs directory found." },
+    { id: "dependency-updates",       category: "governance",    critical: false, description: "Automated dependency update config (Dependabot / Renovate) present." },
+    { id: "codeowners",               category: "governance",    critical: false, description: "CODEOWNERS file defines code ownership." },
+    // ── Agentic ─────────────────────────────────────────────────────────────
+    { id: "agent-skill-catalog",      category: "agentic",       critical: false, description: "Agent skill catalog or reusable prompt assets found." },
+    { id: "agent-orchestration",      category: "agentic",       critical: false, description: "Multi-agent orchestration configuration detected." },
+    { id: "safety-rules",             category: "agentic",       critical: false, description: "Agent instructions contain explicit safety guardrails." },
+    { id: "model-pinned",             category: "agentic",       critical: false, description: "AI model version pinned in config or instructions." },
+    { id: "tool-whitelist",           category: "agentic",       critical: false, description: "Allowed tools / function calls defined in agent instructions." },
   ],
 };
 
@@ -434,6 +459,176 @@ export function scanTargetProject(targetDir) {
   const hasNotes = has(".claude/NOTES.md") || has("NOTES.md");
   const hasNextSession = has(".claude/NEXT_SESSION.md") || has("NEXT_SESSION.md");
 
+  // ━━━ PHASE 1 EXPANSION — SUB-DIMENSION SIGNALS ━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  // ── Safety: Access & Permissions ──────────────────────────────────────────
+  const hasCloudCredentialFiles =
+    has(".aws/credentials") ||
+    has(".gcloud/application_default_credentials.json") ||
+    hasMatch((f) => /^\.azure\/.*\.(json|pem|p12)$/.test(f));
+
+  const hasDependencyVulnCheck =
+    depsText.includes("snyk") || depsText.includes("audit-ci") || depsText.includes("pip-audit") ||
+    has(".snyk") ||
+    Boolean(packageJson?.scripts?.audit) ||
+    Boolean(packageJson?.scripts?.["security-check"]) ||
+    Boolean(packageJson?.scripts?.security);
+
+  // ── Reliability: Testing depth ────────────────────────────────────────────
+  const hasTestCoverage =
+    depsText.includes("c8") || depsText.includes("nyc") || depsText.includes("istanbul") ||
+    depsText.includes("pytest-cov") || depsText.includes("coverage") ||
+    depsText.includes("jacoco") || depsText.includes("simplecov") || depsText.includes("lcov") ||
+    has(".nycrc") || has(".nycrc.json") ||
+    Boolean(packageJson?.jest?.collectCoverage) ||
+    Boolean(packageJson?.c8) ||
+    hasMatch((f) => /^jest\.config\.[^/]+$/.test(f));
+
+  const hasIntegrationTests =
+    hasGlob("tests/integration/") || hasGlob("test/integration/") ||
+    hasGlob("integration-tests/") || hasGlob("integration/") ||
+    hasMatch((f) => /integration[._-]test/i.test(f)) ||
+    hasMatch((f) => /test[._-]integration/i.test(f));
+
+  const hasE2eTests =
+    depsText.includes("playwright") || depsText.includes("cypress") || depsText.includes("puppeteer") ||
+    depsText.includes("selenium") || depsText.includes("webdriverio") ||
+    hasGlob("e2e/") || hasGlob("playwright/") ||
+    has("playwright.config.ts") || has("playwright.config.js") ||
+    has("cypress.config.ts") || has("cypress.config.js") || has("cypress.json");
+
+  // Read Dockerfile content once — used in health-check and dockerfile checks
+  const dockerfileText = (() => {
+    const df = allFiles.find((f) => /^dockerfile(\..*)?$/i.test(f));
+    return df ? safeReadText(path.join(resolvedTarget, df)) : "";
+  })();
+
+  const hasDockerfile =
+    dockerfileText.length > 0 || has("docker-compose.yml") || has("docker-compose.yaml");
+
+  const hasHealthCheck =
+    dockerfileText.toLowerCase().includes("healthcheck") ||
+    has("healthcheck.sh") || has("health-check.sh") ||
+    hasMatch((f) => f === ".fly.toml" || f === "fly.toml") ||  // Fly.io health check implied
+    (() => {
+      const workflowFiles = allFiles.filter(
+        (f) => f.startsWith(".github/workflows/") && /\.ya?ml$/.test(f)
+      );
+      return workflowFiles.some((f) => {
+        const txt = safeReadText(path.join(resolvedTarget, f)).toLowerCase();
+        return txt.includes("/health") || txt.includes("healthcheck");
+      });
+    })();
+
+  const hasFeatureFlags =
+    depsText.includes("launchdarkly") || depsText.includes("unleash") || depsText.includes("flagsmith") ||
+    depsText.includes("growthbook") || depsText.includes("flipt") || depsText.includes("openfeature") ||
+    depsText.includes("@launchdarkly/") ||
+    hasMatch((f) => f.includes("feature-flag") || f.includes("feature_flag"));
+
+  // ── Evaluation: Adversarial & prompt depth ────────────────────────────────
+  const hasAdversarialTests = (() => {
+    if (hasGlob("evals/adversarial") || hasGlob("adversarial/")) return true;
+    if (hasMatch((f) => /adversarial|jailbreak|inject/i.test(f))) return true;
+    const evalFiles = allFiles
+      .filter((f) => EVAL_DIRS.some((d) => f.startsWith(d)) && f.endsWith(".json"))
+      .slice(0, 10);
+    for (const f of evalFiles) {
+      const txt = safeReadText(path.join(resolvedTarget, f)).toLowerCase();
+      if (txt.includes("adversarial") || txt.includes("jailbreak") || txt.includes("inject")) return true;
+    }
+    return false;
+  })();
+
+  const hasPromptTests =
+    hasMatch((f) => f.includes("prompt") && /\.(test|spec)\.[^/]+$/.test(f)) ||
+    hasMatch((f) => f.startsWith("evals/") && f.includes("prompt"));
+
+  // ── Observability: SLO & alerting ─────────────────────────────────────────
+  const hasSloDefinition =
+    has("SLO.md") || has("slo.yaml") || has("slo.yml") ||
+    hasMatch((f) => /^slo[._-]/i.test(path.basename(f)) && /\.(yaml|yml|json|md)$/.test(f)) ||
+    hasMatch((f) => f.startsWith("docs/") && f.toLowerCase().includes("slo"));
+
+  const hasAlertConfig =
+    hasMatch((f) => /alertmanager/i.test(f)) ||
+    depsText.includes("pagerduty") || depsText.includes("@pagerduty") || depsText.includes("opsgenie") ||
+    hasMatch((f) => f.includes("alert") && /\.(yaml|yml|json)$/.test(f) && !f.includes("node_modules"));
+
+  // ── Governance: API docs, ADRs, commit conventions ────────────────────────
+  const hasApiDocs =
+    has("openapi.yaml") || has("openapi.yml") || has("openapi.json") ||
+    has("swagger.yaml") || has("swagger.yml") || has("swagger.json") ||
+    hasGlob("docs/api/") ||
+    depsText.includes("swagger-ui") || depsText.includes("swagger-jsdoc") ||
+    hasMatch((f) => /openapi|swagger/i.test(f) && /\.(yaml|yml|json)$/.test(f));
+
+  const hasAdrDir =
+    hasGlob("docs/adr/") || hasGlob("ADR/") || hasGlob("adr/") ||
+    hasMatch((f) => /\/adr\//i.test(f) || (f.startsWith("docs/") && /decision/i.test(f)));
+
+  const hasCommitLintConfig =
+    has(".commitlintrc") || has(".commitlintrc.json") || has(".commitlintrc.yaml") || has(".commitlintrc.yml") ||
+    has("commitlint.config.js") || has("commitlint.config.ts") || has("commitlint.config.mjs") ||
+    depsText.includes("@commitlint/");
+
+  // ── Agentic: Safety rules, model pinning, tool governance ─────────────────
+  const hasSafetyRulesInInstructions = (() => {
+    const CANDIDATE_FILES = [
+      "AGENTS.md", ".github/copilot-instructions.md", ".cursorrules",
+      "system_prompt.md", "SYSTEM_PROMPT.md", ".claude/NOTES.md",
+    ];
+    const SAFETY_KEYWORDS = [
+      "never", "must not", "do not", "forbidden", "prohibited",
+      "safety", "guardrail", "reject", "deny",
+    ];
+    for (const f of CANDIDATE_FILES) {
+      if (!has(f)) continue;
+      const txt = safeReadText(path.join(resolvedTarget, f)).toLowerCase();
+      if (SAFETY_KEYWORDS.some((kw) => txt.includes(kw))) return true;
+    }
+    return false;
+  })();
+
+  const hasModelPinned = (() => {
+    const CANDIDATE_FILES = [
+      "AGENTS.md", ".github/copilot-instructions.md", ".cursorrules",
+      "system_prompt.md", "SYSTEM_PROMPT.md", ".continue/config.json",
+      ".aider.conf.yml", "promptfoo.yaml", "promptfooconfig.yaml",
+    ];
+    const MODEL_PATTERNS = [
+      "gpt-4o", "gpt-4-turbo", "gpt-3.5-turbo", "claude-3", "claude-opus",
+      "claude-sonnet", "claude-haiku", "gemini-1.5", "llama-3", "mistral-7b",
+      "o1-preview", "o1-mini",
+    ];
+    for (const f of CANDIDATE_FILES) {
+      if (!has(f)) continue;
+      const txt = safeReadText(path.join(resolvedTarget, f)).toLowerCase();
+      if (MODEL_PATTERNS.some((m) => txt.includes(m))) return true;
+    }
+    return false;
+  })();
+
+  const hasPromptVersioning =
+    (hasPromptAssets || hasAgentSkillCatalog) &&
+    trackedFiles.some((f) =>
+      f.startsWith("prompts/") || f.startsWith(".github/prompts/") || f.startsWith("skills/")
+    );
+
+  const hasToolWhitelist = (() => {
+    if (!hasAgentInstructions) return false;
+    const CANDIDATE_FILES = [
+      "AGENTS.md", ".github/copilot-instructions.md", ".cursorrules", "system_prompt.md",
+    ];
+    const TOOL_KEYWORDS = ["tool", "function call", "allowed", "permitted", "capabilities"];
+    for (const f of CANDIDATE_FILES) {
+      if (!has(f)) continue;
+      const txt = safeReadText(path.join(resolvedTarget, f)).toLowerCase();
+      if (TOOL_KEYWORDS.filter((kw) => txt.includes(kw)).length >= 2) return true;
+    }
+    return false;
+  })();
+
   return {
     targetDir: resolvedTarget,
     scannedAt: new Date().toISOString(),
@@ -462,6 +657,20 @@ export function scanTargetProject(targetDir) {
     hasNotes, hasNextSession,
     evalCorpusExists: hasEvalDir,
     hasRetryDependency: hasRetryLibrary,
+    // ── Phase 1 expansion signals ──────────────────────────────────────────
+    // Safety sub-dimensions
+    hasCloudCredentialFiles, hasDependencyVulnCheck,
+    // Reliability sub-dimensions
+    hasTestCoverage, hasIntegrationTests, hasE2eTests,
+    hasDockerfile, hasHealthCheck, hasFeatureFlags,
+    // Evaluation sub-dimensions
+    hasAdversarialTests, hasPromptTests,
+    // Observability sub-dimensions
+    hasSloDefinition, hasAlertConfig,
+    // Governance sub-dimensions
+    hasApiDocs, hasAdrDir, hasCommitLintConfig,
+    // Agentic sub-dimensions
+    hasSafetyRulesInInstructions, hasModelPinned, hasPromptVersioning, hasToolWhitelist,
   };
 }
 
@@ -576,6 +785,97 @@ function buildWorkflowResults(corpus, scan, previousRun) {
       evidence = { orchestrationConfigFound: scan.hasAgentOrchestration };
     }
 
+    // ── Phase 1 expansion workflow checks ────────────────────────────────────
+    if (workflow.id === "dep-vuln-check") {
+      status = scan.hasDependencyVulnCheck ? "pass" : "fail";
+      evidence = { depVulnCheckDetected: scan.hasDependencyVulnCheck };
+    }
+
+    if (workflow.id === "cloud-credential-files") {
+      status = !scan.hasCloudCredentialFiles ? "pass" : "fail";
+      evidence = { cloudCredentialFilesFound: scan.hasCloudCredentialFiles };
+    }
+
+    if (workflow.id === "test-coverage-config") {
+      status = scan.hasTestCoverage ? "pass" : "fail";
+      evidence = { coverageConfigDetected: scan.hasTestCoverage };
+    }
+
+    if (workflow.id === "integration-tests") {
+      status = (scan.hasIntegrationTests || scan.hasE2eTests) ? "pass" : "fail";
+      evidence = { integrationTestsFound: scan.hasIntegrationTests, e2eTestsFound: scan.hasE2eTests };
+    }
+
+    if (workflow.id === "health-check") {
+      status = scan.hasHealthCheck ? "pass" : "fail";
+      evidence = { healthCheckDetected: scan.hasHealthCheck };
+    }
+
+    if (workflow.id === "lock-file") {
+      status = scan.hasLockFile ? "pass" : "fail";
+      evidence = { lockFileFound: scan.hasLockFile };
+    }
+
+    if (workflow.id === "lint-config") {
+      status = scan.hasLintConfig ? "pass" : "fail";
+      evidence = { lintConfigDetected: scan.hasLintConfig };
+    }
+
+    if (workflow.id === "pre-commit-hooks") {
+      status = scan.hasPreCommitHooks ? "pass" : "fail";
+      evidence = { preCommitHooksDetected: scan.hasPreCommitHooks };
+    }
+
+    if (workflow.id === "adversarial-tests") {
+      status = scan.hasAdversarialTests ? "pass" : "fail";
+      evidence = { adversarialTestsFound: scan.hasAdversarialTests };
+    }
+
+    if (workflow.id === "golden-datasets") {
+      status = scan.hasGoldenDatasets ? "pass" : "fail";
+      evidence = { goldenDatasetsFound: scan.hasGoldenDatasets };
+    }
+
+    if (workflow.id === "monitoring-config") {
+      status = scan.hasMonitoringConfig ? "pass" : "fail";
+      evidence = { monitoringConfigDetected: scan.hasMonitoringConfig };
+    }
+
+    if (workflow.id === "slo-definition") {
+      status = scan.hasSloDefinition ? "pass" : "fail";
+      evidence = { sloDefinitionFound: scan.hasSloDefinition };
+    }
+
+    if (workflow.id === "api-documentation") {
+      status = scan.hasApiDocs ? "pass" : "fail";
+      evidence = { apiDocsFound: scan.hasApiDocs };
+    }
+
+    if (workflow.id === "dependency-updates") {
+      status = scan.hasDependencyUpdateConfig ? "pass" : "fail";
+      evidence = { depUpdateConfigFound: scan.hasDependencyUpdateConfig };
+    }
+
+    if (workflow.id === "codeowners") {
+      status = scan.hasCodeOwners ? "pass" : "fail";
+      evidence = { codeownersFound: scan.hasCodeOwners };
+    }
+
+    if (workflow.id === "safety-rules") {
+      status = scan.hasSafetyRulesInInstructions ? "pass" : "fail";
+      evidence = { safetyRulesDetected: scan.hasSafetyRulesInInstructions };
+    }
+
+    if (workflow.id === "model-pinned") {
+      status = scan.hasModelPinned ? "pass" : "fail";
+      evidence = { modelPinnedDetected: scan.hasModelPinned };
+    }
+
+    if (workflow.id === "tool-whitelist") {
+      status = scan.hasToolWhitelist ? "pass" : "fail";
+      evidence = { toolWhitelistDetected: scan.hasToolWhitelist };
+    }
+
     // ── Gravio-specific corpus checks (backward compat) ─────────────────────
     if (workflow.id === "verification-suite") {
       status = scan.testSignal.testSignal ? "pass" : "fail";
@@ -629,74 +929,91 @@ function buildAdversarialResults(previousRun) {
  * and every language/ecosystem is measured against the same universal rubric.
  */
 function computeRichScorecard(scan) {
-  // ── Safety (30%) ────────────────────────────────────────────────────────
+  // ── Safety (25%) ────────────────────────────────────────────────────────
   // Core question: Can the agent cause a data breach or security incident?
   let safety = 0;
-  if (scan.committedEnvFiles.length === 0) safety += 40; // no secrets in git — biggest risk
-  if (scan.gitignoreEnvPasses)             safety += 20; // env files excluded / n-a
-  if (scan.gitignoreExists)                safety += 10; // at least gitignore exists
-  if (scan.hasSecretScanConfig)            safety += 15; // automated secret scanning tooling
+  if (scan.committedEnvFiles.length === 0) safety += 35; // no secrets in git — biggest risk
+  if (scan.gitignoreEnvPasses)             safety += 15; // env files excluded / n-a
+  if (scan.gitignoreExists)                safety +=  8; // at least gitignore exists
+  if (scan.hasSecretScanConfig)            safety += 12; // automated secret scanning tooling
   if (scan.securityPolicyExists)           safety += 10; // documented security posture
   if (scan.hasAgentInstructions)           safety +=  5; // agent behaviour is bounded/documented
+  if (scan.hasDependencyVulnCheck)         safety += 10; // dep vulnerability scanning
+  if (!scan.hasCloudCredentialFiles)       safety +=  5; // no cloud credential files committed
   // max 100
 
-  // ── Reliability (25%) ───────────────────────────────────────────────────
+  // ── Reliability (20%) ───────────────────────────────────────────────────
   // Core question: Does the agent behave consistently and recover from failure?
   let reliability = 0;
-  if (scan.testSignal.testSignal) reliability += 35; // tests exist (any language)
-  if (scan.cicdExists)            reliability += 25; // automated quality gate on every push
-  if (scan.hasTypeSafety)         reliability += 20; // type system catches regressions
+  if (scan.testSignal.testSignal) reliability += 30; // tests exist (any language)
+  if (scan.cicdExists)            reliability += 20; // automated quality gate on every push
+  if (scan.hasTypeSafety)         reliability += 15; // type system catches regressions
   if (scan.hasLockFile)           reliability += 10; // deterministic dependency resolution
   if (scan.hasLintConfig)         reliability +=  7; // code style enforced consistently
   if (scan.hasPreCommitHooks)     reliability +=  3; // local gate before code reaches CI
+  if (scan.hasTestCoverage)       reliability +=  8; // coverage thresholds configured
+  if (scan.hasIntegrationTests || scan.hasE2eTests) reliability += 5; // integration or E2E tests
+  if (scan.hasHealthCheck)        reliability +=  2; // health check defined
   // max 100
 
-  // ── Evaluation (20%) ────────────────────────────────────────────────────
+  // ── Evaluation (15%) ────────────────────────────────────────────────────
   // Core question: Does the agent measure whether it is getting better or worse?
   let evaluation = 0;
-  if (scan.hasEvalDir || scan.hasEvalConfig) evaluation += 40; // eval suite or framework present
-  if (scan.hasBaseline)                      evaluation += 20; // regression baseline tracked
-  if (scan.hasGoldenDatasets)                evaluation += 20; // golden outputs for comparison
-  if (scan.hasEvalConfig)                    evaluation += 10; // explicit eval framework config
-  if (scan.hasEvalScript)                    evaluation += 10; // eval is runnable via script
+  if (scan.hasEvalDir || scan.hasEvalConfig) evaluation += 35; // eval suite or framework present
+  if (scan.hasBaseline)                      evaluation += 18; // regression baseline tracked
+  if (scan.hasGoldenDatasets)                evaluation += 17; // golden outputs for comparison
+  if (scan.hasEvalConfig)                    evaluation +=  8; // explicit eval framework config
+  if (scan.hasEvalScript)                    evaluation +=  8; // eval is runnable via script
+  if (scan.hasAdversarialTests)              evaluation +=  8; // adversarial / injection tests
+  if (scan.hasPromptTests)                   evaluation +=  6; // prompt-specific tests
   // max 100 (hasEvalConfig counted once if both hasEvalDir and hasEvalConfig)
   evaluation = Math.min(100, evaluation);
 
   // ── Observability (10%) ─────────────────────────────────────────────────
   // Core question: Can you see what the agent did and diagnose failures?
   let observability = 0;
-  if (scan.hasOtelDependency)      observability += 35; // OpenTelemetry = structured traces
-  if (scan.hasRunArtifacts)        observability += 25; // agent persists its own run outputs
-  if (scan.hasStructuredLogging)   observability += 25; // machine-parseable logs
+  if (scan.hasOtelDependency)      observability += 30; // OpenTelemetry = structured traces
+  if (scan.hasRunArtifacts)        observability += 22; // agent persists its own run outputs
+  if (scan.hasStructuredLogging)   observability += 20; // machine-parseable logs
   if (scan.hasMonitoringConfig)    observability += 15; // alerting / dashboards configured
+  if (scan.hasSloDefinition)       observability +=  8; // SLO defined
+  if (scan.hasAlertConfig)         observability +=  5; // alert routing configured
   // max 100
   observability = Math.min(100, observability);
 
   // ── Governance (15%) ────────────────────────────────────────────────────
   // Core question: Is the agent's behaviour documented, controlled, and auditable?
   let governance = 0;
-  if (scan.readmeExists)      governance += 20; // humans can understand what this does
-  if (scan.hasChangelog)      governance += 20; // changes are tracked over time
-  if (scan.hasAiDocs)         governance += 25; // agent instructions are explicitly documented
-  if (scan.licenseExists)     governance += 10; // legal clarity
-  if (scan.hasDecisionLog)    governance += 10; // architectural decisions captured
-  if (scan.hasVersion)        governance +=  8; // versioned = releases are intentional
-  if (scan.hasContributing)   governance +=  4; // contributors know the rules
-  if (scan.hasCodeOwners)     governance +=  3; // clear code ownership
+  if (scan.readmeExists)           governance += 18; // humans can understand what this does
+  if (scan.hasChangelog)           governance += 18; // changes are tracked over time
+  if (scan.hasAiDocs)              governance += 20; // agent instructions are explicitly documented
+  if (scan.licenseExists)          governance +=  8; // legal clarity
+  if (scan.hasDecisionLog)         governance +=  8; // architectural decisions captured
+  if (scan.hasVersion)             governance +=  7; // versioned = releases are intentional
+  if (scan.hasContributing)        governance +=  4; // contributors know the rules
+  if (scan.hasCodeOwners)          governance +=  3; // clear code ownership
+  if (scan.hasApiDocs)             governance +=  5; // API contract documented
+  if (scan.hasAdrDir)              governance +=  4; // design decisions recorded
+  if (scan.hasCommitLintConfig)    governance +=  3; // commit conventions enforced
+  if (scan.hasDependencyUpdateConfig) governance += 2; // automated dep hygiene
   // max 100
   governance = Math.min(100, governance);
 
   // ── Agentic (15%) ───────────────────────────────────────────────────────
   // Core question: Is this codebase ready for reliable human+AI collaboration?
   let agentic = 0;
-  if (scan.hasAiDocs)                           agentic += 20; // explicit AI operating rules
-  if (scan.hasAgentInstructions)                agentic += 20; // bounded behavior contract
-  if (scan.hasAgentSkillCatalog)                agentic += 15; // reusable skills/playbooks exist
-  if (scan.hasPromptAssets)                     agentic += 10; // prompt assets are versioned
-  if (scan.hasAgentOrchestration)               agentic += 10; // multi-agent config present
-  if (scan.hasEvalDir || scan.hasEvalConfig)    agentic += 15; // measurable agent quality loop
-  if (scan.hasRunArtifacts)                     agentic += 10; // runs are persisted for audits
-  if (scan.hasNotes && scan.hasNextSession)     agentic += 10; // handoff continuity for teams
+  if (scan.hasAiDocs)                           agentic += 15; // explicit AI operating rules
+  if (scan.hasAgentInstructions)                agentic += 15; // bounded behavior contract
+  if (scan.hasAgentSkillCatalog)                agentic += 12; // reusable skills/playbooks exist
+  if (scan.hasPromptAssets)                     agentic +=  8; // prompt assets are versioned
+  if (scan.hasAgentOrchestration)               agentic +=  8; // multi-agent config present
+  if (scan.hasEvalDir || scan.hasEvalConfig)    agentic += 12; // measurable agent quality loop
+  if (scan.hasRunArtifacts)                     agentic +=  8; // runs are persisted for audits
+  if (scan.hasNotes && scan.hasNextSession)     agentic +=  7; // handoff continuity for teams
+  if (scan.hasSafetyRulesInInstructions)        agentic +=  5; // explicit safety guardrails
+  if (scan.hasModelPinned)                      agentic +=  4; // model version locked
+  if (scan.hasPromptVersioning)                 agentic +=  3; // prompts tracked in git
+  if (scan.hasToolWhitelist)                    agentic +=  3; // tool use boundaries defined
   agentic = Math.min(100, agentic);
 
   return {

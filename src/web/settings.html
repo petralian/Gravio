@@ -75,16 +75,28 @@
         <p class="db-error" id="st-keys-error" hidden></p>
       </section>
 
-      <!-- Advanced: E2EE (pro/team/admin only) -->
+      <!-- Advanced: E2EE (team/admin only) -->
       <section class="db-settings-section" id="st-e2ee-section" hidden>
         <div class="db-settings-section-head">
-          <h2 class="db-settings-h2">Advanced &mdash; E2EE decrypt tool</h2>
+          <h2 class="db-settings-h2">Advanced &mdash; E2EE compliance mode</h2>
           <p class="db-settings-desc">
-            Manually decrypt an encrypted run envelope using your project ID and API key.
-            This tool operates entirely in-browser &mdash; your key never leaves your device.
+            Gravio scans are encrypted client-side before publishing. You can configure the encryption mode per-scan via CLI flags for compliance workflows (e.g. finance, health, government).
+            Use the decrypt tool below to manually recover plaintext runs in your dashboard for audit or recovery.
           </p>
+          <div class="db-settings-subsection">
+            <p class="db-settings-desc" style="font-size:13px;margin-bottom:12px;"><strong>Configure E2EE mode on scan:</strong></p>
+            <ul style="margin:0;padding-left:20px;font-size:13px;color:var(--text-2);line-height:1.7">
+              <li><code>node gravio.mjs --token gv_xxx</code> — Default (API-key derived). Auto-configured on first run.</li>
+              <li><code>node gravio.mjs --passphrase "my-secret"</code> — Passphrase mode. You control the encryption key.</li>
+              <li><code>node gravio.mjs --key "&lt;64-hex&gt;"</code> — Raw key mode. For custom key management.</li>
+            </ul>
+            <p style="font-size:12px;color:var(--text-3);margin-top:8px;">
+              All modes encrypt with AES-256-GCM. Server stores ciphertext only.
+            </p>
+          </div>
         </div>
         <div class="db-form-card">
+          <p style="font-size:13px;font-weight:600;color:var(--text-1);margin-bottom:12px">Decrypt a run</p>
           <div class="db-field">
             <label for="st-e2ee-project">Project ID</label>
             <input type="text" id="st-e2ee-project" placeholder="my-project" autocomplete="off" spellcheck="false" />
@@ -93,7 +105,7 @@
             <label for="st-e2ee-key">API key (gv_...)</label>
             <input type="password" id="st-e2ee-key" placeholder="gv_..." autocomplete="off" spellcheck="false" />
           </div>
-          <button class="m-btn m-btn-outline" id="st-e2ee-load" type="button">Load encrypted latest run</button>
+          <button class="m-btn m-btn-outline" id="st-e2ee-load" type="button">Decrypt latest run</button>
           <textarea class="db-raw-json" id="st-e2ee-output" readonly spellcheck="false" style="min-height:180px;"></textarea>
         </div>
       </section>

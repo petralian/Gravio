@@ -241,7 +241,7 @@ async function init() {
     }
     const user = await me.json();
 
-    if (user.plan === "pro" || user.plan === "team" || user.role === "admin") {
+    if (user.plan === "team" || user.role === "admin") {
       $("st-e2ee-section")?.removeAttribute("hidden");
     }
 
