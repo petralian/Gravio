@@ -8,6 +8,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import crypto from "node:crypto";
 import { evaluate } from "./core/evaluate.mjs";
+import { buildRunArtifact, DEFAULT_CORPUS, DEFAULT_WEIGHTS } from "./core/scanner.mjs";
 import {
   registerUser, loginUser, createSession,
   validateSession, destroySession,
@@ -559,6 +560,91 @@ function boolToInt(value) {
   return value ? 1 : 0;
 }
 
+function lemonHeaders(apiKey) {
+  return {
+    Accept: "application/vnd.api+json",
+    "Content-Type": "application/vnd.api+json",
+    Authorization: `Bearer ${apiKey}`,
+  };
+}
+
+function extractSubscriptionAttrs(payload) {
+  return payload?.data?.attributes ?? payload?.attributes ?? {};
+}
+
+function subscriptionSeatsFromAttrs(attrs, fallback = 1) {
+  const fromItem = parseMaybeInt(attrs?.first_subscription_item?.quantity, NaN);
+  const fromAttrs = parseMaybeInt(attrs?.quantity ?? attrs?.seats ?? attrs?.subscription_quantity, NaN);
+  if (Number.isInteger(fromItem)) return fromItem;
+  if (Number.isInteger(fromAttrs)) return fromAttrs;
+  return fallback;
+}
+
+function derivePlanFromSubscription(attrs, existingPlan = "free", explicitPlan = null) {
+  if (explicitPlan === "pro" || explicitPlan === "team" || explicitPlan === "free") return explicitPlan;
+  const seats = subscriptionSeatsFromAttrs(attrs, 1);
+  if (seats >= TEAM_INCLUDED_SEATS) return "team";
+  if (existingPlan === "team") return "pro";
+  if (existingPlan === "free") return "pro";
+  return existingPlan;
+}
+
+function persistedBillingFromSubscription(attrs, existing, explicitPlan = null) {
+  const existingSeats = parseMaybeInt(existing?.billing_seats, 1);
+  const seats = subscriptionSeatsFromAttrs(attrs, existingSeats);
+  const plan = derivePlanFromSubscription(attrs, existing?.plan ?? "free", explicitPlan);
+  const status = String(attrs?.status ?? existing?.billing_status ?? "none").trim().toLowerCase() || "none";
+  const cancelled = boolToInt(Boolean(attrs?.cancelled ?? attrs?.is_cancelled ?? existing?.billing_cancelled));
+  const customerId = String(attrs?.customer_id ?? existing?.lemon_customer_id ?? "").trim() || null;
+  const subscriptionId = String(attrs?.id ?? attrs?.subscription_id ?? existing?.lemon_subscription_id ?? "").trim() || null;
+  const renewsAt = attrs?.renews_at ?? attrs?.ends_at ?? attrs?.billing_anchor ?? existing?.billing_renews_at ?? null;
+  const portalUrl = attrs?.urls?.customer_portal
+    ?? attrs?.urls?.customer_portal_update_subscription
+    ?? attrs?.urls?.update_payment_method
+    ?? existing?.billing_portal_url
+    ?? null;
+  return {
+    plan,
+    customerId,
+    subscriptionId,
+    status,
+    seats,
+    renewsAt,
+    cancelled,
+    portalUrl,
+  };
+}
+
+async function lemonApiRequest(apiKey, method, endpointPath, jsonApiBody = null) {
+  const response = await fetch(`https://api.lemonsqueezy.com${endpointPath}`, {
+    method,
+    headers: lemonHeaders(apiKey),
+    ...(jsonApiBody ? { body: JSON.stringify(jsonApiBody) } : {}),
+  });
+
+  const raw = await response.text();
+  let parsed;
+  try { parsed = JSON.parse(raw); } catch { parsed = null; }
+
+  return {
+    ok: response.ok,
+    status: response.status,
+    body: parsed ?? raw,
+  };
+}
+
+function userOwnsLemonSubscription(authUser, billingRow, subscriptionAttrs) {
+  const authEmail = String(authUser?.email ?? "").trim().toLowerCase();
+  const lemonEmail = String(subscriptionAttrs?.user_email ?? "").trim().toLowerCase();
+  if (authEmail && lemonEmail && authEmail === lemonEmail) return true;
+
+  const expectedCustomerId = String(billingRow?.lemon_customer_id ?? "").trim();
+  const lemonCustomerId = String(subscriptionAttrs?.customer_id ?? "").trim();
+  if (expectedCustomerId && lemonCustomerId && expectedCustomerId === lemonCustomerId) return true;
+
+  return false;
+}
+
 /** Current platform version, served to CLI for auto-update checks. */
 const APP_VERSION = (() => {
   try {
@@ -705,6 +791,170 @@ const server = http.createServer(async (req, res) => {
       portalUrl: billing?.billing_portal_url ?? null,
       customerId: billing?.lemon_customer_id ?? null,
       subscriptionId: billing?.lemon_subscription_id ?? null,
+    }));
+    return;
+  }
+
+  // ── POST /api/billing/(cancel|resume|seats) — customer billing actions ──
+  const billingActionMatch = req.method === "POST" && /^\/api\/billing\/(cancel|resume|seats)$/.exec(req.url);
+  if (billingActionMatch) {
+    const authUser = getAuthUser(req);
+    if (!authUser) {
+      res.writeHead(401, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Not authenticated" }));
+      return;
+    }
+
+    const apiKey = process.env.LEMON_API_KEY;
+    if (!apiKey) {
+      res.writeHead(503, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Billing is not configured. Missing LEMON_API_KEY." }));
+      return;
+    }
+
+    const uid = authUser.uid ?? authUser.id;
+    const billing = stmts.getBillingForUser.get(uid);
+    const subscriptionId = String(billing?.lemon_subscription_id ?? "").trim();
+    if (!subscriptionId) {
+      res.writeHead(409, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "No linked subscription found for this account." }));
+      return;
+    }
+
+    const retrieveSub = await lemonApiRequest(apiKey, "GET", `/v1/subscriptions/${encodeURIComponent(subscriptionId)}`);
+    if (!retrieveSub.ok) {
+      res.writeHead(502, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({
+        error: "Unable to retrieve subscription",
+        lemonStatus: retrieveSub.status,
+        lemonBody: retrieveSub.body,
+      }));
+      return;
+    }
+
+    const initialAttrs = extractSubscriptionAttrs(retrieveSub.body);
+    const subscriptionAttrs = { ...initialAttrs, id: retrieveSub.body?.data?.id ?? initialAttrs.id ?? subscriptionId };
+    if (!userOwnsLemonSubscription(authUser, billing, subscriptionAttrs)) {
+      res.writeHead(403, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Forbidden: subscription does not belong to authenticated user." }));
+      return;
+    }
+
+    const action = billingActionMatch[1];
+    let updatedSubscriptionAttrs = subscriptionAttrs;
+
+    if (action === "cancel" || action === "resume") {
+      const cancelled = action === "cancel";
+      const patchSub = await lemonApiRequest(apiKey, "PATCH", `/v1/subscriptions/${encodeURIComponent(subscriptionId)}`, {
+        data: {
+          type: "subscriptions",
+          id: String(subscriptionId),
+          attributes: {
+            cancelled,
+          },
+        },
+      });
+
+      if (!patchSub.ok) {
+        res.writeHead(502, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({
+          error: `Unable to ${action} subscription`,
+          lemonStatus: patchSub.status,
+          lemonBody: patchSub.body,
+        }));
+        return;
+      }
+
+      const attrs = extractSubscriptionAttrs(patchSub.body);
+      updatedSubscriptionAttrs = { ...attrs, id: patchSub.body?.data?.id ?? attrs.id ?? subscriptionId };
+    }
+
+    if (action === "seats") {
+      let payload;
+      try {
+        payload = JSON.parse(await readBody(req));
+      } catch {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Invalid JSON" }));
+        return;
+      }
+
+      const seats = Number(payload?.seats);
+      if (!Number.isInteger(seats) || seats < TEAM_INCLUDED_SEATS || seats > TEAM_MAX_SEATS) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({
+          error: `seats must be an integer between ${TEAM_INCLUDED_SEATS} and ${TEAM_MAX_SEATS}`,
+        }));
+        return;
+      }
+
+      const subItemId = String(subscriptionAttrs?.first_subscription_item?.id ?? "").trim();
+      if (!subItemId) {
+        res.writeHead(409, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Subscription does not expose a quantity item to update." }));
+        return;
+      }
+
+      const patchItem = await lemonApiRequest(apiKey, "PATCH", `/v1/subscription-items/${encodeURIComponent(subItemId)}`, {
+        data: {
+          type: "subscription-items",
+          id: String(subItemId),
+          attributes: {
+            quantity: seats,
+          },
+        },
+      });
+
+      if (!patchItem.ok) {
+        res.writeHead(502, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({
+          error: "Unable to update subscription seats",
+          lemonStatus: patchItem.status,
+          lemonBody: patchItem.body,
+        }));
+        return;
+      }
+
+      const refreshedSub = await lemonApiRequest(apiKey, "GET", `/v1/subscriptions/${encodeURIComponent(subscriptionId)}`);
+      if (!refreshedSub.ok) {
+        res.writeHead(502, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({
+          error: "Seats were updated but billing sync failed. Try refreshing in a moment.",
+          lemonStatus: refreshedSub.status,
+          lemonBody: refreshedSub.body,
+        }));
+        return;
+      }
+
+      const attrs = extractSubscriptionAttrs(refreshedSub.body);
+      updatedSubscriptionAttrs = { ...attrs, id: refreshedSub.body?.data?.id ?? attrs.id ?? subscriptionId };
+    }
+
+    const nextState = persistedBillingFromSubscription(updatedSubscriptionAttrs, billing);
+    stmts.setUserBillingState.run(
+      nextState.plan,
+      nextState.customerId,
+      nextState.subscriptionId,
+      nextState.status,
+      nextState.seats,
+      nextState.renewsAt,
+      nextState.cancelled,
+      nextState.portalUrl,
+      uid,
+    );
+
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({
+      ok: true,
+      action,
+      billing: {
+        plan: nextState.plan,
+        status: nextState.status,
+        seats: nextState.seats,
+        renewsAt: nextState.renewsAt,
+        cancelled: Boolean(nextState.cancelled),
+        portalUrl: nextState.portalUrl,
+      },
     }));
     return;
   }
@@ -919,6 +1169,43 @@ const server = http.createServer(async (req, res) => {
       const changed = stmts.renameProjectRunsForUser.run(destinationProjectId, sourceProjectId, uid).changes;
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ ok: true, destinationProjectId, movedRuns: changed }));
+    } catch (err) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: err.message }));
+    }
+    return;
+  }
+
+  // ── API: POST /api/scan-evaluate ─────────────────────────────────────────
+  if (req.method === "POST" && req.url === "/api/scan-evaluate") {
+    const user = getAuthUser(req);
+    if (!user) {
+      res.writeHead(401, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Authentication required. Use a Bearer API key." }));
+      return;
+    }
+    try {
+      const { scan } = JSON.parse(await readBody(req));
+      if (!scan || typeof scan !== "object" || Array.isArray(scan)) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "scan is required and must be a JSON object" }));
+        return;
+      }
+      const repoRoot = path.join(__dirname, "..");
+      const corpusPath = path.join(repoRoot, "agent-quality", "evals", "workflow-corpus.json");
+      const weightsPath = path.join(repoRoot, "agent-quality", "scorecard", "weights.json");
+      const loadedCorpus = fs.existsSync(corpusPath)
+        ? JSON.parse(fs.readFileSync(corpusPath, "utf8"))
+        : DEFAULT_CORPUS;
+      const loadedWeightsObj = fs.existsSync(weightsPath)
+        ? JSON.parse(fs.readFileSync(weightsPath, "utf8"))
+        : { weights: {} };
+      const weights = Object.keys(loadedWeightsObj.weights ?? {}).length > 0
+        ? loadedWeightsObj.weights
+        : DEFAULT_WEIGHTS;
+      const run = buildRunArtifact({ scan, corpus: loadedCorpus, weights, previousRun: null });
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify(run));
     } catch (err) {
       res.writeHead(400, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ error: err.message }));
@@ -1326,24 +1613,23 @@ const server = http.createServer(async (req, res) => {
     }
 
     const eventName = event?.meta?.event_name ?? "";
+    const objectId = String(event?.data?.id ?? "").trim() || null;
+    const eventDigest = crypto.createHash("sha256").update(rawBody).digest("hex");
+    const headerEventId = String(req.headers["x-event-id"] ?? req.headers["x-webhook-id"] ?? "").trim();
+    const eventKey = headerEventId || `${eventName}:${objectId ?? "none"}:${eventDigest}`;
+
+    const insert = stmts.insertWebhookEvent.run("lemonsqueezy", eventKey, eventName, objectId, rawBody);
+    if (insert.changes === 0) {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ ok: true, duplicate: true }));
+      return;
+    }
+
     const attrs = event?.data?.attributes ?? {};
+    const attrsWithId = { ...attrs, id: event?.data?.id ?? attrs.id };
     const email = String(attrs.user_email ?? "").trim();
     const rawPlan = String(event?.meta?.custom_data?.plan ?? "").trim();
     const mappedPlan = ["free", "pro", "team"].includes(rawPlan) ? rawPlan : null;
-    const lemonCustomerId = String(attrs.customer_id ?? attrs.customer?.id ?? "").trim() || null;
-    const lemonSubscriptionId = String(attrs.subscription_id ?? attrs.id ?? "").trim() || null;
-    const renewsAt = attrs.renews_at ?? attrs.ends_at ?? attrs.billing_anchor ?? null;
-    const rawStatus = String(attrs.status ?? "").trim().toLowerCase();
-    const billingStatus = rawStatus || (eventName === "order_created" ? "active" : "none");
-    const qtyFromCustom = parseMaybeInt(event?.meta?.custom_data?.seats, NaN);
-    const qtyFromAttrs = parseMaybeInt(attrs.quantity ?? attrs.seats ?? attrs.subscription_quantity, NaN);
-    const seats = Number.isInteger(qtyFromCustom)
-      ? qtyFromCustom
-      : (Number.isInteger(qtyFromAttrs) ? qtyFromAttrs : 1);
-    const portalUrl = attrs.urls?.customer_portal
-      ?? attrs.urls?.customer_portal_update_subscription
-      ?? attrs.urls?.update_payment_method
-      ?? null;
 
     const upgradableEvents = [
       "order_created",
@@ -1360,28 +1646,31 @@ const server = http.createServer(async (req, res) => {
     if (email && (upgradableEvents.includes(eventName) || statusOnlyEvents.includes(eventName) || downgradeEvents.includes(eventName))) {
       const dbUser = stmts.getUserByEmail.get(email);
       if (dbUser) {
-        const existingPlan = dbUser.plan ?? "free";
-        let nextPlan = existingPlan;
-        if (upgradableEvents.includes(eventName)) {
-          if (mappedPlan === "pro" || mappedPlan === "team") nextPlan = mappedPlan;
-        }
-        if (downgradeEvents.includes(eventName)) {
-          nextPlan = "free";
-        }
+        const qtyFromCustom = parseMaybeInt(event?.meta?.custom_data?.seats, NaN);
+        const seats = Number.isInteger(qtyFromCustom)
+          ? qtyFromCustom
+          : subscriptionSeatsFromAttrs(attrsWithId, parseMaybeInt(dbUser.billing_seats, 1));
 
-        const cancelled = eventName === "subscription_cancelled"
-          ? true
-          : Boolean(attrs.cancelled ?? attrs.is_cancelled ?? dbUser.billing_cancelled);
+        const explicitPlan = downgradeEvents.includes(eventName)
+          ? "free"
+          : (mappedPlan === "pro" || mappedPlan === "team" ? mappedPlan : null);
+
+        const nextState = persistedBillingFromSubscription(
+          { ...attrsWithId, quantity: seats },
+          dbUser,
+          explicitPlan,
+        );
+        if (eventName === "subscription_cancelled") nextState.cancelled = 1;
 
         stmts.setUserBillingState.run(
-          nextPlan,
-          lemonCustomerId ?? dbUser.lemon_customer_id ?? null,
-          lemonSubscriptionId ?? dbUser.lemon_subscription_id ?? null,
-          billingStatus,
-          seats,
-          renewsAt,
-          boolToInt(cancelled),
-          portalUrl ?? dbUser.billing_portal_url ?? null,
+          nextState.plan,
+          nextState.customerId,
+          nextState.subscriptionId,
+          nextState.status,
+          nextState.seats,
+          nextState.renewsAt,
+          nextState.cancelled,
+          nextState.portalUrl,
           dbUser.id,
         );
       }

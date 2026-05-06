@@ -18,7 +18,7 @@ import { readdirSync, readFileSync, writeFileSync, chmodSync, existsSync, mkdirS
 import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { spawn, spawnSync } from "node:child_process";
-import { runScannerOnce } from "../src/core/scanner.mjs";
+import { scanTargetProject } from "../src/core/scan-signals.mjs";
 import { printScanReport, printPublishResult, printScanStep } from "../src/core/reporter.mjs";
 import { deriveKey, encrypt, generateKey } from "../src/core/crypto-e2ee.mjs";
 
@@ -714,17 +714,18 @@ async function handleRun(args) {
     printScanStep(0);
   }
 
-  const plainTempOutput = path.join(args.target, ".gravio", "latest.plain.tmp");
-  const { run, scan } = runScannerOnce({
-    targetDir: args.target,
-    outputFile: plainTempOutput,
-    repoRoot: ROOT,
-  });
-  try {
-    unlinkSync(plainTempOutput);
-  } catch {
-    // ignore
+  const scan = scanTargetProject(args.target);
+  const evalUrl = new URL("/api/scan-evaluate", server).toString();
+  const evalResult = await httpPost(
+    evalUrl,
+    { scan },
+    { Authorization: `Bearer ${apiKey}` },
+  );
+  if (evalResult.status !== 200) {
+    const errMsg = typeof evalResult.data === "object" ? evalResult.data?.error : String(evalResult.data);
+    throw new Error(`Scan evaluation failed: HTTP ${evalResult.status}: ${errMsg ?? "Server error"}`);
   }
+  const run = evalResult.data;
 
   const { envelope, keyMessage } = buildEncryptedRunEnvelope(run, {
     project: projectId,
