@@ -70,6 +70,21 @@ const server = http.createServer(async (req, res) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
 
+  const hostHeader = String(req.headers.host ?? "").split(":")[0].toLowerCase();
+  const canonicalHost = String(process.env.CANONICAL_HOST ?? "gravio.dev").toLowerCase();
+  const pathOnly = String(req.url ?? "/").split("?")[0];
+  const shouldRedirectToCanonical =
+    req.method === "GET" &&
+    (hostHeader === "gravio-platform.fly.dev" || hostHeader === `www.${canonicalHost}`) &&
+    pathOnly !== "/health" &&
+    !pathOnly.startsWith("/.well-known/");
+
+  if (shouldRedirectToCanonical) {
+    res.writeHead(308, { Location: `https://${canonicalHost}${req.url}` });
+    res.end();
+    return;
+  }
+
   if (req.method === "OPTIONS") {
     res.writeHead(204);
     res.end();

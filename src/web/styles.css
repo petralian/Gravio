@@ -1048,6 +1048,12 @@ body.onboarding-page {
   flex-wrap: wrap;
 }
 
+.ob-auth-ok {
+  margin-top: 12px;
+  color: var(--neon-green);
+  font-size: 14px;
+}
+
 .ob-steps {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1082,6 +1088,33 @@ body.onboarding-page {
   font-size: 14px;
   line-height: 1.6;
   margin-bottom: 12px;
+}
+
+.ob-inline-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-3);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.ob-project-input {
+  width: 100%;
+  background: #060606;
+  border: 1px solid var(--border-bright);
+  color: var(--text-1);
+  border-radius: 10px;
+  padding: 12px;
+  font-size: 15px;
+  font-family: var(--font-mono);
+}
+
+.ob-project-input:focus {
+  outline: none;
+  border-color: var(--neon-cyan);
+  box-shadow: 0 0 0 3px rgba(0, 229, 255, 0.12);
 }
 
 .ob-code {
@@ -1131,6 +1164,56 @@ body.onboarding-page {
 .ob-faq p {
   color: var(--text-2);
   margin-top: 8px;
+}
+
+.ob-auth-modal-wrap {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+}
+
+.ob-auth-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.72);
+}
+
+.ob-auth-modal {
+  position: relative;
+  width: min(92vw, 620px);
+  background: var(--surface-1);
+  border: 1px solid var(--border-bright);
+  border-radius: 14px;
+  padding: 20px;
+  z-index: 1;
+}
+
+.ob-auth-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-2);
+  font-size: 20px;
+  cursor: pointer;
+}
+
+.ob-auth-title {
+  font-size: 26px;
+  margin-bottom: 6px;
+}
+
+.ob-auth-sub {
+  color: var(--text-2);
+  margin-bottom: 16px;
+  font-size: 14px;
 }
 
 /* onboarding header adapts to logged-in state */

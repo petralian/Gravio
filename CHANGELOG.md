@@ -15,6 +15,10 @@ All notable changes to this project will be documented in this file.
 - Dashboard layout fixed so "My projects" and "API keys" render inside the primary dashboard container with consistent spacing.
 - Onboarding now uses an auth-aware unified header (user pill + sign-out when authenticated; sign-in CTA when unauthenticated).
 - Onboarding hero CTA now adapts to session state, hiding "Create account or sign in" for logged-in users and showing "Open dashboard" instead.
+- Marketing header now removes the separate onboarding menu item and routes "Start free" directly to guided onboarding.
+- Onboarding flow is now register-first with in-page auth modal, project-first step ordering, and live command updates from the chosen project name.
+- Onboarding copy now clarifies that commands must be run in a real project directory (not random folders) to avoid npm/scan command confusion.
+- Canonical host redirects now keep browser sessions on `gravio.dev` (including redirect from `gravio-platform.fly.dev` and `www.gravio.dev`) to improve session continuity.
 
 ## [0.4.0] — 2026-05-05
 

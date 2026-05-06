@@ -35,56 +35,96 @@
       <p class="m-eyebrow">GETTING STARTED</p>
       <h1 class="ob-title">From zero to first score in 5 minutes</h1>
       <p class="ob-lead">
-        This guide is built for non-coders. Follow the steps in order and copy/paste each command.
-        Local scan works right away. Registration is required for cloud scoring and dashboard features.
+        Start free with one uninterrupted flow: create account, choose your project name,
+        run your first scan, and publish encrypted results to your dashboard.
       </p>
       <div class="ob-cta-row">
-        <a href="/login" id="ob-signup-cta" class="m-btn m-btn-neon m-btn-lg">Create account or sign in</a>
-        <a href="/dashboard" id="ob-dashboard-cta" class="m-btn m-btn-outline m-btn-lg" hidden>Open dashboard</a>
+        <button id="ob-start-free" class="m-btn m-btn-neon m-btn-lg" type="button">Create account or sign in</button>
       </div>
+      <p class="ob-auth-ok" id="ob-auth-ok" hidden></p>
     </section>
 
     <section class="ob-steps" aria-label="Onboarding steps">
       <article class="ob-step-card">
         <p class="ob-step-num">Step 1</p>
-        <h2>Install dependencies</h2>
-        <p>Open terminal in your project folder and run:</p>
-        <pre class="ob-code" id="cmd-install">npm ci</pre>
-        <button class="m-btn m-btn-outline ob-copy" type="button" data-copy-id="cmd-install">Copy command</button>
+        <h2>Create your project name</h2>
+        <p>This name is reused in every command below and auto-populates in your publish command.</p>
+        <label class="ob-inline-label" for="ob-project-id">Project name</label>
+        <input id="ob-project-id" class="ob-project-input" type="text" value="my-first-project" autocomplete="off" spellcheck="false" />
       </article>
 
       <article class="ob-step-card">
         <p class="ob-step-num">Step 2</p>
         <h2>Run your first local scan</h2>
-        <p>This works for every user immediately. No login required for local-only scan.</p>
+        <p>Run this in your actual project folder. It will fail in random folders that don't contain your project files.</p>
         <pre class="ob-code" id="cmd-local">node scripts/scanner-daemon.mjs --once</pre>
         <button class="m-btn m-btn-outline ob-copy" type="button" data-copy-id="cmd-local">Copy command</button>
       </article>
 
       <article class="ob-step-card">
         <p class="ob-step-num">Step 3</p>
-        <h2>Create a project id</h2>
-        <p>Pick something simple like team-name-app. You will reuse it on every publish.</p>
-        <pre class="ob-code" id="cmd-project">my-first-project</pre>
-      </article>
-
-      <article class="ob-step-card">
-        <p class="ob-step-num">Step 4</p>
         <h2>Publish encrypted results</h2>
-        <p>Use your API key from dashboard. Free plan allows 3 encrypted cloud scans.</p>
-        <pre class="ob-code" id="cmd-publish">node scripts/scanner-daemon.mjs --once --publish --project my-first-project --server https://gravio-platform.fly.dev --api-key gv_your_api_key_here</pre>
+        <p>Free plan includes 3 cloud scans after registration. The project name below updates live from Step 1.</p>
+        <pre class="ob-code" id="cmd-publish">node scripts/scanner-daemon.mjs --once --publish --project my-first-project --server https://gravio.dev --api-key gv_your_api_key_here</pre>
         <button class="m-btn m-btn-outline ob-copy" type="button" data-copy-id="cmd-publish">Copy command</button>
       </article>
 
       <article class="ob-step-card">
-        <p class="ob-step-num">Step 5</p>
+        <p class="ob-step-num">Step 4</p>
         <h2>View your scorecard</h2>
-        <p>Go to dashboard, select project, and decrypt in browser.</p>
+        <p>Go straight to your dashboard to decrypt and review the score for your project.</p>
         <div class="ob-cta-row">
-          <a href="/dashboard" class="m-btn m-btn-neon">Open dashboard</a>
-          <a href="/login" class="m-btn m-btn-ghost">Manage account</a>
+          <a href="/dashboard" id="ob-dashboard-link" class="m-btn m-btn-neon">Open dashboard</a>
         </div>
       </article>
+    </section>
+
+    <section class="ob-auth-modal-wrap" id="ob-auth-modal-wrap" hidden>
+      <div class="ob-auth-backdrop" id="ob-auth-backdrop"></div>
+      <div class="ob-auth-modal" role="dialog" aria-modal="true" aria-labelledby="ob-auth-title">
+        <button class="ob-auth-close" id="ob-auth-close" type="button" aria-label="Close">×</button>
+        <h2 id="ob-auth-title" class="ob-auth-title">Start free</h2>
+        <p class="ob-auth-sub">Create account or sign in to unlock your first 3 encrypted cloud scans.</p>
+
+        <div class="auth-tabs" role="tablist">
+          <button class="auth-tab auth-tab-active" id="ob-tab-login" role="tab" aria-selected="true" aria-controls="ob-panel-login" type="button">Sign in</button>
+          <button class="auth-tab" id="ob-tab-register" role="tab" aria-selected="false" aria-controls="ob-panel-register" type="button">Create account</button>
+        </div>
+
+        <div id="ob-panel-login" role="tabpanel" aria-labelledby="ob-tab-login">
+          <form class="auth-form" id="ob-form-login" novalidate>
+            <div class="auth-field">
+              <label for="ob-login-email">Email</label>
+              <input type="email" id="ob-login-email" name="email" autocomplete="email" placeholder="you@example.com" required />
+            </div>
+            <div class="auth-field">
+              <label for="ob-login-password">Password</label>
+              <input type="password" id="ob-login-password" name="password" autocomplete="current-password" placeholder="••••••••" required />
+            </div>
+            <p class="auth-error" id="ob-login-error" hidden></p>
+            <button class="m-btn m-btn-neon auth-submit" type="submit" id="ob-login-submit">Sign in →</button>
+          </form>
+        </div>
+
+        <div id="ob-panel-register" role="tabpanel" aria-labelledby="ob-tab-register" hidden>
+          <form class="auth-form" id="ob-form-register" novalidate>
+            <div class="auth-field">
+              <label for="ob-reg-email">Email</label>
+              <input type="email" id="ob-reg-email" name="email" autocomplete="email" placeholder="you@example.com" required />
+            </div>
+            <div class="auth-field">
+              <label for="ob-reg-password">Password</label>
+              <input type="password" id="ob-reg-password" name="password" autocomplete="new-password" placeholder="Min. 8 characters" required />
+            </div>
+            <div class="auth-field">
+              <label for="ob-reg-confirm">Confirm password</label>
+              <input type="password" id="ob-reg-confirm" name="confirm" autocomplete="new-password" placeholder="••••••••" required />
+            </div>
+            <p class="auth-error" id="ob-reg-error" hidden></p>
+            <button class="m-btn m-btn-neon auth-submit" type="submit" id="ob-reg-submit">Create account →</button>
+          </form>
+        </div>
+      </div>
     </section>
 
     <section class="ob-faq">
@@ -94,12 +134,12 @@
         <p>Yes. Use the guided steps above. If commands are new to you, copy one command at a time and paste into terminal exactly as shown.</p>
       </details>
       <details>
-        <summary>Does a new user need approval before scanning locally?</summary>
-        <p>No approval needed. Local scan mode runs immediately. Account is needed for cloud publish, saved projects, dashboard, and scoring tool access.</p>
+        <summary>Why does npm ci fail in random folders?</summary>
+        <p><code>npm ci</code> requires an existing <code>package-lock.json</code>. Use onboarding commands from your real project folder, not a random empty directory.</p>
       </details>
       <details>
-        <summary>Is the scoring tool the same as production scoring?</summary>
-        <p>Yes, it uses the same evaluator. It is account-gated so only signed-in users can use it.</p>
+        <summary>Why was I getting logged out?</summary>
+        <p>Switching between domains can break session continuity. We now keep onboarding and auth on <code>gravio.dev</code> to keep sessions stable.</p>
       </details>
     </section>
   </main>

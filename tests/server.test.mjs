@@ -87,6 +87,12 @@ describe("GET /", () => {
     assert.strictEqual(res.status, 200);
     assert.ok(res.body.includes("<title>Gravio"), "Expected Gravio title in marketing HTML");
   });
+
+  it("redirects fly host to canonical gravio.dev", async () => {
+    const res = await httpGet(`http://localhost:${TEST_PORT}/`, { Host: "gravio-platform.fly.dev" });
+    assert.strictEqual(res.status, 308);
+    assert.strictEqual(res.headers.location, "https://gravio.dev/");
+  });
 });
 
 describe("GET /styles.css", () => {

@@ -27,11 +27,10 @@
       <nav class="m-nav-links" aria-label="Primary navigation">
         <a href="#how">How it works</a>
         <a href="#pricing">Pricing</a>
-        <a href="#install">Install</a>
-        <a href="/onboarding">Onboarding</a>
+        <a href="#install">Get started</a>
         <a href="/login" class="m-btn m-btn-outline m-btn-sm">Customer login</a>
         <a href="mailto:hello@gravio.dev" class="m-btn m-btn-outline m-btn-sm">Book demo</a>
-        <a href="/login" class="m-btn m-btn-neon m-btn-sm">Start free (3 scans)</a>
+        <a href="/onboarding" class="m-btn m-btn-neon m-btn-sm">Start free</a>
       </nav>
     </div>
   </header>
@@ -48,12 +47,12 @@
           <br/><span class="m-neon-text">production-safe.</span>
         </h1>
         <p class="m-hero-lead">
-          Drop the daemon in your project root. It scans silently, scores your agent
-          on safety, reliability, and governance — then publishes encrypted results
-          only your browser can decrypt.
+          Register first, then run your first 3 encrypted cloud scans with a guided flow.
+          Gravio scores your agent on safety, reliability, and governance while keeping
+          results encrypted end to end.
         </p>
         <div class="m-cta-row">
-          <a href="/login" class="m-btn m-btn-neon m-btn-lg">Register and get 3 free scans</a>
+          <a href="/onboarding" class="m-btn m-btn-neon m-btn-lg">Start free</a>
           <a href="/login" class="m-btn m-btn-outline m-btn-lg">Customer login</a>
           <a href="#how" class="m-btn m-btn-ghost m-btn-lg">See how it works →</a>
         </div>
@@ -260,8 +259,8 @@
       <div class="m-install-inner">
         <div class="m-install-copy">
           <p class="m-eyebrow">ZERO CONFIG</p>
-          <h2 class="m-section-h2">Register first,<br/>then run in 30 seconds.</h2>
-          <p class="m-section-sub">Local scan is instant. Cloud scoring and dashboard require login + API key.</p>
+          <h2 class="m-section-h2">Register first,<br/>then launch your first 3 scans.</h2>
+          <p class="m-section-sub">Start free in guided onboarding: create account, choose project name, run scan, publish encrypted results.</p>
           <div class="m-install-feats">
             <div class="m-install-feat"><span class="t-pass">✓</span> macOS · Windows · Linux</div>
             <div class="m-install-feat"><span class="t-pass">✓</span> Beginner-friendly onboarding</div>
@@ -279,17 +278,15 @@
             <span class="m-terminal-title">Terminal</span>
           </div>
           <div class="m-terminal-body">
-<pre class="m-terminal-pre"><span class="t-comment"># Register and get API key</span>
-<span class="t-comment"># Visit: https://gravio-platform.fly.dev/login</span>
+<pre class="m-terminal-pre"><span class="t-comment"># Register first</span>
+<span class="t-comment"># Visit: https://gravio.dev/onboarding</span>
 
-<span class="t-comment"># One-time scan → writes agent-quality/runs/latest.json</span>
-<span class="t-prompt">$</span> <span class="t-cmd">npm run scorecard:scan</span>
-
-<span class="t-comment"># Watch mode — rescans on file change</span>
-<span class="t-prompt">$</span> <span class="t-cmd">npm run scorecard:scan:watch</span>
+<span class="t-comment"># Pick project id in onboarding (example: my-first-project)</span>
+<span class="t-comment"># Then run your first scan from your project root</span>
+<span class="t-prompt">$</span> <span class="t-cmd">node scripts/scanner-daemon.mjs --once</span>
 
 <span class="t-comment"># Publish encrypted results to your dashboard</span>
-<span class="t-prompt">$</span> <span class="t-cmd">node scripts/scanner-daemon.mjs --once --publish --project my-saas --api-key gv_xxx --server https://gravio-platform.fly.dev</span><span class="t-cursor">█</span></pre>
+<span class="t-prompt">$</span> <span class="t-cmd">node scripts/scanner-daemon.mjs --once --publish --project my-first-project --api-key gv_xxx --server https://gravio.dev</span><span class="t-cursor">█</span></pre>
           </div>
         </div>
       </div>
@@ -317,8 +314,8 @@
       <h2 class="m-cta-h2">Ready to see your agent quality score?</h2>
       <p>Register now and get 3 encrypted cloud scans free.</p>
       <div class="m-cta-row">
-        <a href="/onboarding" class="m-btn m-btn-outline m-btn-lg">Guided onboarding</a>
-        <a href="/login" class="m-btn m-btn-neon m-btn-lg">Register free</a>
+        <a href="/onboarding" class="m-btn m-btn-neon m-btn-lg">Start free</a>
+        <a href="/login" class="m-btn m-btn-outline m-btn-lg">Customer login</a>
         <a href="mailto:hello@gravio.dev" class="m-btn m-btn-neon m-btn-lg">Get early access</a>
       </div>
     </section>
