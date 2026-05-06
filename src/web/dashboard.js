@@ -205,6 +205,15 @@ function renderProjectsGrid(projects) {
       </button>
     `;
   }).join("");
+
+  // Always append the "Add project" card at the end
+  elProjGrid.insertAdjacentHTML("beforeend", `
+    <a class="db-proj-card db-proj-card-new" href="/onboarding" aria-label="Add a new project">
+      <span class="db-proj-card-new-icon" aria-hidden="true">+</span>
+      <span class="db-proj-card-new-label">Add project</span>
+      <span class="db-proj-card-new-sub">Set up the CLI in a new folder</span>
+    </a>
+  `);
 }
 
 // ─── Workspace tabs ───
@@ -293,6 +302,7 @@ function renderWorkspace(projectId, payload) {
 
   renderWorkspaceScans(scans);
   renderWorkspaceRecs(scans);
+  renderWorkspaceRunScans(projectId, scans.length > 0);
   switchTab("overview");
   showView("workspace");
 }
@@ -310,10 +320,77 @@ function renderWorkspaceScans(scans) {
     <tr>
       <td><input type="checkbox" data-scan-id="${s.id}" /></td>
       <td style="font-family:var(--font-mono);font-size:12px">${esc(s.runId ?? "run")}</td>
-      <td>${formatDate(s.publishedAt)}</td>
+      <td title="${esc(formatDate(s.publishedAt))}">${formatDateRelative(s.publishedAt)}</td>
       <td class="${scoreColorClass(s.overallScore ?? 0)}">${formatScore(s.overallScore)}</td>
       <td><span class="db-rating-badge ${ratingBadgeClass(s.rating)}">${esc(s.rating ?? "Unknown")}</span></td>
     </tr>`).join("");
+}
+
+function renderWorkspaceRunScans(projectId, hasScans) {
+  const panel = $("db-tab-runscans");
+  const pid   = esc(projectId);
+
+  const statusHtml = hasScans
+    ? `<div class="db-runscans-status db-runscans-ok">
+         <span class="db-auth-badge db-auth-badge-ok">&#10003; Auth completed</span>
+         <p class="db-runscans-status-text">This project has been scanned before. On a new machine or folder? Re-run Step&nbsp;2 to re-authorize.</p>
+       </div>`
+    : `<div class="db-runscans-status db-runscans-warn">
+         <span class="db-auth-badge db-auth-badge-warn">&#9888; No scans yet</span>
+         <p class="db-runscans-status-text">Complete the steps below to authorize and publish your first scan.</p>
+       </div>`;
+
+  panel.innerHTML = `
+    <div class="db-runscans">
+      ${statusHtml}
+      <div class="db-runscans-steps">
+
+        <div class="db-runscans-step">
+          <div class="db-runscans-step-num">1</div>
+          <div class="db-runscans-step-body">
+            <h3 class="db-runscans-h3">Download the CLI</h3>
+            <p class="db-runscans-p">Save <code>gravio.mjs</code> to your project folder if you don&#39;t have it already.</p>
+            <p class="db-runscans-platform">Windows (PowerShell)</p>
+            <div class="db-runscans-cmd-row">
+              <pre class="db-runscans-cmd" id="rs-cmd-dl-win">Invoke-WebRequest https://gravio.dev/cli/gravio.mjs -OutFile gravio.mjs</pre>
+              <button class="m-btn m-btn-outline m-btn-sm db-rs-copy" data-copy-id="rs-cmd-dl-win" type="button">Copy</button>
+            </div>
+            <p class="db-runscans-platform">macOS / Linux</p>
+            <div class="db-runscans-cmd-row">
+              <pre class="db-runscans-cmd" id="rs-cmd-dl-mac">curl -fsSL https://gravio.dev/cli/gravio.mjs -o gravio.mjs</pre>
+              <button class="m-btn m-btn-outline m-btn-sm db-rs-copy" data-copy-id="rs-cmd-dl-mac" type="button">Copy</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="db-runscans-step">
+          <div class="db-runscans-step-num">2</div>
+          <div class="db-runscans-step-body">
+            <h3 class="db-runscans-h3">Authorize this folder <span class="db-runscans-note">(once per machine / folder)</span></h3>
+            <p class="db-runscans-p">Your project ID is pre-filled. Need your API key? <a href="/settings" class="db-runscans-link">Get it in Settings &#8594;</a></p>
+            <div class="db-runscans-cmd-row">
+              <pre class="db-runscans-cmd" id="rs-cmd-auth">node gravio.mjs --authorize --target . --project ${pid} --server https://gravio.dev --api-key YOUR_API_KEY</pre>
+              <button class="m-btn m-btn-outline m-btn-sm db-rs-copy" data-copy-id="rs-cmd-auth" type="button">Copy</button>
+            </div>
+            <p class="db-runscans-foot">Authorization is saved in <code>.gravio/auth.json</code>. No need to re-authorize on the same machine.</p>
+          </div>
+        </div>
+
+        <div class="db-runscans-step">
+          <div class="db-runscans-step-num">3</div>
+          <div class="db-runscans-step-body">
+            <h3 class="db-runscans-h3">Run a scan</h3>
+            <p class="db-runscans-p">Run from the root of your project folder. Results publish to this dashboard automatically.</p>
+            <div class="db-runscans-cmd-row">
+              <pre class="db-runscans-cmd" id="rs-cmd-scan">node gravio.mjs --once --target .</pre>
+              <button class="m-btn m-btn-outline m-btn-sm db-rs-copy" data-copy-id="rs-cmd-scan" type="button">Copy</button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  `;
 }
 
 function renderWorkspaceRecs(scans) {
@@ -431,6 +508,8 @@ function bindEvents() {
     if (cb.checked) state.selectedScanIds.add(id);
     else state.selectedScanIds.delete(id);
     elDeleteConfirm.setAttribute("hidden", "");
+    const n = state.selectedScanIds.size;
+    elDeleteSelected.textContent = n > 0 ? `Delete selected (${n})` : "Delete selected";
   });
 
   elDeleteSelected.addEventListener("click", () => {
@@ -447,6 +526,18 @@ function bindEvents() {
   });
 
   elConfirmDelete.addEventListener("click", deleteSelectedScans);
+
+  // Copy buttons in the Run Scans tab (panel persists; content is re-rendered per project)
+  $("db-tab-runscans").addEventListener("click", (e) => {
+    const btn = e.target.closest(".db-rs-copy");
+    if (!btn) return;
+    const pre = document.getElementById(btn.dataset.copyId);
+    if (!pre) return;
+    navigator.clipboard?.writeText(pre.textContent).catch(() => {});
+    const orig = btn.textContent;
+    btn.textContent = "Copied!";
+    setTimeout(() => { btn.textContent = orig; }, 1600);
+  });
 
   window.addEventListener("popstate", () => {
     const projectId = getRequestedProjectFromUrl();
