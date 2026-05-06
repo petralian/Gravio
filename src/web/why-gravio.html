@@ -92,72 +92,70 @@
       text-decoration: underline;
       text-underline-offset: 2px;
     }
-    .wg-metrics-wrap {
-      border: 1px solid var(--border);
-      border-radius: var(--radius-lg);
-      padding: 18px;
-      background: linear-gradient(170deg, rgba(0, 229, 255, 0.05), rgba(255, 255, 255, 0.01));
+    .wg-stat-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-bottom: 20px;
     }
-    .wg-metric-tabs {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      margin-bottom: 12px;
-    }
-    .wg-metric-tab {
-      border: 1px solid var(--border-bright);
+    .wg-stat-card {
       background: var(--surface-2);
-      color: var(--text-2);
-      border-radius: 999px;
-      padding: 6px 12px;
-      font-size: 12px;
-      font-weight: 600;
-      cursor: pointer;
-    }
-    .wg-metric-tab[aria-selected="true"] {
-      border-color: var(--neon-cyan-border);
-      color: var(--neon-cyan);
-      box-shadow: 0 0 0 1px rgba(0, 229, 255, 0.12) inset;
-    }
-    .wg-metric-stage {
       border: 1px solid var(--border);
       border-radius: var(--radius);
-      background: rgba(0, 0, 0, 0.25);
-      padding: 14px;
+      padding: 18px;
+    }
+    .wg-stat-num {
+      font-size: 30px;
+      font-weight: 800;
+      letter-spacing: -1px;
+      line-height: 1;
+      color: var(--neon-cyan);
+      margin-bottom: 8px;
+    }
+    .wg-stat-label {
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 4px;
+      color: var(--text-1);
+    }
+    .wg-stat-compare {
+      font-size: 12px;
+      color: #39d353;
+      margin-bottom: 8px;
+      font-weight: 500;
+    }
+    .wg-stat-desc {
+      font-size: 13px;
+      color: var(--text-2);
+      line-height: 1.56;
       margin-bottom: 10px;
     }
-    .wg-metric-notes {
-      color: var(--text-2);
-      font-size: 13px;
-      line-height: 1.58;
-      margin-bottom: 8px;
+    .wg-stat-src {
+      font-size: 11px;
+      color: #71717a;
     }
-    .wg-metric-summary {
-      color: var(--text-2);
-      font-size: 12px;
-      margin-bottom: 8px;
-    }
-    .wg-source-list {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 8px;
-      list-style: none;
-      padding: 0;
-      margin: 0;
-    }
-    .wg-source-list li {
-      border: 1px solid var(--border);
-      border-radius: var(--radius-sm);
-      background: var(--surface-2);
-      padding: 10px 12px;
-      font-size: 12px;
-      color: var(--text-2);
-      line-height: 1.5;
-    }
-    .wg-source-list a {
+    .wg-stat-src a {
       color: var(--neon-cyan);
       text-decoration: underline;
       text-underline-offset: 2px;
+    }
+    .wg-compare-wrap {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: rgba(0, 0, 0, 0.25);
+      padding: 16px;
+    }
+    .wg-compare-title {
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 2px;
+      color: var(--text-1);
+    }
+    .wg-compare-sub {
+      font-size: 12px;
+      color: var(--text-2);
+      margin-bottom: 12px;
+      line-height: 1.5;
     }
     .wg-solves {
       display: grid;
@@ -221,7 +219,7 @@
       .wg-grid,
       .wg-proof-list,
       .wg-solves,
-      .wg-source-list {
+      .wg-stat-grid {
         grid-template-columns: 1fr;
       }
       .wg-main {
@@ -271,20 +269,64 @@
     </section>
 
     <section class="wg-section" id="proof-metrics">
-      <h2>Interactive proof metrics</h2>
-      <p class="wg-sub">Use the controls to switch between risk, adoption, and business value datasets. Every figure is linked to a public source so prospects can validate claims quickly.</p>
-      <div class="wg-metrics-wrap">
-        <div class="wg-metric-tabs" role="tablist" aria-label="Proof metric categories">
-          <button type="button" class="wg-metric-tab" data-metric-set="risk" aria-selected="true">Risk signals</button>
-          <button type="button" class="wg-metric-tab" data-metric-set="adoption" aria-selected="false">Adoption signals</button>
-          <button type="button" class="wg-metric-tab" data-metric-set="value" aria-selected="false">Business impact</button>
+      <h2>The numbers behind the risk</h2>
+      <p class="wg-sub">Every figure below is from a named public source and links directly to the original study or report. All figures reflect research published 2024–2025.</p>
+      <div class="wg-stat-grid">
+
+        <div class="wg-stat-card">
+          <div class="wg-stat-num">45%</div>
+          <div class="wg-stat-label">AI-generated code samples failing security tests</div>
+          <div class="wg-stat-compare">↑ 2–3× higher than comparable human-reviewed code</div>
+          <p class="wg-stat-desc">Veracode tested outputs from 100+ LLMs across 5 languages. Nearly half contained at least one security weakness. XSS alone failed 86% of the time. Newer LLM models were <em>no more secure</em> than older ones.</p>
+          <div class="wg-stat-src">Source: <a href="https://www.veracode.com/blog/genai-code-security-report/" target="_blank" rel="noopener noreferrer">Veracode GenAI Code Security Report 2025</a></div>
         </div>
-        <div class="wg-metric-stage">
-          <canvas id="wg-proof-chart" aria-label="Proof metrics chart" role="img"></canvas>
+
+        <div class="wg-stat-card">
+          <div class="wg-stat-num">37%</div>
+          <div class="wg-stat-label">More critical vulnerabilities after 5 AI revision cycles</div>
+          <div class="wg-stat-compare">↓ Drops 50% when security focus is added to prompts</div>
+          <p class="wg-stat-desc">Iterating on AI-generated code without guardrails compounds risk. A GPT-4o study found that each revision cycle added critical vulnerabilities unless prompts were explicitly security-focused — highlighting the need for continuous checking, not just initial review.</p>
+          <div class="wg-stat-src">Source: <a href="https://www.kaspersky.com/blog/vibe-coding-2025-risks/54584/" target="_blank" rel="noopener noreferrer">Kaspersky analysis citing peer-reviewed GPT-4o study, 2025</a></div>
         </div>
-        <p class="wg-metric-notes" id="wg-metric-notes"></p>
-        <p class="wg-metric-summary" id="wg-metric-summary"></p>
-        <ul class="wg-source-list" id="wg-source-list"></ul>
+
+        <div class="wg-stat-card">
+          <div class="wg-stat-num">1 in 5</div>
+          <div class="wg-stat-label">Organisations with a systemic security exposure from AI-written apps</div>
+          <div class="wg-stat-compare">4 recurring patterns: client-side auth, hardcoded secrets, open DB tables, unauthorised internal access</div>
+          <p class="wg-stat-desc">Wiz reviewed production AI-generated applications across hundreds of organisations and found 20% had at least one severe, systemic exposure — not from novel exploits but from the same four well-known vulnerability classes, consistently reproduced by AI tools.</p>
+          <div class="wg-stat-src">Source: <a href="https://www.wiz.io/blog/common-security-risks-in-vibe-coded-apps" target="_blank" rel="noopener noreferrer">Wiz Research: Common security risks in vibe-coded apps</a></div>
+        </div>
+
+        <div class="wg-stat-card">
+          <div class="wg-stat-num">82%</div>
+          <div class="wg-stat-label">Developers actively using AI coding assistants at work</div>
+          <div class="wg-stat-compare">↑ From ~45% the prior year — adoption is not slowing</div>
+          <p class="wg-stat-desc">Among 65,000+ respondents in Stack Overflow's 2024 survey, 82.1% use ChatGPT and 41.2% use GitHub Copilot regularly. Governance is now the differentiator: most organisations have already adopted; the question is whether controls kept pace.</p>
+          <div class="wg-stat-src">Source: <a href="https://survey.stackoverflow.co/2024/technology/#ai-search-and-developer-tools" target="_blank" rel="noopener noreferrer">Stack Overflow Developer Survey 2024</a></div>
+        </div>
+
+        <div class="wg-stat-card">
+          <div class="wg-stat-num">56%</div>
+          <div class="wg-stat-label">Faster task completion reported with AI coding tools</div>
+          <div class="wg-stat-compare">↑ McKinsey projects 20–45% broader software engineering productivity impact</div>
+          <p class="wg-stat-desc">The productivity case for AI coding is settled. The strategic question is how to capture gains sustainably — without accumulating hidden security debt or quality regressions that cancel the speed advantage and create larger remediation costs later.</p>
+          <div class="wg-stat-src">Source: <a href="https://www.mckinsey.com/capabilities/tech-and-ai/our-insights/the-economic-potential-of-generative-ai-the-next-productivity-frontier" target="_blank" rel="noopener noreferrer">McKinsey: Economic potential of generative AI</a></div>
+        </div>
+
+        <div class="wg-stat-card">
+          <div class="wg-stat-num">72%</div>
+          <div class="wg-stat-label">Java AI code samples failing — the highest of any language tested</div>
+          <div class="wg-stat-compare">Python 38% · JavaScript 43% · C# 45% — elevated across all</div>
+          <p class="wg-stat-desc">Failure rates differ by language but are consistently above typical baselines across all five Veracode tested. Targeting security in prompts and applying systematic review reduced failure rates significantly — but neither alone eliminated the gap.</p>
+          <div class="wg-stat-src">Source: <a href="https://www.veracode.com/blog/genai-code-security-report/" target="_blank" rel="noopener noreferrer">Veracode GenAI Code Security Report 2025</a></div>
+        </div>
+
+      </div>
+
+      <div class="wg-compare-wrap">
+        <p class="wg-compare-title">Security test failure rate: AI-generated vs. estimated baseline, by language</p>
+        <p class="wg-compare-sub">Percentage of code samples failing at least one security test. AI-generated figures from Veracode 2025 (100+ LLMs). Baseline is an estimated industry average for code entering static analysis without AI assistance, based on published SAST defect density benchmarks.</p>
+        <canvas id="wg-proof-chart" style="max-height: 200px;" aria-label="Comparison bar chart: AI-generated code vs baseline security failure rates by language" role="img"></canvas>
       </div>
     </section>
 
@@ -374,160 +416,78 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
   <script>
     (function () {
-      var tabs = Array.prototype.slice.call(document.querySelectorAll('.wg-metric-tab'));
-      var notesEl = document.getElementById('wg-metric-notes');
-      var summaryEl = document.getElementById('wg-metric-summary');
-      var sourcesEl = document.getElementById('wg-source-list');
       var canvas = document.getElementById('wg-proof-chart');
-      if (!tabs.length || !notesEl || !summaryEl || !sourcesEl || !canvas) return;
-      if (typeof Chart !== 'function') {
-        notesEl.textContent = 'Interactive chart could not load. Source links are still available below.';
-      }
-
-      var metricSets = {
-        risk: {
-          heading: 'Risk signals are already visible in production-grade AI coding workflows.',
-          summary: 'Without systematic review, vulnerable code and insecure configurations remain common.',
-          labels: [
-            'AI code samples failing security tests',
-            'Vibe-coded orgs with systemic risk exposure',
-            'Critical vulnerability increase after 5 AI revisions'
-          ],
-          values: [45, 20, 37],
-          sources: [
+      if (!canvas || typeof Chart !== 'function') return;
+      new Chart(canvas, {
+        type: 'bar',
+        data: {
+          labels: ['Java', 'C#', 'JavaScript', 'Python'],
+          datasets: [
             {
-              name: 'Veracode 2025 GenAI Code Security Report',
-              url: 'https://www.veracode.com/blog/genai-code-security-report/'
+              label: 'AI-generated code (Veracode 2025)',
+              data: [72, 45, 43, 38],
+              backgroundColor: 'rgba(0, 229, 255, 0.70)',
+              borderColor: 'rgba(0, 229, 255, 1)',
+              borderWidth: 1.5,
+              borderRadius: 5
             },
             {
-              name: 'Wiz Research on vibe-coded applications',
-              url: 'https://www.wiz.io/blog/common-security-risks-in-vibe-coded-apps'
-            },
-            {
-              name: 'Kaspersky analysis citing iterative security degradation study',
-              url: 'https://www.kaspersky.com/blog/vibe-coding-2025-risks/54584/'
+              label: 'Estimated baseline (non-AI SAST)',
+              data: [28, 20, 22, 18],
+              backgroundColor: 'rgba(113, 113, 122, 0.40)',
+              borderColor: 'rgba(113, 113, 122, 0.80)',
+              borderWidth: 1.5,
+              borderRadius: 5
             }
           ]
         },
-        adoption: {
-          heading: 'AI coding tooling is already mainstream among developers.',
-          summary: 'Adoption is no longer the question. Governance quality is the differentiator.',
-          labels: [
-            'Developers regularly using ChatGPT',
-            'Developers regularly using GitHub Copilot',
-            'Developers wanting to keep using Copilot'
-          ],
-          values: [82.1, 41.2, 72.1],
-          sources: [
-            {
-              name: 'Stack Overflow Developer Survey 2024 (AI tools)',
-              url: 'https://survey.stackoverflow.co/2024/technology/#ai-search-and-developer-tools'
-            }
-          ]
-        },
-        value: {
-          heading: 'The upside of AI coding is large, but depends on responsible execution.',
-          summary: 'The same reports highlighting productivity gains also call for stronger controls and human oversight.',
-          labels: [
-            'Potential software engineering productivity impact',
-            'GenAI annual economic value (low estimate, $T)',
-            'GenAI annual economic value (high estimate, $T)'
-          ],
-          values: [20, 2.6, 4.4],
-          sources: [
-            {
-              name: 'McKinsey: Economic potential of generative AI',
-              url: 'https://www.mckinsey.com/capabilities/tech-and-ai/our-insights/the-economic-potential-of-generative-ai-the-next-productivity-frontier'
-            }
-          ]
-        }
-      };
-
-      var chart = null;
-
-      function renderSources(items) {
-        sourcesEl.innerHTML = '';
-        items.forEach(function (item) {
-          var li = document.createElement('li');
-          var a = document.createElement('a');
-          a.href = item.url;
-          a.target = '_blank';
-          a.rel = 'noopener noreferrer';
-          a.textContent = item.name;
-          li.appendChild(a);
-          sourcesEl.appendChild(li);
-        });
-      }
-
-      function ensureChart(set) {
-        if (typeof Chart !== 'function') return;
-        var color = 'rgba(0, 229, 255, 0.72)';
-        var borderColor = 'rgba(0, 229, 255, 1)';
-        if (!chart) {
-          chart = new Chart(canvas, {
-            type: 'bar',
-            data: {
-              labels: set.labels,
-              datasets: [{
-                data: set.values,
-                borderColor: borderColor,
-                backgroundColor: color,
-                borderWidth: 1.5,
-                borderRadius: 7
-              }]
-            },
-            options: {
-              animation: { duration: 360 },
-              maintainAspectRatio: true,
-              scales: {
-                y: {
-                  beginAtZero: true,
-                  grid: { color: 'rgba(255,255,255,0.08)' },
-                  ticks: { color: '#a1a1aa' }
-                },
-                x: {
-                  grid: { display: false },
-                  ticks: { color: '#a1a1aa' }
-                }
+        options: {
+          animation: { duration: 300 },
+          maintainAspectRatio: true,
+          scales: {
+            y: {
+              beginAtZero: true,
+              max: 100,
+              grid: { color: 'rgba(255,255,255,0.07)' },
+              ticks: {
+                color: '#a1a1aa',
+                font: { size: 11 },
+                callback: function (v) { return v + '%'; }
               },
-              plugins: {
-                legend: { display: false },
-                tooltip: {
-                  callbacks: {
-                    label: function (ctx) {
-                      return String(ctx.raw);
-                    }
-                  }
+              title: {
+                display: true,
+                text: 'Failure rate (%)',
+                color: '#71717a',
+                font: { size: 11 }
+              }
+            },
+            x: {
+              grid: { display: false },
+              ticks: { color: '#a1a1aa', font: { size: 11 } }
+            }
+          },
+          plugins: {
+            legend: {
+              display: true,
+              position: 'top',
+              align: 'start',
+              labels: {
+                color: '#a1a1aa',
+                font: { size: 11 },
+                boxWidth: 12,
+                padding: 14
+              }
+            },
+            tooltip: {
+              callbacks: {
+                label: function (ctx) {
+                  return ' ' + ctx.dataset.label + ': ' + ctx.raw + '%';
                 }
               }
             }
-          });
-          return;
+          }
         }
-        chart.data.labels = set.labels;
-        chart.data.datasets[0].data = set.values;
-        chart.update();
-      }
-
-      function activate(setName) {
-        var set = metricSets[setName];
-        if (!set) return;
-        tabs.forEach(function (tab) {
-          tab.setAttribute('aria-selected', tab.getAttribute('data-metric-set') === setName ? 'true' : 'false');
-        });
-        notesEl.textContent = set.heading;
-        summaryEl.textContent = set.summary;
-        renderSources(set.sources);
-        ensureChart(set);
-      }
-
-      tabs.forEach(function (tab) {
-        tab.addEventListener('click', function () {
-          activate(tab.getAttribute('data-metric-set'));
-        });
       });
-
-      activate('risk');
     })();
   </script>
   <script src="site-chrome.js"></script>
