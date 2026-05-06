@@ -1156,6 +1156,22 @@ body.onboarding-page {
   min-width: 130px;
 }
 
+.ob-os-label {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  margin: 14px 0 6px;
+}
+.ob-os-label:first-of-type { margin-top: 6px; }
+
+.ob-step-foot {
+  font-size: 13px;
+  color: var(--text-3);
+  margin-top: 8px;
+}
+
 .ob-faq {
   background: var(--surface-2);
   border: 1px solid var(--border);

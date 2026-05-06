@@ -90,6 +90,7 @@ Update NOTES.md when:
 4. **Canonical host redirect:** GET requests on `gravio-platform.fly.dev` or `www.gravio.dev` 308 to `gravio.dev`. Don't bypass this when adding routes; if a new route should be exempt (e.g. `/.well-known/...`), add it to the exemption list in the redirect block.
 5. **No build step.** Web JS is served raw. Don't introduce bundling, JSX, or TS without explicit user approval.
 6. **`[hidden]` is sacred.** Never write CSS that sets `display:` on a selector that might also receive the `hidden` attribute. The global `[hidden] { display: none !important }` rule at the top of `styles.css` exists because three separate visual bugs were caused by `.m-btn { display: inline-flex }` and `.ob-auth-modal-wrap { display: grid }` overriding the attribute. Use the attribute, not class toggles, for visibility.
+7. **CLI bundle is committed, not built at deploy time.** Users download `https://gravio.dev/cli/gravio.mjs` — a single self-contained file produced by `npm run build:cli` (esbuild). Whenever you change `scripts/scanner-daemon.mjs`, `src/core/scanner-daemon.mjs`, or `src/core/crypto-e2ee.mjs`, you **must** also run `npm run build:cli` and commit the regenerated `src/web/cli/gravio.mjs` in the same commit. The Dockerfile uses `npm ci --omit=dev`, so esbuild is unavailable in the container — never rely on rebuilding at deploy time.
 
 ---
 

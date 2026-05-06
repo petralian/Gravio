@@ -38,22 +38,36 @@
 
       <article class="ob-step-card">
         <p class="ob-step-num">Step 2</p>
-        <h2>Run your first local scan</h2>
-        <p>Run this in your actual project folder. It will fail in random folders that don't contain your project files.</p>
-        <pre class="ob-code" id="cmd-local">node scripts/scanner-daemon.mjs --once</pre>
-        <button class="m-btn m-btn-outline ob-copy" type="button" data-copy-id="cmd-local">Copy command</button>
+        <h2>Download the Gravio CLI</h2>
+        <p>One file, no install. Drops <code>gravio.mjs</code> into your current folder. Requires Node.js 20 or newer.</p>
+        <p class="ob-os-label">macOS / Linux:</p>
+        <pre class="ob-code" id="cmd-download-unix">curl -fsSL https://gravio.dev/cli/gravio.mjs -o gravio.mjs</pre>
+        <button class="m-btn m-btn-outline ob-copy" type="button" data-copy-id="cmd-download-unix">Copy command</button>
+        <p class="ob-os-label">Windows (PowerShell):</p>
+        <pre class="ob-code" id="cmd-download-win">Invoke-WebRequest https://gravio.dev/cli/gravio.mjs -OutFile gravio.mjs</pre>
+        <button class="m-btn m-btn-outline ob-copy" type="button" data-copy-id="cmd-download-win">Copy command</button>
       </article>
 
       <article class="ob-step-card">
         <p class="ob-step-num">Step 3</p>
-        <h2>Publish encrypted results</h2>
-        <p>Free plan includes 3 cloud scans after registration. The project name below updates live from Step 1.</p>
-        <pre class="ob-code" id="cmd-publish">node scripts/scanner-daemon.mjs --once --publish --project my-first-project --server https://gravio.dev --api-key gv_your_api_key_here</pre>
-        <button class="m-btn m-btn-outline ob-copy" type="button" data-copy-id="cmd-publish">Copy command</button>
+        <h2>Run your first local scan</h2>
+        <p>From the same folder where you downloaded <code>gravio.mjs</code>, run:</p>
+        <pre class="ob-code" id="cmd-local">node gravio.mjs --once --target .</pre>
+        <button class="m-btn m-btn-outline ob-copy" type="button" data-copy-id="cmd-local">Copy command</button>
+        <p class="ob-step-foot">Writes <code>agent-quality/runs/latest.json</code> next to the file. No data leaves your machine.</p>
       </article>
 
       <article class="ob-step-card">
         <p class="ob-step-num">Step 4</p>
+        <h2>Publish encrypted results</h2>
+        <p>Free plan includes 3 cloud scans after registration. Generate an API key on the <a href="/dashboard">dashboard</a> first, then run:</p>
+        <pre class="ob-code" id="cmd-publish">node gravio.mjs --once --target . --publish --project my-first-project --server https://gravio.dev --api-key gv_your_api_key_here</pre>
+        <button class="m-btn m-btn-outline ob-copy" type="button" data-copy-id="cmd-publish">Copy command</button>
+        <p class="ob-step-foot">The CLI prints your encryption key on first run — copy and keep it. Without it, your scorecard cannot be decrypted on the dashboard.</p>
+      </article>
+
+      <article class="ob-step-card">
+        <p class="ob-step-num">Step 5</p>
         <h2>View your scorecard</h2>
         <p>Go straight to your dashboard to decrypt and review the score for your project.</p>
         <div class="ob-cta-row">
@@ -117,8 +131,16 @@
         <p>Yes. Use the guided steps above. If commands are new to you, copy one command at a time and paste into terminal exactly as shown.</p>
       </details>
       <details>
-        <summary>Why does npm ci fail in random folders?</summary>
-        <p><code>npm ci</code> requires an existing <code>package-lock.json</code>. Use onboarding commands from your real project folder, not a random empty directory.</p>
+        <summary>Do I need to install anything?</summary>
+        <p>No. <code>gravio.mjs</code> is a single self-contained file with zero npm dependencies. The only requirement is Node.js 20 or newer (<a href="https://nodejs.org" target="_blank" rel="noopener">download here</a>). Drop the file in any folder and run it.</p>
+      </details>
+      <details>
+        <summary>What does the local scan actually look at?</summary>
+        <p>It walks the target folder for evidence of secret hygiene, test signal, changelog, session notes, and git status — and writes <code>agent-quality/runs/latest.json</code>. It never reads <code>.env</code> contents and never sends data anywhere unless you pass <code>--publish</code>.</p>
+      </details>
+      <details>
+        <summary>I lost my encryption key. Can I still see my scorecard?</summary>
+        <p>No. Gravio is zero-knowledge — the server never sees your key. If you lose it, the encrypted run cannot be decrypted. Re-run the scan with <code>--publish</code> to generate a new key.</p>
       </details>
       <details>
         <summary>Why was I getting logged out?</summary>

@@ -52,7 +52,8 @@
             <div class="tool-howto-body">
               <h3>Generate one from your own project</h3>
               <p>Run the Gravio scanner against your repository — it writes a fresh <code>latest.json</code> you can paste here.</p>
-              <code class="tool-howto-cmd">node scripts/scanner-daemon.mjs --once</code>
+              <code class="tool-howto-cmd">curl -fsSL https://gravio.dev/cli/gravio.mjs -o gravio.mjs
+node gravio.mjs --once --target .</code>
               <p style="margin-top:8px">The result lands at <code>agent-quality/runs/latest.json</code>. Open it, copy the contents, paste into the textarea below — or use <strong>Import JSON file</strong>.</p>
             </div>
           </div>

@@ -11,6 +11,7 @@
     "scorecard:new-run": "node scripts/new-run.mjs",
     "scorecard:scan": "node scripts/scanner-daemon.mjs --once",
     "scorecard:scan:watch": "node scripts/scanner-daemon.mjs",
+    "build:cli": "node scripts/build-cli.mjs",
     "secret-scan": "node scripts/secret-scan.mjs",
     "verify": "npm run secret-scan && npm test && npm run scorecard:check"
   },
@@ -19,5 +20,8 @@
   },
   "dependencies": {
     "better-sqlite3": "^12.9.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.24.0"
   }
 }

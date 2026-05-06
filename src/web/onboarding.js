@@ -31,7 +31,7 @@ function getProjectId() {
 function updateProjectCommands() {
   const projectId = getProjectId();
   if (elCmdPublish) {
-    elCmdPublish.textContent = `node scripts/scanner-daemon.mjs --once --publish --project ${projectId} --server https://gravio.dev --api-key gv_your_api_key_here`;
+    elCmdPublish.textContent = `node gravio.mjs --once --target . --publish --project ${projectId} --server https://gravio.dev --api-key gv_your_api_key_here`;
   }
   if (elDashboardLink) {
     elDashboardLink.href = `/dashboard?project=${encodeURIComponent(projectId)}`;
