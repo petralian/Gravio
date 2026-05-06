@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Gravio — Dashboard</title>
-  <meta name="description" content="View your codebase quality scorecard on the Gravio dashboard." />
+  <meta name="description" content="View and manage your AI agent quality projects on the Gravio dashboard." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
@@ -16,123 +16,134 @@
 
   <main class="db-main m-container">
 
-    <div class="db-header">
-      <p class="m-eyebrow">USER DASHBOARD</p>
-      <h1 class="db-h1">Your scanning workspace</h1>
-      <p class="db-lead">
-        Track last scans, project trends, and recommendations. Create API keys for CLI publishing.
-      </p>
+    <!-- ═══ VIEW: PROJECTS HOME ═══ -->
+    <div id="db-view-projects">
+
+      <div class="db-ph-header">
+        <div class="db-ph-title-row">
+          <div>
+            <p class="m-eyebrow">PROJECTS</p>
+            <h1 class="db-h1">Your projects</h1>
+          </div>
+          <a href="/settings" class="m-btn m-btn-outline m-btn-sm">Settings</a>
+        </div>
+        <div class="db-ph-controls">
+          <div class="db-search-wrap">
+            <input type="search" id="db-search" class="db-search-input" placeholder="Search projects…" autocomplete="off" />
+          </div>
+          <select id="db-sort" class="db-sort-select">
+            <option value="recent">Most recent</option>
+            <option value="score-asc">Lowest score</option>
+            <option value="score-desc">Highest score</option>
+            <option value="name">Name A–Z</option>
+          </select>
+        </div>
+      </div>
+
+      <p class="db-error" id="db-ph-error" hidden></p>
+
+      <div class="db-projects-grid" id="db-projects-grid"></div>
+
+      <div id="db-projects-empty" hidden>
+        <div class="db-empty-state">
+          <p class="db-empty-title">No projects yet</p>
+          <p class="db-empty-sub">Run <code>node gravio.mjs --once</code> in your repo to publish your first scan.</p>
+          <a href="/onboarding" class="m-btn m-btn-neon m-btn-sm" style="margin-top:20px">Get started →</a>
+        </div>
+      </div>
+
     </div>
 
-    <section class="db-overview" id="db-overview">
-      <div class="db-stat-card">
-        <p class="db-stat-label">Last scan done</p>
-        <p class="db-stat-value" id="db-last-scan">—</p>
-      </div>
-      <div class="db-stat-card">
-        <p class="db-stat-label">Projects</p>
-        <p class="db-stat-value" id="db-project-count">0</p>
-      </div>
-      <div class="db-stat-card">
-        <p class="db-stat-label">Total scans</p>
-        <p class="db-stat-value" id="db-scan-count">0</p>
-      </div>
-    </section>
+    <!-- ═══ VIEW: PROJECT WORKSPACE ═══ -->
+    <div id="db-view-workspace" hidden>
 
-    <section class="db-projects-section" id="db-projects-section" hidden>
-      <h2 class="db-section-h2">Projects</h2>
-      <p class="db-lead db-mini-lead">Select a project to view scan history, trends, summary, and recommendations.</p>
-      <ul class="db-projects-list" id="db-projects-list"></ul>
-    </section>
-
-    <section class="db-project-detail" id="db-project-detail" hidden>
-      <div class="db-project-detail-head">
-        <h2 class="db-section-h2">Project details</h2>
-        <p class="db-project-code" id="db-selected-project">—</p>
+      <!-- Breadcrumb -->
+      <div class="db-ws-nav">
+        <button class="db-back-btn" id="db-back-btn" type="button">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M10 3L5 8l5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          All projects
+        </button>
       </div>
 
-      <div class="db-detail-stats">
-        <div class="db-detail-chip"><span>Total scans</span><strong id="db-detail-total">0</strong></div>
-        <div class="db-detail-chip"><span>Best score</span><strong id="db-detail-best">—</strong></div>
-        <div class="db-detail-chip"><span>Average score</span><strong id="db-detail-avg">—</strong></div>
-        <div class="db-detail-chip"><span>Trend</span><strong id="db-detail-trend">—</strong></div>
-      </div>
-
-      <div class="db-summary-box">
-        <h3 class="db-subtitle">Summary</h3>
-        <p id="db-summary-text">No scans loaded yet.</p>
-      </div>
-
-      <div class="db-summary-box">
-        <h3 class="db-subtitle">Recommendations</h3>
-        <ul id="db-recommendations" class="db-recommendations-list"></ul>
-      </div>
-
-      <h3 class="db-subtitle">Scans</h3>
-      <p class="db-error" id="db-error" hidden></p>
-      <div class="db-scan-actions">
-        <button class="m-btn m-btn-outline" id="db-delete-selected" type="button">Delete selected scans</button>
-      </div>
-      <div class="db-delete-confirm" id="db-delete-confirm" hidden>
-        <p>Are you sure you want to delete selected scans? This cannot be undone.</p>
-        <div class="db-delete-confirm-actions">
-          <button class="m-btn m-btn-neon" id="db-confirm-delete" type="button">Yes, delete</button>
-          <button class="m-btn m-btn-outline" id="db-cancel-delete" type="button">Cancel</button>
-        </div>
-      </div>
-      <div class="db-scan-table-wrap">
-        <table class="db-scan-table">
-          <thead>
-            <tr>
-              <th>Select</th>
-              <th>Run</th>
-              <th>Published</th>
-              <th>Score</th>
-              <th>Rating</th>
-            </tr>
-          </thead>
-          <tbody id="db-scan-rows"></tbody>
-        </table>
-      </div>
-    </section>
-
-    <section class="db-apikeys-section" id="db-apikeys-section" hidden>
-      <h2 class="db-section-h2">API keys</h2>
-      <p class="db-lead db-mini-lead">
-        Create an API key, authorize once in your repo, then scan and publish from CLI.
-      </p>
-      <div class="db-key-actions">
-        <input type="text" id="db-key-label" placeholder="Key label (optional)" class="db-key-label-input" />
-        <button class="m-btn m-btn-neon" id="db-gen-key" type="button">Generate new key</button>
-      </div>
-      <div class="db-new-key-banner" id="db-new-key-banner" hidden>
-        <p class="db-new-key-label">New key — copy now, it won't be shown again:</p>
-        <div class="db-new-key-row">
-          <code class="db-new-key-value" id="db-new-key-value"></code>
-          <button class="m-btn m-btn-outline db-copy-btn" id="db-copy-key" type="button">Copy</button>
-        </div>
-      </div>
-      <ul class="db-keys-list" id="db-keys-list"></ul>
-    </section>
-
-    <section class="db-apikeys-section" id="db-e2ee-section" hidden>
-      <h2 class="db-section-h2">Optional encrypted run tools</h2>
-      <details>
-        <summary class="db-raw-summary">Open E2EE decrypt tool</summary>
-        <div class="db-form-card" style="margin-top: 14px;">
-          <div class="db-field">
-            <label for="db-e2ee-project">Project ID</label>
-            <input type="text" id="db-e2ee-project" placeholder="my-project" autocomplete="off" spellcheck="false" />
+      <!-- Hero header -->
+      <div class="db-ws-hero">
+        <div class="db-ws-hero-left">
+          <p class="db-ws-project-name" id="db-ws-project-name">—</p>
+          <div class="db-ws-meta-row">
+            <span id="db-ws-scan-count">—</span>
+            <span class="db-ws-sep">·</span>
+            <span id="db-ws-last-scan">—</span>
           </div>
-          <div class="db-field">
-            <label for="db-e2ee-key">API key (gv_...)</label>
-            <input type="password" id="db-e2ee-key" placeholder="gv_..." autocomplete="off" spellcheck="false" />
-          </div>
-          <button class="m-btn m-btn-outline" id="db-e2ee-load" type="button">Load encrypted latest run</button>
-          <textarea class="db-raw-json" id="db-e2ee-output" readonly spellcheck="false" style="min-height:180px;"></textarea>
         </div>
-      </details>
-    </section>
+        <div class="db-ws-hero-right">
+          <p class="db-ws-score-value" id="db-ws-score">—</p>
+          <div class="db-ws-badges" id="db-ws-badges"></div>
+        </div>
+      </div>
+
+      <!-- Tabs -->
+      <div class="db-tabs" role="tablist">
+        <button class="db-tab db-tab-active" role="tab" data-tab="overview" type="button">Overview</button>
+        <button class="db-tab" role="tab" data-tab="scans" type="button">Scans</button>
+        <button class="db-tab" role="tab" data-tab="recommendations" type="button">Recommendations</button>
+      </div>
+
+      <p class="db-error" id="db-ws-error" hidden></p>
+
+      <!-- Tab: Overview -->
+      <div class="db-tab-panel" id="db-tab-overview">
+        <div class="db-overview-stats">
+          <div class="db-stat-card">
+            <p class="db-stat-label">Total scans</p>
+            <p class="db-stat-value" id="db-ov-total">—</p>
+          </div>
+          <div class="db-stat-card">
+            <p class="db-stat-label">Best score</p>
+            <p class="db-stat-value" id="db-ov-best">—</p>
+          </div>
+          <div class="db-stat-card">
+            <p class="db-stat-label">Average score</p>
+            <p class="db-stat-value" id="db-ov-avg">—</p>
+          </div>
+        </div>
+        <div id="db-ov-summary"></div>
+        <div id="db-ov-recent"></div>
+      </div>
+
+      <!-- Tab: Scans -->
+      <div class="db-tab-panel" id="db-tab-scans" hidden>
+        <div class="db-scan-actions">
+          <button class="m-btn m-btn-outline m-btn-sm" id="db-delete-selected" type="button">Delete selected</button>
+        </div>
+        <div class="db-delete-confirm" id="db-delete-confirm" hidden>
+          <p>Delete selected scans? This cannot be undone.</p>
+          <div class="db-delete-confirm-actions">
+            <button class="m-btn m-btn-outline m-btn-sm" style="border-color:var(--danger);color:var(--danger)" id="db-confirm-delete" type="button">Yes, delete</button>
+            <button class="m-btn m-btn-outline m-btn-sm" id="db-cancel-delete" type="button">Cancel</button>
+          </div>
+        </div>
+        <div class="db-scan-table-wrap">
+          <table class="db-scan-table">
+            <thead>
+              <tr>
+                <th>Select</th>
+                <th>Run</th>
+                <th>Published</th>
+                <th>Score</th>
+                <th>Rating</th>
+              </tr>
+            </thead>
+            <tbody id="db-scan-rows"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Tab: Recommendations -->
+      <div class="db-tab-panel" id="db-tab-recommendations" hidden>
+        <ul class="db-recs-list" id="db-recs-list"></ul>
+      </div>
+
+    </div>
 
   </main>
 

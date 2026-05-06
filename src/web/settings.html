@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gravio &mdash; Settings</title>
+  <meta name="description" content="Manage your Gravio API keys and account settings." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="dashboard">
+
+  <div data-site-header></div>
+
+  <main class="db-main m-container">
+
+    <div class="db-ph-header" style="margin-bottom:40px">
+      <div class="db-ph-title-row">
+        <div>
+          <p class="m-eyebrow">ACCOUNT</p>
+          <h1 class="db-h1">Settings</h1>
+        </div>
+        <a href="/dashboard" class="m-btn m-btn-outline m-btn-sm">&larr; Dashboard</a>
+      </div>
+    </div>
+
+    <div class="db-settings-sections">
+
+      <!-- API Keys -->
+      <section class="db-settings-section" id="st-apikeys-section">
+        <div class="db-settings-section-head">
+          <h2 class="db-settings-h2">API keys</h2>
+          <p class="db-settings-desc">
+            Create an API key and use it with <code>--api-key</code> when authorizing the CLI.
+            Keys are user-bound &mdash; one key works across all your projects.
+          </p>
+        </div>
+        <div class="db-key-actions">
+          <input type="text" id="st-key-label" placeholder="Label (optional)" class="db-key-label-input" autocomplete="off" />
+          <button class="m-btn m-btn-neon" id="st-gen-key" type="button">Generate new key</button>
+        </div>
+        <div class="db-new-key-banner" id="st-new-key-banner" hidden>
+          <p class="db-new-key-label">New key &mdash; copy now, it won&rsquo;t be shown again:</p>
+          <div class="db-new-key-row">
+            <code class="db-new-key-value" id="st-new-key-value"></code>
+            <button class="m-btn m-btn-outline db-copy-btn" id="st-copy-key" type="button">Copy</button>
+          </div>
+        </div>
+        <ul class="db-keys-list" id="st-keys-list"></ul>
+        <p class="db-error" id="st-keys-error" hidden></p>
+      </section>
+
+      <!-- Advanced: E2EE (pro/team/admin only) -->
+      <section class="db-settings-section" id="st-e2ee-section" hidden>
+        <div class="db-settings-section-head">
+          <h2 class="db-settings-h2">Advanced &mdash; E2EE decrypt tool</h2>
+          <p class="db-settings-desc">
+            Manually decrypt an encrypted run envelope using your project ID and API key.
+            This tool operates entirely in-browser &mdash; your key never leaves your device.
+          </p>
+        </div>
+        <div class="db-form-card">
+          <div class="db-field">
+            <label for="st-e2ee-project">Project ID</label>
+            <input type="text" id="st-e2ee-project" placeholder="my-project" autocomplete="off" spellcheck="false" />
+          </div>
+          <div class="db-field">
+            <label for="st-e2ee-key">API key (gv_...)</label>
+            <input type="password" id="st-e2ee-key" placeholder="gv_..." autocomplete="off" spellcheck="false" />
+          </div>
+          <button class="m-btn m-btn-outline" id="st-e2ee-load" type="button">Load encrypted latest run</button>
+          <textarea class="db-raw-json" id="st-e2ee-output" readonly spellcheck="false" style="min-height:180px;"></textarea>
+        </div>
+      </section>
+
+    </div>
+
+  </main>
+
+  <div data-site-footer></div>
+
+  <script src="site-chrome.js"></script>
+  <script src="settings.js"></script>
+</body>
+</html>

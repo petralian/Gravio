@@ -111,13 +111,10 @@ npm run secret-scan            # Run secret scanner
 npm run verify                 # secret-scan + tests + gate (full CI check)
 
 # CLI authorize + encrypted publish flow
-node gravio.mjs --setup --target .                                  # verifies Node >=20 + installs detected deps once
 node gravio.mjs --authorize --target . --project my-project --server https://gravio.dev --api-key gv_xxx
 node gravio.mjs --once --target .   # scan is blocked unless authorized; then writes encrypted latest.json and auto-publishes
 node gravio.mjs --logout --target . # remove local .gravio/auth.json
 ```
-
-Onboarding UX now auto-issues a user-bound token from the signed-in session using `POST /api/keys/onboarding` and injects it into Step 3, so users no longer need to manually create/paste a key from dashboard first. CLI now also supports `--setup` and performs one-time automatic setup on first run to verify Node version and install detected repo dependencies.
 
 ---
 
@@ -152,14 +149,17 @@ Onboarding UX now auto-issues a user-bound token from the signed-in session usin
 
 ## Dashboard Interaction Model
 
-- Dashboard default surface is no longer decrypt-first; users land on overview metrics (`last scan`, `projects`, `total scans`) plus project list and API key management.
-- E2EE decrypt module is optional and shown only for Pro/Team/admin users.
-- Project drill-down now shows:
-  - full scan history list
-  - trend summary and aggregate stats
-  - recommendation list
-  - multi-select scan deletion with inline two-step confirmation
-- `POST /api/runs/delete` deletes selected scan IDs scoped to the authenticated user and project.
+- Dashboard is a **two-view SPA** (`dashboard.html` + `dashboard.js`):
+  - **View 1 — Projects home**: card grid of all user projects with score, trend badge, rating badge, scan count, relative last-scan time. Supports search and sort (recent / score asc/desc / name).
+  - **View 2 — Project workspace**: breadcrumb back nav + hero header (project name, score, rating, trend) + three-tab panel: Overview, Scans, Recommendations.
+- API keys and E2EE decrypt tool are **no longer on the dashboard**; they live at `/settings` (`settings.html` + `settings.js`).
+- E2EE decrypt module shown only for Pro/Team/admin users; lives under Settings > Advanced.
+- Project drill-down tabs:
+  - **Overview** — stat chips (total scans, best, avg) + latest summary + recent 5 scans mini-table
+  - **Scans** — full paginated scan table with multi-select delete (inline two-step confirmation)
+  - **Recommendations** — deduplicated recs from last 10 scans, sorted by frequency
+- URL param `?project=<id>` still works — jumps directly into project workspace on load.
+- Browser back/forward (popstate) returns to projects home.
 
 ---
 
@@ -175,7 +175,6 @@ Onboarding UX now auto-issues a user-bound token from the signed-in session usin
 - `/api/publish` accepts all scans; free users are auto-trimmed to latest 3 retained scans
 - `/api/publish` appends run history rows (no longer overwrites one row per project)
 - `/api/me` returns `plan` field so the frontend can gate features
-- `POST /api/keys/onboarding` requires session-cookie auth, rotates prior `onboarding-cli` token, and returns a fresh user-bound CLI bearer token for onboarding Step 3.
 
 ---
 
