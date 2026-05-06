@@ -15,6 +15,20 @@
       "requiredEvidence": ["selectedSkill", "triggerReason"]
     },
     {
+      "id": "agent-skill-catalog",
+      "category": "agentic",
+      "critical": false,
+      "description": "Reusable AI skill catalog or prompt assets are versioned in the repo.",
+      "requiredEvidence": ["skillCatalogFound", "promptAssetsFound"]
+    },
+    {
+      "id": "agent-orchestration",
+      "category": "agentic",
+      "critical": false,
+      "description": "Agent orchestration config exists for repeatable human+AI collaboration.",
+      "requiredEvidence": ["orchestrationConfigFound"]
+    },
+    {
       "id": "edit-discipline",
       "category": "reliability",
       "critical": true,

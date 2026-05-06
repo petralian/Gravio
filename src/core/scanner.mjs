@@ -28,15 +28,16 @@ const IGNORE_DIRS = new Set([
   ".cache",
 ]);
 
-const DIMENSIONS = ["safety", "reliability", "evaluation", "observability", "governance"];
+const DIMENSIONS = ["safety", "reliability", "evaluation", "observability", "governance", "agentic"];
 
 // Default weights — set by Gravio, same for every project (like Google Lighthouse).
 const DEFAULT_WEIGHTS = {
-  safety: 0.30,
-  reliability: 0.25,
-  evaluation: 0.20,
+  safety: 0.25,
+  reliability: 0.20,
+  evaluation: 0.15,
   observability: 0.10,
   governance: 0.15,
+  agentic: 0.15,
 };
 
 /**
@@ -58,6 +59,8 @@ const DEFAULT_CORPUS = {
     { id: "readme-docs",          category: "governance",    critical: false, description: "README.md exists." },
     { id: "changelog-hygiene",    category: "governance",    critical: false, description: "CHANGELOG or release notes maintained." },
     { id: "agent-instructions",   category: "governance",    critical: true,  description: "Agent behaviour instructions file found (AGENTS.md, copilot-instructions, .cursorrules, etc.)." },
+    { id: "agent-skill-catalog",  category: "agentic",       critical: false, description: "Agent skill catalog or reusable prompt assets found." },
+    { id: "agent-orchestration",  category: "agentic",       critical: false, description: "Multi-agent orchestration configuration detected." },
   ],
 };
 
@@ -268,6 +271,16 @@ export function scanTargetProject(targetDir) {
     has(".cursor/rules") || has("system_prompt.md") || has("SYSTEM_PROMPT.md") ||
     has(".continue/config.json") || has(".aider.conf.yml") || has(".claude/NOTES.md");
 
+  // Agentic readiness signals (humans + AI workflows, reusable skills/prompts).
+  const hasAgentSkillCatalog =
+    hasGlob(".github/skills/") || hasGlob("skills/") || hasGlob(".cursor/rules/") || has("SKILL.md");
+
+  const hasPromptAssets =
+    hasGlob(".github/prompts/") || hasGlob("prompts/") || has("STARTUP_PROMPT.md") || has("SYSTEM_PROMPT.md");
+
+  const hasAgentOrchestration =
+    hasGlob(".github/agents/") || has("AGENTS.md") || has(".continue/config.json") || has(".aider.conf.yml");
+
   // ━━━ RELIABILITY ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   // Tests — any language
@@ -443,6 +456,8 @@ export function scanTargetProject(targetDir) {
     // governance
     readmeExists, licenseExists, hasChangelog, hasVersion,
     hasAiDocs, hasDecisionLog, hasContributing, hasCodeOwners,
+    // agentic
+    hasAgentSkillCatalog, hasPromptAssets, hasAgentOrchestration,
     // back-compat fields used elsewhere
     hasNotes, hasNextSession,
     evalCorpusExists: hasEvalDir,
@@ -546,6 +561,19 @@ function buildWorkflowResults(corpus, scan, previousRun) {
     if (workflow.id === "agent-instructions") {
       status = scan.hasAiDocs ? "pass" : "fail";
       evidence = { agentInstructionsFound: scan.hasAiDocs };
+    }
+
+    if (workflow.id === "agent-skill-catalog") {
+      status = (scan.hasAgentSkillCatalog || scan.hasPromptAssets) ? "pass" : "fail";
+      evidence = {
+        skillCatalogFound: scan.hasAgentSkillCatalog,
+        promptAssetsFound: scan.hasPromptAssets,
+      };
+    }
+
+    if (workflow.id === "agent-orchestration") {
+      status = scan.hasAgentOrchestration ? "pass" : "fail";
+      evidence = { orchestrationConfigFound: scan.hasAgentOrchestration };
     }
 
     // ── Gravio-specific corpus checks (backward compat) ─────────────────────
@@ -658,12 +686,26 @@ function computeRichScorecard(scan) {
   // max 100
   governance = Math.min(100, governance);
 
+  // ── Agentic (15%) ───────────────────────────────────────────────────────
+  // Core question: Is this codebase ready for reliable human+AI collaboration?
+  let agentic = 0;
+  if (scan.hasAiDocs)                           agentic += 20; // explicit AI operating rules
+  if (scan.hasAgentInstructions)                agentic += 20; // bounded behavior contract
+  if (scan.hasAgentSkillCatalog)                agentic += 15; // reusable skills/playbooks exist
+  if (scan.hasPromptAssets)                     agentic += 10; // prompt assets are versioned
+  if (scan.hasAgentOrchestration)               agentic += 10; // multi-agent config present
+  if (scan.hasEvalDir || scan.hasEvalConfig)    agentic += 15; // measurable agent quality loop
+  if (scan.hasRunArtifacts)                     agentic += 10; // runs are persisted for audits
+  if (scan.hasNotes && scan.hasNextSession)     agentic += 10; // handoff continuity for teams
+  agentic = Math.min(100, agentic);
+
   return {
     safety: Math.round(safety),
     reliability: Math.round(reliability),
     evaluation: Math.round(evaluation),
     observability: Math.round(observability),
     governance: Math.round(governance),
+    agentic: Math.round(agentic),
   };
 }
 

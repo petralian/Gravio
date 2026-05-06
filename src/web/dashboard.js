@@ -47,6 +47,7 @@ const DIM_LABELS = {
   evaluation: "Evaluation",
   observability: "Observability",
   governance: "Governance",
+  agentic: "Agentic",
 };
 
 (async () => {
@@ -384,7 +385,7 @@ function renderScorecard(run, publishedAt) {
 
   elDimensions.innerHTML = "";
   const scorecard = run?.scorecard ?? {};
-  const dimKeys = ["safety", "reliability", "evaluation", "observability", "governance"];
+  const dimKeys = ["safety", "reliability", "evaluation", "observability", "governance", "agentic"];
   const hasDims = dimKeys.some((k) => scorecard[k] !== undefined);
 
   if (hasDims) {

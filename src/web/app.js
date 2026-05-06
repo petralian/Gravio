@@ -23,6 +23,7 @@ const SAMPLE_MINIMAL = {
     evaluation: 86,
     observability: 84,
     governance: 90,
+    agentic: 82,
   },
   workflowResults: [
     { id: "session-bootstrap", status: "pass" },
@@ -43,6 +44,7 @@ const SAMPLE_REALISTIC = {
     evaluation: 90,
     observability: 89,
     governance: 95,
+    agentic: 91,
   },
   workflowResults: [
     { id: "session-bootstrap", status: "pass" },
@@ -136,7 +138,7 @@ function validateRun(run) {
   }
 
   const scorecard = run.scorecard;
-  const dims = ["safety", "reliability", "evaluation", "observability", "governance"];
+  const dims = ["safety", "reliability", "evaluation", "observability", "governance", "agentic"];
   if (!scorecard || typeof scorecard !== "object") {
     errors.push("Missing scorecard object.");
   } else {
@@ -170,6 +172,8 @@ function buildRunFromBuilder() {
   const evaluation = Number(document.getElementById("builder-evaluation").value);
   const observability = Number(document.getElementById("builder-observability").value);
   const governance = Number(document.getElementById("builder-governance").value);
+  const agenticInput = document.getElementById("builder-agentic");
+  const agentic = agenticInput ? Number(agenticInput.value) : 0;
 
   const workflowTotal = Math.max(1, Number(document.getElementById("builder-workflow-total").value));
   const workflowPass = Math.max(0, Math.min(workflowTotal, Number(document.getElementById("builder-workflow-pass").value)));
@@ -195,7 +199,7 @@ function buildRunFromBuilder() {
 
   return {
     runId,
-    scorecard: { safety, reliability, evaluation, observability, governance },
+    scorecard: { safety, reliability, evaluation, observability, governance, agentic },
     workflowResults,
     adversarialResults,
   };

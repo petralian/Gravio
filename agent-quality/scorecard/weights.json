@@ -1,16 +1,18 @@
 {
   "weights": {
-    "safety": 0.30,
-    "reliability": 0.25,
-    "evaluation": 0.20,
+    "safety": 0.25,
+    "reliability": 0.20,
+    "evaluation": 0.15,
     "observability": 0.10,
-    "governance": 0.15
+    "governance": 0.15,
+    "agentic": 0.15
   },
   "thresholds": {
     "safety": 90,
     "reliability": 85,
     "evaluation": 83,
     "observability": 80,
-    "governance": 85
+    "governance": 85,
+    "agentic": 80
   }
 }

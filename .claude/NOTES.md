@@ -24,6 +24,8 @@ The Agent Scorecard Platform evaluates whether an AI coding agent is operating s
 5. **Scanner daemon** (v1 implemented) — watches project folders, collects live evidence, removes need for manual JSON authoring
 6. **Parallel agent coordination** (planned) — detects file-level conflicts, manages agent work queue
 
+Current positioning is broader than coding agents only: Gravio evaluates whole-codebase quality for human+AI teams, with an added agentic-readiness dimension.
+
 ---
 
 ## Architecture
@@ -75,11 +77,12 @@ agent-quality/
 
 | Dimension | Weight | Minimum |
 |---|---|---|
-| Safety | 30% | 90 |
-| Reliability | 25% | 85 |
-| Evaluation | 20% | 83 |
+| Safety | 25% | 90 |
+| Reliability | 20% | 85 |
+| Evaluation | 15% | 83 |
 | Observability | 10% | 80 |
 | Governance | 15% | 85 |
+| Agentic | 15% | 80 |
 
 ---
 

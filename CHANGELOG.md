@@ -17,6 +17,8 @@ All notable changes to this project will be documented in this file.
 - Dashboard decryption mode for API keys, with browser-side WebCrypto decrypt for encrypted run envelopes.
 
 ### Changed
+- Scoring model expanded from 5 to 6 dimensions by adding `agentic` readiness (skills, prompts, orchestration, and human+AI collaboration signals).
+- Branding/copy updated from AI-coding-agent-only wording to broader codebase quality positioning across human and AI workflows.
 - Marketing copy now requires registration before cloud scoring and replaces misleading global `agentscored` install examples with real project commands.
 - Public "Try the tool" CTAs replaced with registration-first messaging ("3 free scans") and onboarding links.
 - CLI publish now requires `--api-key` and prints explicit login/dashboard guidance when missing or unauthorized.

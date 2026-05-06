@@ -46,6 +46,7 @@ const DIM_COLOR = {
   evaluation:    c.bblue,
   observability: c.bmagenta,
   governance:    c.byellow,
+  agentic:       c.bcyan,
 };
 
 function scoreColor(score) {
@@ -115,13 +116,14 @@ function spinnerStop(icon, msg) {
 }
 
 // ─── Dimension config ─────────────────────────────────────────────────────────
-const DIM_ORDER = ["safety", "reliability", "evaluation", "observability", "governance"];
+const DIM_ORDER = ["safety", "reliability", "evaluation", "observability", "governance", "agentic"];
 const DIM_META  = {
-  safety:        { label: "Safety",        icon: "🛡 ", weight: "30%" },
-  reliability:   { label: "Reliability",   icon: "⚡ ", weight: "25%" },
-  evaluation:    { label: "Evaluation",    icon: "🧪 ", weight: "20%" },
+  safety:        { label: "Safety",        icon: "🛡 ", weight: "25%" },
+  reliability:   { label: "Reliability",   icon: "⚡ ", weight: "20%" },
+  evaluation:    { label: "Evaluation",    icon: "🧪 ", weight: "15%" },
   observability: { label: "Observability", icon: "📡 ", weight: "10%" },
   governance:    { label: "Governance",    icon: "📋 ", weight: "15%" },
+  agentic:       { label: "Agentic",       icon: "🤖 ", weight: "15%" },
 };
 
 // ─── Diagnostic Catalog ───────────────────────────────────────────────────────
@@ -137,6 +139,7 @@ function buildCatalog(scan) {
     evalCorpusExists, evalCorpusFileCount, hasBaseline, hasEvalScript,
     hasOtelDependency, hasStructuredLogging, hasRunArtifacts,
     readmeExists, licenseExists, hasChangelog, hasVersion,
+    hasAiDocs, hasAgentSkillCatalog, hasPromptAssets,
   } = scan;
 
   return [
@@ -233,6 +236,16 @@ function buildCatalog(scan) {
       pass: hasVersion,
       label: "Version field",
       brief: hasVersion ? "package.json versioned" : "no version in package.json" },
+
+    // ── AGENTIC ─────────────────────────────────────────────────────────────
+    { dim: "agentic", id: "agent-instructions", severity: "medium",
+      pass: hasAiDocs,
+      label: "Agent instructions",
+      brief: hasAiDocs ? "agent rules detected" : "no agent instruction files" },
+    { dim: "agentic", id: "agent-skill-catalog", severity: "low",
+      pass: hasAgentSkillCatalog || hasPromptAssets,
+      label: "Skills / prompts",
+      brief: (hasAgentSkillCatalog || hasPromptAssets) ? "skill or prompt assets found" : "no reusable skills/prompts" },
   ];
 }
 
@@ -242,7 +255,7 @@ const HEADER_CHECK_IDS = [
   "test-signal",     "cicd-pipeline",
   "type-safety",     "eval-corpus",
   "otel-tracing",    "changelog",
-  "readme",
+  "readme",          "agent-instructions",
 ];
 
 function printCheckLines(catalog, scan) {
@@ -322,7 +335,7 @@ export function printScanReport({ run, scan, version = "?" }) {
   console.log();
   console.log(
     `  ${c.bcyan}${c.bold}  gravio  ${c.reset}` +
-    `${c.dim}AI Agent Quality Engine${c.reset}` +
+    `${c.dim}Codebase Quality Engine${c.reset}` +
     " ".repeat(22) +
     `${c.dim}v${version}  ${timestamp()}${c.reset}`
   );
@@ -348,7 +361,7 @@ export function printScanReport({ run, scan, version = "?" }) {
   console.log();
   console.log(hr());
   console.log();
-  console.log(`  ${c.bold}${c.white}Scores${c.reset}  ${c.dim}Five dimensions of agent quality${c.reset}`);
+  console.log(`  ${c.bold}${c.white}Scores${c.reset}  ${c.dim}Six dimensions of codebase quality${c.reset}`);
   printDimensionBars(scorecard);
 
   // ── Overall score banner ─────────────────────────────────────────────────────
