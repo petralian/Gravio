@@ -2759,6 +2759,42 @@ button#evaluate-btn:hover {
   padding: 4px 0 32px;
 }
 
+.db-runscans-primary {
+  padding: 24px 0 20px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 4px;
+}
+.db-runscans-primary .db-runscans-h3 {
+  font-size: 18px;
+  margin-bottom: 6px;
+}
+
+.db-runscans-details {
+  border-bottom: 1px solid var(--border);
+  padding: 16px 0;
+}
+.db-runscans-details-summary {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-3);
+  cursor: pointer;
+  user-select: none;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.db-runscans-details-summary::-webkit-details-marker { display: none; }
+.db-runscans-details-summary::before {
+  content: "▶";
+  font-size: 9px;
+  transition: transform 0.15s;
+}
+details[open] > .db-runscans-details-summary::before { transform: rotate(90deg); }
+.db-runscans-details > .db-runscans-steps {
+  margin-top: 16px;
+}
+
 .db-runscans-status {
   display: flex;
   align-items: flex-start;

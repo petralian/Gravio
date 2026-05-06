@@ -19,6 +19,7 @@ const state = {
   currentScans: [],
   searchQuery: "",
   sortMode: "recent",
+  cliToken: null,
 };
 
 // ─── DOM refs (all exist from page load) ───
@@ -329,72 +330,103 @@ function renderWorkspaceScans(scans) {
 function renderWorkspaceRunScans(projectId, hasScans) {
   const panel = $("db-tab-runscans");
   const pid   = esc(projectId);
+  const token = state.cliToken ?? null;
+  const tokenCmd = token
+    ? `node gravio.mjs --token ${token}`
+    : `node gravio.mjs --token YOUR_API_KEY`;
+  const tokenFoot = token
+    ? `<p class="db-runscans-foot">Token auto-filled from your session.</p>`
+    : `<p class="db-runscans-foot">Need your token? <a href="/settings" class="db-runscans-link">Settings &#8594;</a></p>`;
+
   const mergeOptions = state.projects
     .filter((p) => p.project_id !== projectId)
     .map((p) => `<option value="${esc(p.project_id)}">${esc(p.project_id)}</option>`)
     .join("");
 
-  const statusHtml = hasScans
-    ? `<div class="db-runscans-status db-runscans-ok">
-         <span class="db-auth-badge db-auth-badge-ok">&#10003; Auth completed</span>
-         <p class="db-runscans-status-text">This project has been scanned before. On a new machine or folder? Re-run Step&nbsp;2 to re-authorize.</p>
-       </div>`
-    : `<div class="db-runscans-status db-runscans-warn">
+  const primarySection = hasScans
+    ? `<!-- Already scanned: just run again -->
+       <div class="db-runscans-primary">
+         <h3 class="db-runscans-h3">Run another scan</h3>
+         <p class="db-runscans-p">From the folder where <code>gravio.mjs</code> lives. Auth is already saved.</p>
+         <div class="db-runscans-cmd-row">
+           <pre class="db-runscans-cmd" id="rs-cmd-scan">node gravio.mjs</pre>
+           <button class="m-btn m-btn-outline m-btn-sm db-rs-copy" data-copy-id="rs-cmd-scan" type="button">Copy</button>
+         </div>
+       </div>
+
+       <details class="db-runscans-details">
+         <summary class="db-runscans-details-summary">New machine or folder?</summary>
+         <div class="db-runscans-steps">
+           <div class="db-runscans-step">
+             <div class="db-runscans-step-num">1</div>
+             <div class="db-runscans-step-body">
+               <h3 class="db-runscans-h3">Download the CLI</h3>
+               <p class="db-runscans-platform">Windows (PowerShell)</p>
+               <div class="db-runscans-cmd-row">
+                 <pre class="db-runscans-cmd" id="rs-cmd-dl-win">Invoke-WebRequest https://gravio.dev/cli/gravio.mjs -OutFile gravio.mjs</pre>
+                 <button class="m-btn m-btn-outline m-btn-sm db-rs-copy" data-copy-id="rs-cmd-dl-win" type="button">Copy</button>
+               </div>
+               <p class="db-runscans-platform">macOS / Linux</p>
+               <div class="db-runscans-cmd-row">
+                 <pre class="db-runscans-cmd" id="rs-cmd-dl-mac">curl -fsSL https://gravio.dev/cli/gravio.mjs -o gravio.mjs</pre>
+                 <button class="m-btn m-btn-outline m-btn-sm db-rs-copy" data-copy-id="rs-cmd-dl-mac" type="button">Copy</button>
+               </div>
+             </div>
+           </div>
+           <div class="db-runscans-step">
+             <div class="db-runscans-step-num">2</div>
+             <div class="db-runscans-step-body">
+               <h3 class="db-runscans-h3">Connect &amp; scan</h3>
+               <p class="db-runscans-p">One command — handles setup, auth, link to this project, and scan.</p>
+               <div class="db-runscans-cmd-row">
+                 <pre class="db-runscans-cmd" id="rs-cmd-auth">${tokenCmd}</pre>
+                 <button class="m-btn m-btn-outline m-btn-sm db-rs-copy" data-copy-id="rs-cmd-auth" type="button">Copy</button>
+               </div>
+               ${tokenFoot}
+             </div>
+           </div>
+         </div>
+       </details>`
+    : `<!-- No scans yet: first-time setup -->
+       <div class="db-runscans-status db-runscans-warn">
          <span class="db-auth-badge db-auth-badge-warn">&#9888; No scans yet</span>
-         <p class="db-runscans-status-text">Complete the steps below to authorize and publish your first scan.</p>
+         <p class="db-runscans-status-text">Run the commands below to publish your first scan for this project.</p>
+       </div>
+       <div class="db-runscans-steps">
+         <div class="db-runscans-step">
+           <div class="db-runscans-step-num">1</div>
+           <div class="db-runscans-step-body">
+             <h3 class="db-runscans-h3">Download the CLI</h3>
+             <p class="db-runscans-p">Save <code>gravio.mjs</code> to your project folder if you don&#39;t have it already.</p>
+             <p class="db-runscans-platform">Windows (PowerShell)</p>
+             <div class="db-runscans-cmd-row">
+               <pre class="db-runscans-cmd" id="rs-cmd-dl-win">Invoke-WebRequest https://gravio.dev/cli/gravio.mjs -OutFile gravio.mjs</pre>
+               <button class="m-btn m-btn-outline m-btn-sm db-rs-copy" data-copy-id="rs-cmd-dl-win" type="button">Copy</button>
+             </div>
+             <p class="db-runscans-platform">macOS / Linux</p>
+             <div class="db-runscans-cmd-row">
+               <pre class="db-runscans-cmd" id="rs-cmd-dl-mac">curl -fsSL https://gravio.dev/cli/gravio.mjs -o gravio.mjs</pre>
+               <button class="m-btn m-btn-outline m-btn-sm db-rs-copy" data-copy-id="rs-cmd-dl-mac" type="button">Copy</button>
+             </div>
+           </div>
+         </div>
+         <div class="db-runscans-step">
+           <div class="db-runscans-step-num">2</div>
+           <div class="db-runscans-step-body">
+             <h3 class="db-runscans-h3">Connect &amp; scan</h3>
+             <p class="db-runscans-p">One command — handles setup, auth, links this folder to project <code>${pid}</code>, and runs your first scan.</p>
+             <div class="db-runscans-cmd-row">
+               <pre class="db-runscans-cmd" id="rs-cmd-auth">${tokenCmd}</pre>
+               <button class="m-btn m-btn-outline m-btn-sm db-rs-copy" data-copy-id="rs-cmd-auth" type="button">Copy</button>
+             </div>
+             ${tokenFoot}
+           </div>
+         </div>
        </div>`;
 
   panel.innerHTML = `
     <div class="db-runscans">
-      ${statusHtml}
-
-      <!-- ─ Primary flow ─ -->
-      <div class="db-runscans-steps">
-
-        <div class="db-runscans-step">
-          <div class="db-runscans-step-num">1</div>
-          <div class="db-runscans-step-body">
-            <h3 class="db-runscans-h3">Download the CLI</h3>
-            <p class="db-runscans-p">Save <code>gravio.mjs</code> to your project folder if you don&#39;t have it already.</p>
-            <p class="db-runscans-platform">Windows (PowerShell)</p>
-            <div class="db-runscans-cmd-row">
-              <pre class="db-runscans-cmd" id="rs-cmd-dl-win">Invoke-WebRequest https://gravio.dev/cli/gravio.mjs -OutFile gravio.mjs</pre>
-              <button class="m-btn m-btn-outline m-btn-sm db-rs-copy" data-copy-id="rs-cmd-dl-win" type="button">Copy</button>
-            </div>
-            <p class="db-runscans-platform">macOS / Linux</p>
-            <div class="db-runscans-cmd-row">
-              <pre class="db-runscans-cmd" id="rs-cmd-dl-mac">curl -fsSL https://gravio.dev/cli/gravio.mjs -o gravio.mjs</pre>
-              <button class="m-btn m-btn-outline m-btn-sm db-rs-copy" data-copy-id="rs-cmd-dl-mac" type="button">Copy</button>
-            </div>
-          </div>
-        </div>
-
-        <div class="db-runscans-step">
-          <div class="db-runscans-step-num">2</div>
-          <div class="db-runscans-step-body">
-            <h3 class="db-runscans-h3">First-time connect &amp; scan</h3>
-            <p class="db-runscans-p">Auto-runs setup, auth, link, scan, and publish in one command.</p>
-            <div class="db-runscans-cmd-row">
-              <pre class="db-runscans-cmd" id="rs-cmd-auth">node gravio.mjs --token YOUR_API_KEY</pre>
-              <button class="m-btn m-btn-outline m-btn-sm db-rs-copy" data-copy-id="rs-cmd-auth" type="button">Copy</button>
-            </div>
-            <p class="db-runscans-foot">Need your key? <a href="/settings" class="db-runscans-link">Settings &#8594;</a></p>
-          </div>
-        </div>
-
-        <div class="db-runscans-step">
-          <div class="db-runscans-step-num">3</div>
-          <div class="db-runscans-step-body">
-            <h3 class="db-runscans-h3">Subsequent scans</h3>
-            <p class="db-runscans-p">From the same folder — auth and link are already saved.</p>
-            <div class="db-runscans-cmd-row">
-              <pre class="db-runscans-cmd" id="rs-cmd-scan">node gravio.mjs</pre>
-              <button class="m-btn m-btn-outline m-btn-sm db-rs-copy" data-copy-id="rs-cmd-scan" type="button">Copy</button>
-            </div>
-          </div>
-        </div>
-
-      </div>
+      ${primarySection}
 
       <!-- ─ Advanced commands ─ -->
       <div class="db-cmd-ref">
@@ -663,6 +695,18 @@ function renderWorkspaceRecs(scans) {
     </li>`).join("");
 }
 
+// ─── CLI token ───
+async function fetchCliToken() {
+  try {
+    const res = await fetch("/api/keys/onboarding", { method: "POST" });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return (typeof data?.key === "string") ? data.key : null;
+  } catch {
+    return null;
+  }
+}
+
 // ─── Data loaders ───
 async function loadProjects() {
   const res = await fetch("/api/runs/list");
@@ -833,6 +877,7 @@ async function init() {
       return;
     }
     state.user = await me.json();
+    state.cliToken = await fetchCliToken();
     bindEvents();
     await loadProjects();
 
