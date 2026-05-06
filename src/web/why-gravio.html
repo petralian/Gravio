@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Why Gravio | AI Coding Risk Control for Fast Teams</title>
+  <meta name="description" content="Ship faster with AI coding while reducing production risk. Gravio gives continuous codebase oversight, policy scoring, and secure trend tracking across human and AI workflows." />
+  <meta property="og:title" content="Why Gravio | AI Coding Risk Control for Fast Teams" />
+  <meta property="og:description" content="A minimal way to add oversight to AI-assisted software delivery without slowing down developers." />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://gravio.dev/why-gravio.html" />
+  <link rel="canonical" href="https://gravio.dev/why-gravio.html" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    .wg-main {
+      padding: 62px 28px 100px;
+    }
+    .wg-hero {
+      text-align: center;
+      max-width: 860px;
+      margin: 0 auto 58px;
+    }
+    .wg-hero h1 {
+      font-size: clamp(32px, 5vw, 58px);
+      line-height: 1.04;
+      letter-spacing: -1.8px;
+      margin-bottom: 16px;
+    }
+    .wg-lead {
+      color: var(--text-2);
+      font-size: 18px;
+      line-height: 1.68;
+      max-width: 720px;
+      margin: 0 auto 26px;
+    }
+    .wg-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+      margin-bottom: 58px;
+    }
+    .wg-card {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 22px;
+    }
+    .wg-card h3 {
+      font-size: 16px;
+      margin-bottom: 8px;
+      letter-spacing: -0.2px;
+    }
+    .wg-card p {
+      font-size: 14px;
+      color: var(--text-2);
+      line-height: 1.62;
+    }
+    .wg-section {
+      margin-bottom: 54px;
+    }
+    .wg-section h2 {
+      font-size: clamp(24px, 3.4vw, 38px);
+      letter-spacing: -1px;
+      margin-bottom: 10px;
+    }
+    .wg-sub {
+      color: var(--text-2);
+      margin-bottom: 18px;
+      max-width: 800px;
+    }
+    .wg-proof-list {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      list-style: none;
+      padding: 0;
+    }
+    .wg-proof-list li {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 14px;
+      font-size: 14px;
+      color: var(--text-2);
+      line-height: 1.55;
+    }
+    .wg-proof-list a {
+      color: var(--neon-cyan);
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
+    .wg-metrics-wrap {
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 18px;
+      background: linear-gradient(170deg, rgba(0, 229, 255, 0.05), rgba(255, 255, 255, 0.01));
+    }
+    .wg-metric-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .wg-metric-tab {
+      border: 1px solid var(--border-bright);
+      background: var(--surface-2);
+      color: var(--text-2);
+      border-radius: 999px;
+      padding: 6px 12px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .wg-metric-tab[aria-selected="true"] {
+      border-color: var(--neon-cyan-border);
+      color: var(--neon-cyan);
+      box-shadow: 0 0 0 1px rgba(0, 229, 255, 0.12) inset;
+    }
+    .wg-metric-stage {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: rgba(0, 0, 0, 0.25);
+      padding: 14px;
+      margin-bottom: 10px;
+    }
+    .wg-metric-notes {
+      color: var(--text-2);
+      font-size: 13px;
+      line-height: 1.58;
+      margin-bottom: 8px;
+    }
+    .wg-metric-summary {
+      color: var(--text-2);
+      font-size: 12px;
+      margin-bottom: 8px;
+    }
+    .wg-source-list {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    .wg-source-list li {
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--surface-2);
+      padding: 10px 12px;
+      font-size: 12px;
+      color: var(--text-2);
+      line-height: 1.5;
+    }
+    .wg-source-list a {
+      color: var(--neon-cyan);
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
+    .wg-solves {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+    }
+    .wg-solve {
+      border: 1px solid var(--border);
+      background: linear-gradient(160deg, rgba(0, 229, 255, 0.05), rgba(255, 255, 255, 0.01));
+      border-radius: var(--radius);
+      padding: 20px;
+    }
+    .wg-solve strong {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 14px;
+    }
+    .wg-solve p {
+      color: var(--text-2);
+      font-size: 14px;
+      line-height: 1.58;
+    }
+    .wg-faq {
+      display: grid;
+      gap: 10px;
+    }
+    .wg-faq details {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 14px 16px;
+    }
+    .wg-faq summary {
+      cursor: pointer;
+      font-weight: 600;
+      color: var(--text-1);
+    }
+    .wg-faq p {
+      margin-top: 10px;
+      color: var(--text-2);
+      font-size: 14px;
+      line-height: 1.62;
+    }
+    .wg-cta {
+      border: 1px solid var(--neon-cyan-border);
+      border-radius: var(--radius-lg);
+      background: radial-gradient(circle at 0% 0%, rgba(0, 229, 255, 0.12), rgba(0, 0, 0, 0));
+      padding: 34px;
+      text-align: center;
+    }
+    .wg-cta h2 {
+      font-size: clamp(24px, 3.1vw, 40px);
+      margin-bottom: 10px;
+      letter-spacing: -1px;
+    }
+    .wg-cta p {
+      color: var(--text-2);
+      margin-bottom: 18px;
+    }
+    @media (max-width: 980px) {
+      .wg-grid,
+      .wg-proof-list,
+      .wg-solves,
+      .wg-source-list {
+        grid-template-columns: 1fr;
+      }
+      .wg-main {
+        padding-top: 46px;
+      }
+    }
+  </style>
+</head>
+<body class="marketing">
+  <div data-site-header></div>
+
+  <main class="m-container wg-main">
+    <section class="wg-hero">
+      <p class="m-eyebrow">WHY GRAVIO</p>
+      <h1>AI can ship code in minutes.<br><span class="m-neon-text">Incidents can happen just as fast.</span></h1>
+      <p class="wg-lead">Gravio gives teams a minimal oversight layer for AI-assisted development: continuous quality scoring, policy checks, and secure trend visibility across your full codebase.</p>
+      <div class="m-cta-row" style="justify-content:center; margin-bottom: 8px;">
+        <a href="/onboarding" class="m-btn m-btn-neon m-btn-lg">Start free</a>
+        <a href="/login" class="m-btn m-btn-outline m-btn-lg">Customer login</a>
+      </div>
+    </section>
+
+    <section class="wg-grid" aria-label="Business outcomes">
+      <article class="wg-card">
+        <h3>Ship Faster, With Guardrails</h3>
+        <p>AI pair-programming keeps velocity high. Gravio makes sure speed does not silently trade away reliability, security, or governance.</p>
+      </article>
+      <article class="wg-card">
+        <h3>See Risk Before Production</h3>
+        <p>Score trends and failed checks surface weak spots early, so teams fix regressions in CI windows instead of incident response windows.</p>
+      </article>
+      <article class="wg-card">
+        <h3>Create Trust With Evidence</h3>
+        <p>Use concrete scan history and policy outcomes to align engineering leaders, security teams, and customers around quality posture.</p>
+      </article>
+    </section>
+
+    <section class="wg-section" id="proof">
+      <h2>Why oversight matters now</h2>
+      <p class="wg-sub">Industry and security guidance is increasingly clear: AI-generated code without review, testing, and governance can introduce exploitable and expensive failures. Gravio operationalizes those controls without adding workflow drag.</p>
+      <ul class="wg-proof-list">
+        <li><strong>Kaspersky:</strong> Examples of vibe-coding abuse and manipulation risks in AI-generated software workflows.<br><a href="https://www.kaspersky.com/blog/vibe-coding-2025-risks/54584/#:~:text=As%20an%20example%20of%20such,paid%20features%20or%20alter%20data." target="_blank" rel="noopener noreferrer">Read Kaspersky analysis</a></li>
+        <li><strong>OWASP:</strong> The Top 10 risks for LLM applications, including prompt injection and insecure output handling.<br><a href="https://owasp.org/www-project-top-10-for-large-language-model-applications/" target="_blank" rel="noopener noreferrer">Read OWASP Top 10 for LLM Apps</a></li>
+        <li><strong>NIST:</strong> Formal AI risk management framework emphasizing governance, measurement, and continuous monitoring.<br><a href="https://www.nist.gov/itl/ai-risk-management-framework" target="_blank" rel="noopener noreferrer">Read NIST AI RMF</a></li>
+        <li><strong>MITRE ATLAS:</strong> Knowledge base of adversarial techniques targeting AI-enabled systems and pipelines.<br><a href="https://atlas.mitre.org/" target="_blank" rel="noopener noreferrer">Read MITRE ATLAS</a></li>
+      </ul>
+    </section>
+
+    <section class="wg-section" id="proof-metrics">
+      <h2>Interactive proof metrics</h2>
+      <p class="wg-sub">Use the controls to switch between risk, adoption, and business value datasets. Every figure is linked to a public source so prospects can validate claims quickly.</p>
+      <div class="wg-metrics-wrap">
+        <div class="wg-metric-tabs" role="tablist" aria-label="Proof metric categories">
+          <button type="button" class="wg-metric-tab" data-metric-set="risk" aria-selected="true">Risk signals</button>
+          <button type="button" class="wg-metric-tab" data-metric-set="adoption" aria-selected="false">Adoption signals</button>
+          <button type="button" class="wg-metric-tab" data-metric-set="value" aria-selected="false">Business impact</button>
+        </div>
+        <div class="wg-metric-stage">
+          <canvas id="wg-proof-chart" aria-label="Proof metrics chart" role="img"></canvas>
+        </div>
+        <p class="wg-metric-notes" id="wg-metric-notes"></p>
+        <p class="wg-metric-summary" id="wg-metric-summary"></p>
+        <ul class="wg-source-list" id="wg-source-list"></ul>
+      </div>
+    </section>
+
+    <section class="wg-section" id="solution">
+      <h2>What Gravio solves</h2>
+      <p class="wg-sub">Most teams either move fast without controls or add heavy governance that kills momentum. Gravio is the middle path: lightweight, continuous, and developer-native.</p>
+      <div class="wg-solves">
+        <article class="wg-solve">
+          <strong>No visibility into AI code quality</strong>
+          <p>Gravio provides repeatable multi-dimensional scoring and trend history, so quality moves from opinion to measurable signal.</p>
+        </article>
+        <article class="wg-solve">
+          <strong>Inconsistent review and policy enforcement</strong>
+          <p>Checks are evaluated uniformly across projects, reducing human variance and hidden drift between teams.</p>
+        </article>
+        <article class="wg-solve">
+          <strong>Security/compliance anxiety about AI workflows</strong>
+          <p>Use account-scoped access controls and optional E2EE to keep visibility high while preserving data boundaries.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="wg-section" id="geo-aio">
+      <h2>Built to be understood by humans and AI overviews</h2>
+      <p class="wg-sub">This page is intentionally structured for GEO and AIO: explicit problem statements, evidence links, concise claims, and FAQ answers that search systems can quote accurately.</p>
+      <div class="wg-faq">
+        <details open>
+          <summary>What is Gravio in one sentence?</summary>
+          <p>Gravio is a codebase quality engine that adds continuous oversight to AI-assisted software delivery without slowing teams down.</p>
+        </details>
+        <details>
+          <summary>Who should use Gravio?</summary>
+          <p>Engineering teams using AI coding assistants who need speed plus measurable quality, security, and governance outcomes.</p>
+        </details>
+        <details>
+          <summary>How quickly can teams adopt it?</summary>
+          <p>Teams can start with the guided onboarding flow in minutes, run scans immediately, and use dashboard trends for ongoing improvement.</p>
+        </details>
+      </div>
+    </section>
+
+    <section class="wg-cta">
+      <p class="m-eyebrow">CONVERSION</p>
+      <h2>Keep your AI velocity.<br>Remove the blind spots.</h2>
+      <p>Start free and get a baseline quality signal for your codebase today.</p>
+      <div class="m-cta-row" style="justify-content:center; margin-bottom: 0;">
+        <a href="/onboarding" class="m-btn m-btn-neon m-btn-lg">Start free</a>
+        <a href="/dashboard" class="m-btn m-btn-outline m-btn-lg">View dashboard</a>
+      </div>
+    </section>
+  </main>
+
+  <div data-site-footer></div>
+
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "What is Gravio in one sentence?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Gravio is a codebase quality engine that adds continuous oversight to AI-assisted software delivery without slowing teams down."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Who should use Gravio?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Engineering teams using AI coding assistants who need speed plus measurable quality, security, and governance outcomes."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How quickly can teams adopt it?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Teams can start with guided onboarding in minutes, run scans immediately, and use dashboard trends for ongoing improvement."
+          }
+        }
+      ]
+    }
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <script>
+    (function () {
+      var tabs = Array.prototype.slice.call(document.querySelectorAll('.wg-metric-tab'));
+      var notesEl = document.getElementById('wg-metric-notes');
+      var summaryEl = document.getElementById('wg-metric-summary');
+      var sourcesEl = document.getElementById('wg-source-list');
+      var canvas = document.getElementById('wg-proof-chart');
+      if (!tabs.length || !notesEl || !summaryEl || !sourcesEl || !canvas) return;
+      if (typeof Chart !== 'function') {
+        notesEl.textContent = 'Interactive chart could not load. Source links are still available below.';
+      }
+
+      var metricSets = {
+        risk: {
+          heading: 'Risk signals are already visible in production-grade AI coding workflows.',
+          summary: 'Without systematic review, vulnerable code and insecure configurations remain common.',
+          labels: [
+            'AI code samples failing security tests',
+            'Vibe-coded orgs with systemic risk exposure',
+            'Critical vulnerability increase after 5 AI revisions'
+          ],
+          values: [45, 20, 37],
+          sources: [
+            {
+              name: 'Veracode 2025 GenAI Code Security Report',
+              url: 'https://www.veracode.com/blog/genai-code-security-report/'
+            },
+            {
+              name: 'Wiz Research on vibe-coded applications',
+              url: 'https://www.wiz.io/blog/common-security-risks-in-vibe-coded-apps'
+            },
+            {
+              name: 'Kaspersky analysis citing iterative security degradation study',
+              url: 'https://www.kaspersky.com/blog/vibe-coding-2025-risks/54584/'
+            }
+          ]
+        },
+        adoption: {
+          heading: 'AI coding tooling is already mainstream among developers.',
+          summary: 'Adoption is no longer the question. Governance quality is the differentiator.',
+          labels: [
+            'Developers regularly using ChatGPT',
+            'Developers regularly using GitHub Copilot',
+            'Developers wanting to keep using Copilot'
+          ],
+          values: [82.1, 41.2, 72.1],
+          sources: [
+            {
+              name: 'Stack Overflow Developer Survey 2024 (AI tools)',
+              url: 'https://survey.stackoverflow.co/2024/technology/#ai-search-and-developer-tools'
+            }
+          ]
+        },
+        value: {
+          heading: 'The upside of AI coding is large, but depends on responsible execution.',
+          summary: 'The same reports highlighting productivity gains also call for stronger controls and human oversight.',
+          labels: [
+            'Potential software engineering productivity impact',
+            'GenAI annual economic value (low estimate, $T)',
+            'GenAI annual economic value (high estimate, $T)'
+          ],
+          values: [20, 2.6, 4.4],
+          sources: [
+            {
+              name: 'McKinsey: Economic potential of generative AI',
+              url: 'https://www.mckinsey.com/capabilities/tech-and-ai/our-insights/the-economic-potential-of-generative-ai-the-next-productivity-frontier'
+            }
+          ]
+        }
+      };
+
+      var chart = null;
+
+      function renderSources(items) {
+        sourcesEl.innerHTML = '';
+        items.forEach(function (item) {
+          var li = document.createElement('li');
+          var a = document.createElement('a');
+          a.href = item.url;
+          a.target = '_blank';
+          a.rel = 'noopener noreferrer';
+          a.textContent = item.name;
+          li.appendChild(a);
+          sourcesEl.appendChild(li);
+        });
+      }
+
+      function ensureChart(set) {
+        if (typeof Chart !== 'function') return;
+        var color = 'rgba(0, 229, 255, 0.72)';
+        var borderColor = 'rgba(0, 229, 255, 1)';
+        if (!chart) {
+          chart = new Chart(canvas, {
+            type: 'bar',
+            data: {
+              labels: set.labels,
+              datasets: [{
+                data: set.values,
+                borderColor: borderColor,
+                backgroundColor: color,
+                borderWidth: 1.5,
+                borderRadius: 7
+              }]
+            },
+            options: {
+              animation: { duration: 360 },
+              maintainAspectRatio: true,
+              scales: {
+                y: {
+                  beginAtZero: true,
+                  grid: { color: 'rgba(255,255,255,0.08)' },
+                  ticks: { color: '#a1a1aa' }
+                },
+                x: {
+                  grid: { display: false },
+                  ticks: { color: '#a1a1aa' }
+                }
+              },
+              plugins: {
+                legend: { display: false },
+                tooltip: {
+                  callbacks: {
+                    label: function (ctx) {
+                      return String(ctx.raw);
+                    }
+                  }
+                }
+              }
+            }
+          });
+          return;
+        }
+        chart.data.labels = set.labels;
+        chart.data.datasets[0].data = set.values;
+        chart.update();
+      }
+
+      function activate(setName) {
+        var set = metricSets[setName];
+        if (!set) return;
+        tabs.forEach(function (tab) {
+          tab.setAttribute('aria-selected', tab.getAttribute('data-metric-set') === setName ? 'true' : 'false');
+        });
+        notesEl.textContent = set.heading;
+        summaryEl.textContent = set.summary;
+        renderSources(set.sources);
+        ensureChart(set);
+      }
+
+      tabs.forEach(function (tab) {
+        tab.addEventListener('click', function () {
+          activate(tab.getAttribute('data-metric-set'));
+        });
+      });
+
+      activate('risk');
+    })();
+  </script>
+  <script src="site-chrome.js"></script>
+</body>
+</html>

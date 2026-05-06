@@ -39,6 +39,7 @@ src/
 
 src/web/
   index.html               Single-page UI with guided onboarding, builder, sample loading
+  why-gravio.html          Conversion-focused explainer page for AI coding risk and Gravio positioning
   styles.css               Dark UI with CSS variables
   app.js                   Browser JS — file import, builder, validation, evaluation
 
@@ -187,6 +188,15 @@ node gravio.mjs --logout --target . # remove local .gravio/auth.json
 5. **Parallel Agent Coordination** — lock manager for multi-agent file access
 6. **Token Efficiency Module** — detect repeated-failure loops, suggest minimal context packs
 7. **Policy Packs** — configurable check sets: Solo Starter, Agency Team, Enterprise Secure
+
+---
+
+## Marketing Route Notes
+
+- Public conversion page: `/why-gravio.html` (server static fallback under `src/web/`).
+- Page intent: convert high-intent prospects by pairing concise business outcomes with external risk references and Gravio-specific remediation positioning.
+- GEO/AIO optimization on page: explicit H1/H2 intent, external authority citations, concise FAQ answers, and `FAQPage` JSON-LD.
+- Interactive evidence panel uses Chart.js (CDN, open source) with three user-selectable datasets (risk, adoption, business impact) and direct links to source reports.
 
 ---
 

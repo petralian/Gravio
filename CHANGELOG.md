@@ -7,15 +7,22 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- New conversion-focused sales page at `/why-gravio.html` explaining AI coding oversight risks, Gravio value props, external trust references, and FAQ schema for improved GEO/AIO discoverability.
+- Interactive proof-metrics module on `/why-gravio.html` using Chart.js (open source) with source-linked risk, adoption, and business-impact datasets.
 - `POST /api/keys/onboarding` — authenticated endpoint that mints a fresh user-bound CLI key (label "onboarding"), deleting any prior key with that label, so the onboarding page always has a real token to auto-fill.
-- 4 new server tests covering the onboarding key route (401 without session, gv_ key returned when authenticated, rotation produces a fresh key, only one "onboarding" key exists after rotation).
+- `GET /api/projects/list` for CLI relink discovery and project identity management.
+- `POST /api/projects/rename` to rename project IDs per user.
+- `POST /api/projects/merge` to combine one project into another selected destination.
+- 7 new server tests covering onboarding key rotation plus project list/rename/merge flows.
 
 ### Changed
-- Onboarding flow restructured from 5 steps to 3 action steps + dashboard: (1) Download CLI, (2) Authorize once with real auto-filled API key, (3) Run scan — project is created automatically on first scan.
-- "Create your project name" is no longer a standalone first step; the project name field is now embedded inside the "Authorize" step.
-- Authorize command now always shows the real user-bound API key (not a placeholder) for signed-in users.
-- Step 3 (run scan) copy now explains: first scan auto-creates the project; subsequent scans add results to the existing one.
-- Auth status line updated to reference "Step 2" (was "Step 3").
+- Shared header and homepage hero now link directly to `/why-gravio.html` as an educational conversion path for new prospects.
+- Onboarding is now a true 3-step flow: (1) download CLI, (2) run one smart command, (3) open dashboard.
+- Onboarding no longer asks for manual project naming; the CLI now auto-generates and persists project identity.
+- Step 2 now uses a single command: `node gravio.mjs --token <gv_...>`.
+- CLI defaults to one-command run mode (`node gravio.mjs`) that auto-discovers setup/auth/link/scan/publish.
+- CLI now persists project linkage in `.gravio/project.json` and supports recovery commands: `link`, `rename`, `merge`, and `doctor`.
+- Dashboard Run Scans tab now includes inline project rename and merge controls.
 
 - `GET /api/runs/:projectId/history` endpoint for project-level scan history with trend stats and recommendations.
 - `POST /api/runs/delete` endpoint to remove selected scans for a project (used by inline delete confirmation flow in dashboard).
