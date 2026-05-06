@@ -179,7 +179,7 @@ function buildCatalog(scan) {
       title: "No eval corpus detected",
       why: "Without golden test cases you cannot tell if a prompt change improved or degraded your agent's output quality. You are shipping blind — every release is a guess.",
       fix: "mkdir -p evals/golden\ncat > evals/golden/sample.json << 'EOF'\n{\n  \"id\": \"basic-001\",\n  \"input\": \"Summarise this meeting in 3 bullets\",\n  \"expected_contains\": [\"action items\", \"owner\", \"deadline\"],\n  \"tags\": [\"regression\"]\n}\nEOF",
-      docs: "https://gravio.dev/tool",
+      docs: "https://gravio.dev/dashboard",
     },
     {
       dim: "evaluation", id: "baseline-tracking", severity: "medium",
@@ -189,7 +189,7 @@ function buildCatalog(scan) {
       title: "No score baseline tracked",
       why: "A baseline file lets CI fail the build when quality scores drop — it acts as a ratchet that prevents you from shipping a measurably worse agent than the last release.",
       fix: "# After a clean scan, commit the baseline:\ncp agent-quality/runs/latest.json agent-quality/baseline.json\ngit add agent-quality/baseline.json\ngit commit -m 'chore: capture quality baseline'\n\n# In CI, add after tests:\nnpm run scorecard:check",
-      docs: "https://gravio.dev/download",
+      docs: "https://gravio.dev/onboarding",
     },
     {
       dim: "evaluation", id: "eval-script", severity: "low",

@@ -74,8 +74,8 @@
       await fetch("/auth/logout", { method: "POST" });
     } catch { /* ignore */ }
     setAuth(null);
-    // Some pages (dashboard, tool) require auth — bounce home on sign out.
-    if (path === "/dashboard" || path === "/tool") {
+    // Dashboard requires auth — bounce home on sign out.
+    if (path === "/dashboard") {
       window.location.href = "/";
     }
   });

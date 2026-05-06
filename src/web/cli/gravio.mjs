@@ -721,7 +721,7 @@ cat > evals/golden/sample.json << 'EOF'
   "tags": ["regression"]
 }
 EOF`,
-      docs: "https://gravio.dev/tool"
+      docs: "https://gravio.dev/dashboard"
     },
     {
       dim: "evaluation",
@@ -733,7 +733,7 @@ EOF`,
       title: "No score baseline tracked",
       why: "A baseline file lets CI fail the build when quality scores drop \u2014 it acts as a ratchet that prevents you from shipping a measurably worse agent than the last release.",
       fix: "# After a clean scan, commit the baseline:\ncp agent-quality/runs/latest.json agent-quality/baseline.json\ngit add agent-quality/baseline.json\ngit commit -m 'chore: capture quality baseline'\n\n# In CI, add after tests:\nnpm run scorecard:check",
-      docs: "https://gravio.dev/download"
+      docs: "https://gravio.dev/onboarding"
     },
     {
       dim: "evaluation",

@@ -127,18 +127,10 @@ describe("GET /dp", () => {
 });
 
 describe("GET /tool", () => {
-  it("redirects to login when unauthenticated", async () => {
+  it("permanently redirects to /dashboard", async () => {
     const res = await httpGet(`http://localhost:${TEST_PORT}/tool`);
-    assert.strictEqual(res.status, 302);
-    assert.strictEqual(res.headers.location, "/login?next=/tool");
-  });
-
-  it("returns 200 with tool HTML when authenticated", async () => {
-    const cookie = await registerAndGetCookie(`tool-${Date.now()}@gravio.test`, "password123");
-    const res = await httpGet(`http://localhost:${TEST_PORT}/tool`, { Cookie: cookie });
-    assert.strictEqual(res.status, 200);
-    assert.ok(res.headers["content-type"]?.includes("text/html"), "Expected HTML content-type");
-    assert.ok(res.body.includes("Scoring Tool"), "Expected Scoring Tool text");
+    assert.strictEqual(res.status, 308);
+    assert.strictEqual(res.headers.location, "/dashboard");
   });
 });
 

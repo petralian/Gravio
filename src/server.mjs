@@ -398,13 +398,8 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (req.method === "GET" && urlPath === "/tool") {
-    const user = getAuthUser(req);
-    if (!user) {
-      res.writeHead(302, { Location: "/login?next=/tool" });
-      res.end();
-      return;
-    }
-    serveStatic(res, path.join(WEB_DIR, "tool.html"));
+    res.writeHead(308, { Location: "/dashboard" });
+    res.end();
     return;
   }
 
@@ -419,7 +414,8 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (req.method === "GET" && urlPath === "/download") {
-    serveStatic(res, path.join(WEB_DIR, "download.html"));
+    res.writeHead(308, { Location: "/onboarding" });
+    res.end();
     return;
   }
 
