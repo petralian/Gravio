@@ -754,7 +754,7 @@ const server = http.createServer(async (req, res) => {
               checkout_data: {
                 custom: {
                   plan: "team",
-                  seats,
+                  seats: String(seats),
                 },
               },
             },
