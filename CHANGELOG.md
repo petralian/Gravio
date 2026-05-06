@@ -7,6 +7,8 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- `GET /api/runs/:projectId/history` endpoint for project-level scan history with trend stats and recommendations.
+- `POST /api/runs/delete` endpoint to remove selected scans for a project (used by inline delete confirmation flow in dashboard).
 - Plan/tier system: `free`, `pro`, `team` tiers per user stored in the `users` table (`plan` column, idempotent `ALTER TABLE` migration on startup).
 - `POST /api/admin/users/:id/plan` — admin-only endpoint to upgrade or downgrade any user's plan.
 - Admin dashboard: new Plan column with inline `<select>` dropdown; free users show scan count as `used / 3`, paid users show bare count.
@@ -17,6 +19,8 @@ All notable changes to this project will be documented in this file.
 - Dashboard decryption mode for API keys, with browser-side WebCrypto decrypt for encrypted run envelopes.
 
 ### Changed
+- Dashboard default UX is now overview-first (last scan, projects, total scans, API key creation), with E2EE tools moved to an optional Pro/Team section.
+- Runs storage changed from single upsert-per-project to append-only scan history rows, enabling per-project timelines and selective scan deletion.
 - Scoring model expanded from 5 to 6 dimensions by adding `agentic` readiness (skills, prompts, orchestration, and human+AI collaboration signals).
 - Branding/copy updated from AI-coding-agent-only wording to broader codebase quality positioning across human and AI workflows.
 - Marketing copy now requires registration before cloud scoring and replaces misleading global `agentscored` install examples with real project commands.

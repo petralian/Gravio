@@ -325,12 +325,55 @@ describe("POST /api/publish + GET /api/runs/:projectId (authenticated)", () => {
     assert.strictEqual(data.ok, true);
   });
 
+  it("stores multiple scans for the same project (history model)", async () => {
+    const res = await httpPost(
+      `http://localhost:${TEST_PORT}/api/publish`,
+      {
+        projectId,
+        run: { runId: "test-run-002", summary: { overallScore: 82 }, scorecard: { safety: 84 } },
+      },
+      { Authorization: `Bearer ${apiKey}` },
+    );
+    assert.strictEqual(res.status, 200);
+  });
+
   it("retrieves stored run via session cookie", async () => {
     const res = await httpGet(`http://localhost:${TEST_PORT}/api/runs/${projectId}`, { Cookie: cookie });
     assert.strictEqual(res.status, 200);
     const data = JSON.parse(res.body);
-    assert.strictEqual(data.run?.runId, testRun.runId);
+    assert.strictEqual(data.run?.runId, "test-run-002");
     assert.ok(typeof data.publishedAt === "string");
+  });
+
+  it("returns project history with scans in latest-first order", async () => {
+    const res = await httpGet(`http://localhost:${TEST_PORT}/api/runs/${projectId}/history`, { Cookie: cookie });
+    assert.strictEqual(res.status, 200);
+    const data = JSON.parse(res.body);
+    assert.ok(Array.isArray(data.scans));
+    assert.ok(data.scans.length >= 2);
+    assert.strictEqual(data.scans[0].runId, "test-run-002");
+    assert.strictEqual(data.scans[1].runId, "test-run-001");
+  });
+
+  it("deletes selected scans with confirmation endpoint", async () => {
+    const history = await httpGet(`http://localhost:${TEST_PORT}/api/runs/${projectId}/history`, { Cookie: cookie });
+    const scans = JSON.parse(history.body).scans;
+    const targetId = scans.find((s) => s.runId === "test-run-001")?.id;
+    assert.ok(targetId, "expected scan id for test-run-001");
+
+    const del = await httpPost(
+      `http://localhost:${TEST_PORT}/api/runs/delete`,
+      { projectId, scanIds: [targetId] },
+      { Cookie: cookie },
+    );
+    assert.strictEqual(del.status, 200);
+    const delBody = JSON.parse(del.body);
+    assert.strictEqual(delBody.ok, true);
+    assert.strictEqual(delBody.deleted, 1);
+
+    const historyAfter = await httpGet(`http://localhost:${TEST_PORT}/api/runs/${projectId}/history`, { Cookie: cookie });
+    const scansAfter = JSON.parse(historyAfter.body).scans;
+    assert.ok(scansAfter.every((s) => s.runId !== "test-run-001"));
   });
 
   it("stores and retrieves encrypted run envelopes", async () => {

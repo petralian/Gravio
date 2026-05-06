@@ -143,21 +143,34 @@ node gravio.mjs --logout --target . # remove local .gravio/auth.json
 - Free scans are always accepted and published to cloud.
 - Cloud retention for free users is capped to latest 3 records (older records auto-pruned).
 - `/api/runs/:projectId` returns generic rating-only payloads for free users (no detailed remediation/check data).
+- `/api/runs/:projectId/history` returns project scan timelines and trend summary, with generic-only details on free tier.
 - Pro/Team/admin users receive full run detail payloads.
 - CLI scan flow is cloud-only (no local run JSON artifact persisted).
+
+## Dashboard Interaction Model
+
+- Dashboard default surface is no longer decrypt-first; users land on overview metrics (`last scan`, `projects`, `total scans`) plus project list and API key management.
+- E2EE decrypt module is optional and shown only for Pro/Team/admin users.
+- Project drill-down now shows:
+  - full scan history list
+  - trend summary and aggregate stats
+  - recommendation list
+  - multi-select scan deletion with inline two-step confirmation
+- `POST /api/runs/delete` deletes selected scan IDs scoped to the authenticated user and project.
 
 ---
 
 ## Plan / Tier System
 
-| Plan | Publish limit | Admin-settable |
+| Plan | Publish behavior | Admin-settable |
 |---|---|---|
-| free | 3 projects | yes |
-| pro | unlimited | yes |
-| team | unlimited | yes |
+| free | always publish, retain latest 3 scans | yes |
+| pro | always publish, unlimited retention | yes |
+| team | always publish, unlimited retention | yes |
 
 - `POST /api/admin/users/:id/plan` — admin-only endpoint to set any user's plan
-- `/api/publish` gates on plan: free users blocked at 3 distinct projects; pro/team and admins are unlimited
+- `/api/publish` accepts all scans; free users are auto-trimmed to latest 3 retained scans
+- `/api/publish` appends run history rows (no longer overwrites one row per project)
 - `/api/me` returns `plan` field so the frontend can gate features
 
 ---

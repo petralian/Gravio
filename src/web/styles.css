@@ -1674,7 +1674,7 @@ button#evaluate-btn:hover {
 .db-main {
   padding-top: 112px;   /* clear sticky nav */
   padding-bottom: 80px;
-  max-width: 800px;
+  max-width: 980px;
 }
 
 /* page header */
@@ -1691,19 +1691,39 @@ button#evaluate-btn:hover {
   font-size: 17px;
   color: var(--text-2);
   line-height: 1.6;
-  max-width: 600px;
+  max-width: 720px;
   margin-bottom: 20px;
 }
-.db-zk-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 13px;
-  color: var(--text-2);
-  background: rgba(0,255,136,0.06);
-  border: 1px solid rgba(0,255,136,0.15);
-  border-radius: 8px;
-  padding: 8px 14px;
+.db-mini-lead { font-size: 14px; margin-bottom: 14px; }
+
+.db-overview {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.db-stat-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 18px 20px;
+}
+
+.db-stat-label {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  margin-bottom: 8px;
+}
+
+.db-stat-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text-1);
+  font-family: var(--font-mono);
 }
 
 .db-admin-back { margin-top: 16px; align-self: flex-start; }
@@ -1796,6 +1816,135 @@ button#evaluate-btn:hover {
   line-height: 1.5;
 }
 .db-submit { align-self: flex-start; }
+
+.db-project-detail {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 28px;
+  margin-bottom: 24px;
+}
+
+.db-project-detail-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.db-project-code {
+  font-family: var(--font-mono);
+  color: var(--neon-cyan);
+  font-size: 13px;
+}
+
+.db-detail-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.db-detail-chip {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.db-detail-chip span {
+  color: var(--text-3);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.db-detail-chip strong {
+  color: var(--text-1);
+  font-size: 18px;
+  font-family: var(--font-mono);
+}
+
+.db-subtitle {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-2);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin: 16px 0 10px;
+}
+
+.db-summary-box {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 10px;
+  background: rgba(255,255,255,0.02);
+}
+
+.db-summary-box p {
+  color: var(--text-2);
+  font-size: 14px;
+}
+
+.db-recommendations-list {
+  margin-left: 18px;
+  color: var(--text-2);
+  font-size: 14px;
+}
+
+.db-scan-actions { margin: 8px 0 12px; }
+
+.db-delete-confirm {
+  border: 1px solid rgba(255,68,102,0.25);
+  background: rgba(255,68,102,0.08);
+  border-radius: 10px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.db-delete-confirm p {
+  color: #ffb8c6;
+  font-size: 13px;
+  margin-bottom: 10px;
+}
+
+.db-delete-confirm-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.db-scan-table-wrap {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow-x: auto;
+}
+
+.db-scan-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.db-scan-table th,
+.db-scan-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  text-align: left;
+}
+
+.db-scan-table th {
+  color: var(--text-3);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.db-scan-table tr:last-child td { border-bottom: none; }
 
 /* results */
 .db-results { margin-top: 40px; }
@@ -1966,6 +2115,8 @@ button#evaluate-btn:hover {
   .m-security-inner { padding: 40px 24px; }
   .m-nav-links a:not(.m-btn) { display: none; }
   .db-form-row { grid-template-columns: 1fr; }
+  .db-overview { grid-template-columns: 1fr 1fr; }
+  .db-detail-stats { grid-template-columns: 1fr 1fr; }
   .db-metrics-row { grid-template-columns: 1fr 1fr; }
   .dimensions-grid { grid-template-columns: 1fr 1fr; }
   .db-score-banner { flex-direction: column; gap: 16px; }
@@ -1981,6 +2132,9 @@ button#evaluate-btn:hover {
   body.app-tool { padding: 0 0 48px; }
   body.app-tool #app { padding: 20px 14px 0; }
   .db-form-card { padding: 20px; }
+  .db-project-detail { padding: 18px; }
+  .db-overview { grid-template-columns: 1fr; }
+  .db-detail-stats { grid-template-columns: 1fr; }
   .db-score-value { font-size: 48px; }
   .db-metrics-row { grid-template-columns: 1fr; }
   .dimensions-grid { grid-template-columns: 1fr; }

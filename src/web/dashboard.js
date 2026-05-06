@@ -8,65 +8,27 @@
 
 const $ = (id) => document.getElementById(id);
 
-const elProjectId = $("db-project-id");
-const elError = $("db-error");
-const elSubmit = $("db-submit");
-const elSubmitLabel = $("db-submit-label");
-const elResults = $("db-results");
-const elFormSection = $("form-section");
+"use strict";
 
-const elScoreValue = $("db-score-value");
-const elPassBadge = $("db-pass-badge");
-const elRunId = $("db-run-id");
-const elPublishedAt = $("db-published-at");
-const elWpr = $("db-wpr");
-const elSafety = $("db-safety");
-const elCritical = $("db-critical");
-const elGates = $("db-gates");
-const elDimensions = $("db-dimensions");
-const elRawJson = $("db-raw-json");
-const elReload = $("db-reload");
+const $ = (id) => document.getElementById(id);
 
-const elModeHex = $("mode-hex");
-const elModePassphrase = $("mode-passphrase");
-const elModeApi = $("mode-api");
-const elPanelHex = $("panel-hex");
-const elPanelPassphrase = $("panel-passphrase");
-const elPanelApi = $("panel-api");
-const elKeyHex = $("db-key-hex");
-const elPassphrase = $("db-passphrase");
-const elSalt = $("db-salt");
-const elApiKey = $("db-api-key");
-
-let currentUser = null;
-let keyMode = "api";
-
-const DIM_LABELS = {
-  safety: "Safety",
-  reliability: "Reliability",
-  evaluation: "Evaluation",
-  observability: "Observability",
-  governance: "Governance",
-  agentic: "Agentic",
+const state = {
+  user: null,
+  projects: [],
+  selectedProject: null,
+  selectedScanIds: new Set(),
+  currentScans: [],
 };
 
-(async () => {
-  try {
-    const res = await fetch("/api/me");
-    if (!res.ok) {
-      location.href = "/login?next=/dashboard";
-      return;
-    }
-    currentUser = await res.json();
-    if (currentUser.role === "admin") {
-      document.getElementById("db-admin-back").removeAttribute("hidden");
-    }
-    loadProjects();
-    loadApiKeys();
-  } catch {
-    location.href = "/login?next=/dashboard";
-  }
-})();
+const elError = $("db-error");
+const elProjectList = $("db-projects-list");
+const elProjectSection = $("db-projects-section");
+const elProjectDetail = $("db-project-detail");
+const elScanRows = $("db-scan-rows");
+const elDeleteSelected = $("db-delete-selected");
+const elDeleteConfirm = $("db-delete-confirm");
+const elConfirmDelete = $("db-confirm-delete");
+const elCancelDelete = $("db-cancel-delete");
 
 function esc(str) {
   return String(str ?? "")
@@ -76,36 +38,228 @@ function esc(str) {
     .replace(/\"/g, "&quot;");
 }
 
-function showError(msg) {
-  elError.textContent = msg;
-  elError.removeAttribute("hidden");
-  elSubmitLabel.textContent = "Load scorecard →";
-  elSubmit.disabled = false;
-}
-
-function clearError() {
-  elError.setAttribute("hidden", "");
-  elError.textContent = "";
-}
-
-function setLoading(loading) {
-  elSubmit.disabled = loading;
-  elSubmitLabel.textContent = loading ? "Loading…" : "Load scorecard →";
-}
-
 function isValidProjectId(id) {
   return /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/.test(id);
 }
 
-function scoreColor(score) {
-  if (score >= 90) return "var(--neon-green)";
-  if (score >= 70) return "var(--neon-cyan)";
-  if (score >= 50) return "var(--neon-cyan)";
-  return "#ff4466";
+function showError(msg) {
+  elError.textContent = msg;
+  elError.removeAttribute("hidden");
 }
 
-function barWidth(score) {
-  return Math.max(0, Math.min(100, Math.round(score))) + "%";
+function clearError() {
+  elError.textContent = "";
+  elError.setAttribute("hidden", "");
+}
+
+function formatScore(score) {
+  return Number.isFinite(score) ? String(Math.round(score)) : "—";
+}
+
+function formatDate(ts) {
+  if (!ts) return "—";
+  const d = new Date(ts);
+  return Number.isNaN(d.valueOf()) ? "—" : d.toLocaleString();
+}
+
+function trendLabel(direction, delta) {
+  if (!Number.isFinite(delta)) return "stable";
+  if (direction === "up") return `up +${delta}`;
+  if (direction === "down") return `down ${delta}`;
+  return "stable 0";
+}
+
+function renderOverview(projects) {
+  const projectCount = projects.length;
+  const totalScans = projects.reduce((acc, p) => acc + Number(p.scan_count ?? 0), 0);
+  const sorted = [...projects].sort((a, b) => String(b.last_scan_at).localeCompare(String(a.last_scan_at)));
+  const lastScanAt = sorted[0]?.last_scan_at ?? null;
+
+  $("db-project-count").textContent = String(projectCount);
+  $("db-scan-count").textContent = String(totalScans);
+  $("db-last-scan").textContent = formatDate(lastScanAt);
+}
+
+function renderProjects(projects) {
+  if (!projects.length) {
+    elProjectList.innerHTML = `<li class="db-project-empty">No cloud scans yet. Run node gravio.mjs --once in a project to publish your first scan.</li>`;
+    elProjectSection.removeAttribute("hidden");
+    return;
+  }
+
+  elProjectList.innerHTML = projects.map((p) => `
+    <li class="db-project-item">
+      <button class="db-project-btn" type="button" data-project="${esc(p.project_id)}">
+        <span class="db-project-id">${esc(p.project_id)}</span>
+        <span class="db-project-date">${formatDate(p.last_scan_at)} · ${Number(p.scan_count ?? 0)} scans · ${esc(p.latest_rating ?? "Unknown")}</span>
+      </button>
+    </li>
+  `).join("");
+  elProjectSection.removeAttribute("hidden");
+}
+
+function renderHistory(projectId, payload) {
+  const stats = payload?.stats ?? {};
+  const scans = payload?.scans ?? [];
+  const limited = Boolean(payload?.limitedDetails);
+
+  state.selectedProject = projectId;
+  state.currentScans = scans;
+  state.selectedScanIds.clear();
+
+  $("db-selected-project").textContent = projectId;
+  $("db-detail-total").textContent = String(stats.totalScans ?? scans.length ?? 0);
+  $("db-detail-best").textContent = formatScore(stats.bestScore);
+  $("db-detail-avg").textContent = formatScore(stats.averageScore);
+  $("db-detail-trend").textContent = trendLabel(stats.trendDirection, stats.trendDelta);
+
+  const latest = scans[0];
+  if (!latest) {
+    $("db-summary-text").textContent = "No scans found for this project.";
+    $("db-recommendations").innerHTML = "";
+    elScanRows.innerHTML = `<tr><td colspan="5" class="db-project-empty">No scans found.</td></tr>`;
+    elProjectDetail.removeAttribute("hidden");
+    return;
+  }
+
+  const scoreText = Number.isFinite(latest.overallScore) ? `Latest score: ${Math.round(latest.overallScore)} (${latest.rating}).` : `Latest rating: ${latest.rating}.`;
+  const limitedText = limited ? " Detailed remediation is available on Pro/Team." : "";
+  $("db-summary-text").textContent = `${scoreText} Last scan at ${formatDate(latest.publishedAt)}.${limitedText}`;
+
+  const recs = [];
+  for (const s of scans.slice(0, 3)) {
+    for (const r of (s.recommendations ?? [])) {
+      if (!recs.includes(r)) recs.push(r);
+    }
+  }
+  if (!recs.length) recs.push("Keep scanning regularly to maintain trend visibility.");
+  $("db-recommendations").innerHTML = recs.map((r) => `<li>${esc(r)}</li>`).join("");
+
+  elScanRows.innerHTML = scans.map((s) => `
+    <tr>
+      <td><input type="checkbox" data-scan-id="${s.id}" /></td>
+      <td>${esc(s.runId ?? "run")}</td>
+      <td>${formatDate(s.publishedAt)}</td>
+      <td>${formatScore(s.overallScore)}</td>
+      <td>${esc(s.rating ?? "Unknown")}</td>
+    </tr>
+  `).join("");
+
+  elProjectDetail.removeAttribute("hidden");
+  elProjectDetail.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+async function loadProjects() {
+  const res = await fetch("/api/runs/list");
+  if (!res.ok) throw new Error("Failed to load projects");
+  const data = await res.json();
+  state.projects = data.runs ?? [];
+  renderOverview(state.projects);
+  renderProjects(state.projects);
+}
+
+async function loadProjectHistory(projectId) {
+  clearError();
+  if (!isValidProjectId(projectId)) {
+    showError("Invalid project ID.");
+    return;
+  }
+  const res = await fetch(`/api/runs/${encodeURIComponent(projectId)}/history`);
+  if (res.status === 404) {
+    showError("Project not found.");
+    return;
+  }
+  if (!res.ok) {
+    showError(`Failed to load project history (${res.status}).`);
+    return;
+  }
+  const payload = await res.json();
+  renderHistory(projectId, payload);
+}
+
+async function deleteSelectedScans() {
+  clearError();
+  const ids = Array.from(state.selectedScanIds);
+  if (!state.selectedProject || !ids.length) {
+    showError("Select at least one scan to delete.");
+    return;
+  }
+
+  elConfirmDelete.disabled = true;
+  try {
+    const res = await fetch("/api/runs/delete", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ projectId: state.selectedProject, scanIds: ids }),
+    });
+    const body = await res.json();
+    if (!res.ok) {
+      showError(body.error ?? "Failed to delete scans.");
+      return;
+    }
+
+    elDeleteConfirm.setAttribute("hidden", "");
+    await loadProjectHistory(state.selectedProject);
+    await loadProjects();
+  } finally {
+    elConfirmDelete.disabled = false;
+  }
+}
+
+async function loadApiKeys() {
+  const res = await fetch("/api/keys");
+  if (!res.ok) return;
+  const { keys } = await res.json();
+  renderKeyList(keys ?? []);
+  $("db-apikeys-section").removeAttribute("hidden");
+}
+
+function renderKeyList(keys) {
+  const list = $("db-keys-list");
+  if (!keys.length) {
+    list.innerHTML = `<li class="db-key-empty">No API keys yet. Generate one above to use with the CLI.</li>`;
+    return;
+  }
+  list.innerHTML = keys.map((k) => `
+    <li class="db-key-item">
+      <span class="db-key-label">${esc(k.label)}</span>
+      <span class="db-key-created">${new Date(k.created_at).toLocaleString([], { dateStyle: "short", timeStyle: "short" })}</span>
+      <button class="adm-act-btn adm-act-danger" data-key-id="${k.id}" type="button">Revoke</button>
+    </li>
+  `).join("");
+}
+
+async function onGenerateKey() {
+  const raw = $("db-key-label").value.trim() || "default";
+  const btn = $("db-gen-key");
+  btn.disabled = true;
+  try {
+    const res = await fetch("/api/keys", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ label: raw }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      showError(data.error ?? "Failed to generate API key.");
+      return;
+    }
+    $("db-new-key-value").textContent = data.key;
+    $("db-new-key-banner").removeAttribute("hidden");
+    $("db-key-label").value = "";
+    renderKeyList(data.keys ?? []);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function onRevokeKeyClick(e) {
+  const btn = e.target.closest("[data-key-id]");
+  if (!btn) return;
+  if (!confirm("Revoke this API key? The CLI will stop working until you use a new key.")) return;
+  btn.disabled = true;
+  await fetch(`/api/keys/${btn.dataset.keyId}`, { method: "DELETE" });
+  await loadApiKeys();
 }
 
 function hexToBytes(hex) {
@@ -113,9 +267,7 @@ function hexToBytes(hex) {
     throw new Error("Invalid hex value");
   }
   const out = new Uint8Array(hex.length / 2);
-  for (let i = 0; i < hex.length; i += 2) {
-    out[i / 2] = Number.parseInt(hex.slice(i, i + 2), 16);
-  }
+  for (let i = 0; i < hex.length; i += 2) out[i / 2] = Number.parseInt(hex.slice(i, i + 2), 16);
   return out;
 }
 
@@ -132,367 +284,126 @@ function base64ToBytes(b64) {
 
 async function deriveKeyHex(passphrase, saltHex, iterations = 210000) {
   const enc = new TextEncoder();
-  const keyMaterial = await crypto.subtle.importKey(
-    "raw",
-    enc.encode(passphrase),
-    { name: "PBKDF2" },
-    false,
-    ["deriveBits"]
-  );
-  const bits = await crypto.subtle.deriveBits(
-    {
-      name: "PBKDF2",
-      hash: "SHA-256",
-      salt: hexToBytes(saltHex),
-      iterations,
-    },
-    keyMaterial,
-    256
-  );
+  const keyMaterial = await crypto.subtle.importKey("raw", enc.encode(passphrase), { name: "PBKDF2" }, false, ["deriveBits"]);
+  const bits = await crypto.subtle.deriveBits({ name: "PBKDF2", hash: "SHA-256", salt: hexToBytes(saltHex), iterations }, keyMaterial, 256);
   return bytesToHex(new Uint8Array(bits));
 }
 
-function defaultSaltForProject(projectId) {
-  const input = `gravio-api-key:${projectId}`;
-  const bytes = new TextEncoder().encode(input);
-  return crypto.subtle.digest("SHA-256", bytes).then((buf) => bytesToHex(new Uint8Array(buf)));
+async function defaultSaltForProject(projectId) {
+  const bytes = new TextEncoder().encode(`gravio-api-key:${projectId}`);
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return bytesToHex(new Uint8Array(digest));
 }
 
 async function decryptEnvelope(envelope, keyHex) {
-  if (!envelope || envelope.format !== "gravio-run-v1") {
-    throw new Error("Unsupported run envelope format");
-  }
-  if (!/^[0-9a-fA-F]{64}$/.test(keyHex)) {
-    throw new Error("Invalid encryption key");
-  }
-
   const payload = base64ToBytes(envelope.ciphertext ?? "");
-  if (payload.length < 28) {
-    throw new Error("Encrypted payload is invalid or truncated");
-  }
-
   const iv = payload.slice(0, 12);
   const tag = payload.slice(12, 28);
   const ciphertext = payload.slice(28);
   const cipherWithTag = new Uint8Array(ciphertext.length + tag.length);
   cipherWithTag.set(ciphertext, 0);
   cipherWithTag.set(tag, ciphertext.length);
-
-  const key = await crypto.subtle.importKey(
-    "raw",
-    hexToBytes(keyHex.toLowerCase()),
-    { name: "AES-GCM" },
-    false,
-    ["decrypt"]
-  );
-
-  const plain = await crypto.subtle.decrypt(
-    { name: "AES-GCM", iv, tagLength: 128 },
-    key,
-    cipherWithTag
-  );
-  const text = new TextDecoder().decode(plain);
-  return JSON.parse(text);
+  const key = await crypto.subtle.importKey("raw", hexToBytes(keyHex), { name: "AES-GCM" }, false, ["decrypt"]);
+  const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv, tagLength: 128 }, key, cipherWithTag);
+  return JSON.parse(new TextDecoder().decode(plain));
 }
 
-function setMode(mode) {
-  keyMode = mode;
-
-  elModeHex?.classList.toggle("db-mode-active", mode === "hex");
-  elModePassphrase?.classList.toggle("db-mode-active", mode === "passphrase");
-  elModeApi?.classList.toggle("db-mode-active", mode === "api");
-
-  if (elModeHex) elModeHex.setAttribute("aria-pressed", String(mode === "hex"));
-  if (elModePassphrase) elModePassphrase.setAttribute("aria-pressed", String(mode === "passphrase"));
-  if (elModeApi) elModeApi.setAttribute("aria-pressed", String(mode === "api"));
-
-  elPanelHex?.classList.toggle("db-panel-hidden", mode !== "hex");
-  elPanelPassphrase?.classList.toggle("db-panel-hidden", mode !== "passphrase");
-  elPanelApi?.classList.toggle("db-panel-hidden", mode !== "api");
-}
-
-if (elModeHex) elModeHex.addEventListener("click", () => setMode("hex"));
-if (elModePassphrase) elModePassphrase.addEventListener("click", () => setMode("passphrase"));
-if (elModeApi) elModeApi.addEventListener("click", () => setMode("api"));
-setMode("api");
-
-async function resolveKeyHex(envelope, projectId) {
-  if (envelope.keyMode === "raw-key" || keyMode === "hex") {
-    const key = String(elKeyHex?.value ?? "").trim().toLowerCase();
-    if (!/^[0-9a-f]{64}$/.test(key)) throw new Error("Enter a valid 64-character hex key");
-    return key;
-  }
-
-  if (keyMode === "passphrase") {
-    const pass = String(elPassphrase?.value ?? "");
-    if (!pass) throw new Error("Enter your passphrase");
-    const saltHex = String(elSalt?.value ?? envelope?.kdf?.saltHex ?? "").trim().toLowerCase();
-    if (!/^[0-9a-f]+$/.test(saltHex)) throw new Error("Enter a valid hex salt");
-    const iterations = Number(envelope?.kdf?.iterations ?? 210000);
-    return deriveKeyHex(pass, saltHex, iterations);
-  }
-
-  const apiKey = String(elApiKey?.value ?? "").trim();
-  if (!apiKey.startsWith("gv_")) throw new Error("Enter a valid API key (gv_...)");
-  const saltHex = String(envelope?.kdf?.saltHex ?? await defaultSaltForProject(projectId)).toLowerCase();
-  const iterations = Number(envelope?.kdf?.iterations ?? 210000);
-  return deriveKeyHex(apiKey, saltHex, iterations);
-}
-
-async function loadProjects() {
-  try {
-    const res = await fetch("/api/runs/list");
-    if (!res.ok) return;
-    const { runs } = await res.json();
-    const section = $("db-projects-section");
-    const list = $("db-projects-list");
-    if (!runs || runs.length === 0) {
-      list.innerHTML = `<li class="db-project-empty">No cloud scans yet. Run <code>node gravio.mjs --once</code> to publish your next scan.</li>`;
-    } else {
-      list.innerHTML = runs.map((r) => `
-        <li class="db-project-item">
-          <button class="db-project-btn" type="button" data-project="${esc(r.project_id)}">
-            <span class="db-project-id">${esc(r.project_id)}</span>
-            <span class="db-project-date">${new Date(r.published_at).toLocaleString()}</span>
-          </button>
-        </li>
-      `).join("");
-      list.onclick = (e) => {
-        const btn = e.target.closest("[data-project]");
-        if (!btn) return;
-        loadProject(btn.dataset.project);
-      };
-    }
-    section.removeAttribute("hidden");
-  } catch {
-    // supplemental section
-  }
-}
-
-async function loadApiKeys() {
-  try {
-    const res = await fetch("/api/keys");
-    if (!res.ok) return;
-    const { keys } = await res.json();
-    renderKeyList(keys);
-    $("db-apikeys-section").removeAttribute("hidden");
-  } catch {
-    // supplemental section
-  }
-}
-
-function renderKeyList(keys) {
-  const list = $("db-keys-list");
-  if (!keys || keys.length === 0) {
-    list.innerHTML = `<li class="db-key-empty">No API keys yet. Generate one above to use with the CLI.</li>`;
+async function loadOptionalE2EE() {
+  const projectId = String($("db-e2ee-project").value ?? "").trim();
+  const apiKey = String($("db-e2ee-key").value ?? "").trim();
+  if (!isValidProjectId(projectId)) {
+    showError("Enter a valid project ID for E2EE load.");
     return;
   }
-  list.innerHTML = keys.map((k) => `
-    <li class="db-key-item">
-      <span class="db-key-label">${esc(k.label)}</span>
-      <span class="db-key-created">${new Date(k.created_at).toLocaleString([], { dateStyle: "short", timeStyle: "short" })}</span>
-      <button class="adm-act-btn adm-act-danger" data-key-id="${k.id}" type="button">Revoke</button>
-    </li>
-  `).join("");
+  if (!apiKey.startsWith("gv_")) {
+    showError("Enter a valid API key for E2EE load.");
+    return;
+  }
 
-  list.onclick = async (e) => {
-    const btn = e.target.closest("[data-key-id]");
-    if (!btn) return;
-    if (!confirm("Revoke this API key? The CLI will stop working until you use a new key.")) return;
-    btn.disabled = true;
-    await fetch(`/api/keys/${btn.dataset.keyId}`, { method: "DELETE" });
-    loadApiKeys();
-  };
+  const out = $("db-e2ee-output");
+  out.value = "Loading...";
+  const res = await fetch(`/api/runs/${encodeURIComponent(projectId)}`);
+  const body = await res.json();
+  if (!res.ok) {
+    out.value = JSON.stringify(body, null, 2);
+    return;
+  }
+
+  if (!body?.run?.format || body.run.format !== "gravio-run-v1") {
+    out.value = JSON.stringify(body.run, null, 2);
+    return;
+  }
+
+  const saltHex = String(body.run?.kdf?.saltHex ?? await defaultSaltForProject(projectId)).toLowerCase();
+  const iterations = Number(body.run?.kdf?.iterations ?? 210000);
+  const keyHex = await deriveKeyHex(apiKey, saltHex, iterations);
+  const decrypted = await decryptEnvelope(body.run, keyHex);
+  out.value = JSON.stringify(decrypted, null, 2);
 }
 
-$("db-gen-key")?.addEventListener("click", async () => {
-  const raw = $("db-key-label").value.trim() || "default";
-  const btn = $("db-gen-key");
-  btn.disabled = true;
-  try {
-    const existingRes = await fetch("/api/keys");
-    let existingLabels = new Set();
-    if (existingRes.ok) {
-      const { keys } = await existingRes.json();
-      existingLabels = new Set((keys ?? []).map((k) => k.label));
-    }
+function bindEvents() {
+  elProjectList.addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-project]");
+    if (!btn) return;
+    loadProjectHistory(btn.dataset.project);
+  });
 
-    let label = raw;
-    if (existingLabels.has(label)) {
-      let n = 2;
-      while (existingLabels.has(`${raw} ${n}`)) n += 1;
-      label = `${raw} ${n}`;
-    }
+  elScanRows.addEventListener("change", (e) => {
+    const cb = e.target.closest("input[type='checkbox'][data-scan-id]");
+    if (!cb) return;
+    const id = Number(cb.dataset.scanId);
+    if (!Number.isInteger(id)) return;
+    if (cb.checked) state.selectedScanIds.add(id);
+    else state.selectedScanIds.delete(id);
+    elDeleteConfirm.setAttribute("hidden", "");
+  });
 
-    const res = await fetch("/api/keys", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ label }),
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      alert(data.error ?? "Failed");
+  elDeleteSelected.addEventListener("click", () => {
+    clearError();
+    if (state.selectedScanIds.size === 0) {
+      showError("Select at least one scan first.");
       return;
     }
-
-    const banner = $("db-new-key-banner");
-    $("db-new-key-value").textContent = data.key;
-    banner.removeAttribute("hidden");
-    if (elApiKey && !elApiKey.value) elApiKey.value = data.key;
-    $("db-key-label").value = "";
-    renderKeyList(data.keys);
-  } finally {
-    btn.disabled = false;
-  }
-});
-
-$("db-copy-key")?.addEventListener("click", () => {
-  const val = $("db-new-key-value").textContent;
-  navigator.clipboard?.writeText(val).then(() => {
-    $("db-copy-key").textContent = "Copied!";
-    setTimeout(() => {
-      $("db-copy-key").textContent = "Copy";
-    }, 2000);
+    elDeleteConfirm.removeAttribute("hidden");
   });
-});
 
-function renderScorecard(run, publishedAt) {
-  const score = run?.summary?.overallScore ?? null;
-  const runId = run?.runId ?? "unknown";
-  const passed = score !== null ? score >= 87 : null;
+  elCancelDelete.addEventListener("click", () => {
+    elDeleteConfirm.setAttribute("hidden", "");
+  });
 
-  if (score !== null) {
-    elScoreValue.textContent = Math.round(score);
-    elScoreValue.style.color = scoreColor(score);
-  } else {
-    elScoreValue.textContent = "—";
-  }
+  elConfirmDelete.addEventListener("click", deleteSelectedScans);
 
-  if (passed !== null) {
-    elPassBadge.textContent = passed ? "PASSED" : "FAILED";
-    elPassBadge.className = "badge " + (passed ? "badge-pass" : "badge-fail");
-  } else {
-    elPassBadge.textContent = "";
-  }
+  $("db-gen-key")?.addEventListener("click", onGenerateKey);
+  $("db-keys-list")?.addEventListener("click", onRevokeKeyClick);
 
-  elRunId.textContent = `Run: ${runId}`;
-  elPublishedAt.textContent = publishedAt ? `Published: ${new Date(publishedAt).toLocaleString()}` : "";
+  $("db-copy-key")?.addEventListener("click", async () => {
+    const val = $("db-new-key-value").textContent;
+    await navigator.clipboard?.writeText(val);
+    $("db-copy-key").textContent = "Copied!";
+    setTimeout(() => { $("db-copy-key").textContent = "Copy"; }, 1600);
+  });
 
-  const wpr = run?.summary?.workflowPassRate ?? null;
-  const safety = run?.scorecard?.safety ?? null;
-  const critical = (run?.adversarialResults ?? []).filter((a) => a.status === "fail").length;
-
-  elWpr.textContent = wpr !== null ? `${(wpr * 100).toFixed(0)}%` : "—";
-  elSafety.textContent = safety !== null ? `${Math.round(safety)}` : "—";
-  elCritical.textContent = `${critical}`;
-
-  elDimensions.innerHTML = "";
-  const scorecard = run?.scorecard ?? {};
-  const dimKeys = ["safety", "reliability", "evaluation", "observability", "governance", "agentic"];
-  const hasDims = dimKeys.some((k) => scorecard[k] !== undefined);
-
-  if (hasDims) {
-    for (const key of dimKeys) {
-      const val = scorecard[key];
-      if (val === undefined) continue;
-      const col = scoreColor(val);
-      const card = document.createElement("div");
-      card.className = "dim-card";
-      card.innerHTML = `
-        <div class="dim-name">${esc(DIM_LABELS[key] ?? key)}</div>
-        <div class="dim-bar-wrap">
-          <div class="dim-bar" style="width:${barWidth(val)};background:${col}"></div>
-        </div>
-        <div class="dim-score" style="color:${col}">${Math.round(val)}</div>
-      `;
-      elDimensions.appendChild(card);
-    }
-  } else {
-    elDimensions.innerHTML = `<div class="dim-empty">No dimension scores found in this run.</div>`;
-  }
-
-  elGates.innerHTML = "";
-  if (run?.limitedDetails) {
-    elGates.innerHTML = `<li class="gate-empty">Upgrade to Pro or Team to unlock detailed fix guidance and remediation checks.</li>`;
-    elDimensions.innerHTML = `<div class="dim-empty">Free tier shows a generic rating only.</div>`;
-    elRawJson.value = JSON.stringify({ summary: run.summary, runId: run.runId, limitedDetails: true }, null, 2);
-    elFormSection.style.display = "none";
-    elResults.removeAttribute("hidden");
-    elResults.scrollIntoView({ behavior: "smooth", block: "start" });
-    return;
-  }
-
-  const checks = run?.workflowResults ?? [];
-  if (checks.length > 0) {
-    for (const check of checks) {
-      const ok = check.status === "pass";
-      const li = document.createElement("li");
-      li.className = "gate-item";
-      const icon = ok ? "✓" : "✗";
-      const cls = ok ? "t-pass" : "t-fail";
-      li.innerHTML = `
-        <span class="${cls} gate-icon">${icon}</span>
-        <span class="gate-name">${esc(check.id)}</span>
-      `;
-      elGates.appendChild(li);
-    }
-  } else {
-    elGates.innerHTML = `<li class="gate-empty">No check data found in this run.</li>`;
-  }
-
-  elRawJson.value = JSON.stringify(run, null, 2);
-  elFormSection.style.display = "none";
-  elResults.removeAttribute("hidden");
-  elResults.scrollIntoView({ behavior: "smooth", block: "start" });
+  $("db-e2ee-load")?.addEventListener("click", loadOptionalE2EE);
 }
 
-async function loadProject(projectId) {
-  clearError();
-  setLoading(true);
-  elProjectId.value = projectId;
-
+async function init() {
   try {
-    if (!isValidProjectId(projectId)) {
-      throw new Error("Invalid project ID — use letters, numbers, hyphens and underscores only");
+    const me = await fetch("/api/me");
+    if (!me.ok) {
+      location.href = "/login?next=/dashboard";
+      return;
+    }
+    state.user = await me.json();
+    if (state.user.plan === "pro" || state.user.plan === "team" || state.user.role === "admin") {
+      $("db-e2ee-section")?.removeAttribute("hidden");
     }
 
-    const res = await fetch(`/api/runs/${encodeURIComponent(projectId)}`);
-    if (res.status === 404) throw new Error(`No published run found for project \"${projectId}\"`);
-    if (!res.ok) throw new Error(`Server error ${res.status} fetching run`);
-
-    const body = await res.json();
-    if (!body?.run) throw new Error("Server response missing run data");
-
-    let run = body.run;
-    if (run?.format === "gravio-run-v1") {
-      const keyHex = await resolveKeyHex(run, projectId);
-      run = await decryptEnvelope(run, keyHex);
-    }
-
-    renderScorecard(run, body.publishedAt ?? null);
-  } catch (err) {
-    showError(err.message ?? "An unexpected error occurred");
-  } finally {
-    setLoading(false);
+    bindEvents();
+    await Promise.all([loadProjects(), loadApiKeys()]);
+  } catch {
+    location.href = "/login?next=/dashboard";
   }
 }
 
-elSubmit?.addEventListener("click", () => {
-  const projectId = elProjectId.value.trim();
-  if (!projectId) {
-    showError("Project ID is required");
-    return;
-  }
-  loadProject(projectId);
-});
-
-elProjectId?.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") elSubmit.click();
-});
-
-elReload?.addEventListener("click", () => {
-  elResults.setAttribute("hidden", "");
-  elFormSection.style.display = "";
-  clearError();
-  elProjectId.focus();
-});
+init();
+    }

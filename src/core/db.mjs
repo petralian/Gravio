@@ -68,8 +68,7 @@ db.exec(`
     project_id  TEXT    NOT NULL,
     user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     ciphertext  TEXT    NOT NULL,
-    published_at TEXT   NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
-    UNIQUE(project_id, user_id)
+    published_at TEXT   NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
   );
 `);
 
@@ -80,6 +79,31 @@ try {
   db.exec(`ALTER TABLE users ADD COLUMN plan TEXT NOT NULL DEFAULT 'free' CHECK (plan IN ('free','pro','team'))`);
 } catch {
   // Column already exists — ignore
+}
+
+// Migration: older schema enforced one run per (project_id, user_id) via UNIQUE.
+// New model stores scan history rows, so drop that unique constraint safely.
+try {
+  const runsSql = db.prepare(`SELECT sql FROM sqlite_master WHERE type='table' AND name='runs'`).get()?.sql ?? "";
+  if (runsSql.includes("UNIQUE(project_id, user_id)")) {
+    db.exec(`
+      CREATE TABLE runs_new (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        project_id  TEXT    NOT NULL,
+        user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        ciphertext  TEXT    NOT NULL,
+        published_at TEXT   NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
+      );
+
+      INSERT INTO runs_new (id, project_id, user_id, ciphertext, published_at)
+      SELECT id, project_id, user_id, ciphertext, published_at FROM runs;
+
+      DROP TABLE runs;
+      ALTER TABLE runs_new RENAME TO runs;
+    `);
+  }
+} catch {
+  // If migration fails unexpectedly, keep startup non-fatal; tests will catch regressions.
 }
 
 // Promote first registered user (or ADMIN_EMAIL) to admin if no admin exists yet
@@ -139,19 +163,39 @@ export const stmts = {
   deleteApiKey: db.prepare(`DELETE FROM api_keys WHERE id=? AND user_id=?`),
 
   // runs
-  upsertRun: db.prepare(
+  insertRun: db.prepare(
     `INSERT INTO runs (project_id, user_id, ciphertext, published_at)
-     VALUES (?, ?, ?, strftime('%Y-%m-%dT%H:%M:%SZ','now'))
-     ON CONFLICT(project_id, user_id) DO UPDATE SET
-       ciphertext=excluded.ciphertext,
-       published_at=excluded.published_at`,
+     VALUES (?, ?, ?, strftime('%Y-%m-%dT%H:%M:%SZ','now'))`,
   ),
-  getRun: db.prepare(
-    `SELECT * FROM runs WHERE project_id=? AND user_id=?`,
+  getLatestRun: db.prepare(
+    `SELECT * FROM runs
+     WHERE project_id=? AND user_id=?
+     ORDER BY published_at DESC, id DESC
+     LIMIT 1`,
   ),
-  getRunAdmin: db.prepare(`SELECT * FROM runs WHERE project_id=?`),
+  getLatestRunAdmin: db.prepare(
+    `SELECT * FROM runs
+     WHERE project_id=?
+     ORDER BY published_at DESC, id DESC
+     LIMIT 1`,
+  ),
+  listProjectScansForUser: db.prepare(
+    `SELECT id, project_id, ciphertext, published_at
+     FROM runs
+     WHERE project_id=? AND user_id=?
+     ORDER BY published_at DESC, id DESC`,
+  ),
   listRunsForUser: db.prepare(
-    `SELECT project_id, published_at FROM runs WHERE user_id=? ORDER BY published_at DESC`,
+    `SELECT project_id,
+            MAX(published_at) AS last_scan_at,
+            COUNT(*) AS scan_count
+     FROM runs
+     WHERE user_id=?
+     GROUP BY project_id
+     ORDER BY last_scan_at DESC`,
+  ),
+  deleteScanByIdForUserProject: db.prepare(
+    `DELETE FROM runs WHERE id=? AND user_id=? AND project_id=?`,
   ),
   listAllRuns: db.prepare(
     `SELECT r.project_id, r.published_at, u.email

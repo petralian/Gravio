@@ -520,9 +520,9 @@ const server = http.createServer(async (req, res) => {
     }
     let runData;
     try { runData = JSON.parse(entry.ciphertext); } catch { runData = null; }
-    const outputRun = isPaid(user) ? runData : toFreeTierGenericRun(runData);
+    const outputRun = isPaidOrAdmin(user) ? runData : toFreeTierGenericRun(runData);
     res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ run: outputRun, publishedAt: entry.published_at, limitedDetails: !isPaid(user) }));
+    res.end(JSON.stringify({ run: outputRun, publishedAt: entry.published_at, limitedDetails: !isPaidOrAdmin(user) }));
     return;
   }
 
