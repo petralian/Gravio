@@ -617,6 +617,12 @@ body.marketing {
   line-height: 1.5;
   color: var(--text-3);
 }
+.m-seats-total {
+  margin: 8px 0 0;
+  font-size: 12px;
+  text-align: center;
+  color: var(--neon-cyan);
+}
 
 /* ── INSTALL ── */
 .m-install-inner {

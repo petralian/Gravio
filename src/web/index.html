@@ -35,6 +35,7 @@
         <div class="m-cta-row">
           <a href="/onboarding" class="m-btn m-btn-neon m-btn-lg">Start free</a>
           <a href="/login" class="m-btn m-btn-outline m-btn-lg">Customer login</a>
+          <a href="/why-gravio.html" class="m-btn m-btn-outline m-btn-lg">Why Gravio</a>
           <a href="#how" class="m-btn m-btn-ghost m-btn-lg">See how it works →</a>
         </div>
         <p class="m-hero-note">No source code ever leaves your machine. <span class="m-neon-subtle">Results secured by your account.</span></p>
@@ -249,6 +250,7 @@
             <li><span class="t-pass">✓</span> Peer percentile benchmarking</li>
           </ul>
           <a href="https://gravio.lemonsqueezy.com/checkout/buy/41b8f6fd-1ff0-4cfb-b993-d035a50b3b8b?embed=1" class="m-btn m-btn-outline m-btn-full lemonsqueezy-button" id="team-checkout-link">Buy Gravio Team</a>
+          <p class="m-seats-total" id="team-total-line">Total: <strong>$59/month</strong></p>
         </div>
 
       </div>
@@ -337,11 +339,17 @@
         var seats = parseInt(slider.value, 10);
         if (!Number.isFinite(seats)) seats = 2;
         var addons = Math.max(0, seats - 2);
+        var total = 59 + addons * 19;
         countEl.textContent = seats;
-        priceEl.textContent = '$' + (59 + addons * 19);
+        priceEl.textContent = '$' + total;
         if (teamButtonEl) {
           teamButtonEl.textContent = 'Buy Gravio Team (' + seats + ' seats)';
           teamButtonEl.setAttribute('data-seats', String(seats));
+        }
+        var totalLineEl = document.getElementById('team-total-line');
+        if (totalLineEl) {
+          var strongEl = totalLineEl.querySelector('strong');
+          if (strongEl) strongEl.textContent = '$' + total + '/month';
         }
       }
 
