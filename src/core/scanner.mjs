@@ -30,6 +30,15 @@ const IGNORE_DIRS = new Set([
 
 const DIMENSIONS = ["safety", "reliability", "evaluation", "observability", "governance"];
 
+// Default weights — mirrors evaluate.mjs. Used when no weights.json found (e.g. user's own project).
+const DEFAULT_WEIGHTS = {
+  safety: 0.30,
+  reliability: 0.25,
+  evaluation: 0.20,
+  observability: 0.10,
+  governance: 0.15,
+};
+
 function toPosix(p) {
   return p.split(path.sep).join("/");
 }
@@ -423,7 +432,8 @@ export function writeRunArtifact(outputFile, run) {
 
 export function runScannerOnce({ targetDir, outputFile, repoRoot }) {
   const corpus = safeReadJson(path.join(repoRoot, "agent-quality", "evals", "workflow-corpus.json"), { workflows: [] });
-  const weights = safeReadJson(path.join(repoRoot, "agent-quality", "scorecard", "weights.json"), { weights: {} }).weights;
+  const rawWeights = safeReadJson(path.join(repoRoot, "agent-quality", "scorecard", "weights.json"), { weights: {} }).weights;
+  const weights = Object.keys(rawWeights).length > 0 ? rawWeights : DEFAULT_WEIGHTS;
   const previousRun = safeReadJson(outputFile, null);
 
   const scan = scanTargetProject(targetDir);

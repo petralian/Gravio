@@ -19,7 +19,6 @@ import https from "node:https";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { runScannerOnce, startScannerWatcher } from "../src/core/scanner.mjs";
-import { generateKey, generateSalt, deriveKey, encrypt } from "../src/core/crypto-e2ee.mjs";
 import { printScanReport, printWatchUpdate, printPublishResult } from "../src/core/reporter.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -38,14 +37,10 @@ function parseArgs(argv) {
     output: path.join(ROOT, "agent-quality", "runs", "latest.json"),
     once: false,
     debounceMs: 500,
-    // Phase 2 publish options
     publish: false,
     project: null,
     server: "http://localhost:3000",
     apiKey: null,
-    key: null,
-    passphrase: null,
-    salt: null,
   };
 
   for (let i = 0; i < argv.length; i++) {
@@ -91,21 +86,6 @@ function parseArgs(argv) {
       i += 1;
       continue;
     }
-    if (token === "--key" && argv[i + 1]) {
-      args.key = argv[i + 1];
-      i += 1;
-      continue;
-    }
-    if (token === "--passphrase" && argv[i + 1]) {
-      args.passphrase = argv[i + 1];
-      i += 1;
-      continue;
-    }
-    if (token === "--salt" && argv[i + 1]) {
-      args.salt = argv[i + 1];
-      i += 1;
-      continue;
-    }
   }
 
   return args;
@@ -144,38 +124,7 @@ function httpPost(url, payload, headers = {}) {
     req.on("error", reject);
     req.write(data);
     req.end();
-  });
-}
-
-/**
- * Resolve the encryption key from CLI args.
- * Priority: --key > --passphrase+salt > generate new key.
- * Prints key/salt to stdout when auto-generated so the user can save it.
- * @returns {{ keyHex: string, salt: string|null }}
- */
-function resolveKey(args) {
-  if (args.key) {
-    if (!/^[0-9a-fA-F]{64}$/.test(args.key)) {
-      console.error("error: --key must be a 64-character hex string");
-      process.exit(1);
-    }
-    return { keyHex: args.key, salt: null };
-  }
-  if (args.passphrase) {
-    const salt = args.salt ?? generateSalt();
-    const keyHex = deriveKey(args.passphrase, salt);
-    if (!args.salt) {
-      console.log(`\n  ⚠  Auto-generated salt — save this to re-derive your key:\n`);
-      console.log(`  --salt ${salt}\n`);
-    }
-    return { keyHex, salt };
-  }
-  // No key provided — generate and print once
-  const keyHex = generateKey();
-  console.log(`\n  \x1b[33m⚠  Auto-generated encryption key — save this before you close the terminal:\x1b[0m\n`);
-  console.log(`  \x1b[2m--key ${keyHex}\x1b[0m\n`);
-  console.log(`  \x1b[2mIf you lose it, your results cannot be decrypted.\x1b[0m\n`);
-  return { keyHex, salt: null };
+});
 }
 
 const args = parseArgs(process.argv.slice(2));
@@ -205,16 +154,12 @@ if (args.once) {
   printScanReport({ run, scan, version: readVersion() });
 
   if (args.publish) {
-    const { keyHex } = resolveKey(args);
-    const plaintext = JSON.stringify(run);
-    const ciphertext = encrypt(keyHex, plaintext);
-
     const publishUrl = new URL("/api/publish", args.server).toString();
 
     try {
       const result = await httpPost(
         publishUrl,
-        { projectId: args.project, ciphertext },
+        { projectId: args.project, run },
         { Authorization: `Bearer ${args.apiKey}` },
       );
       if (result.status === 200 && result.data?.ok) {

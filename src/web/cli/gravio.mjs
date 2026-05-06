@@ -33,6 +33,13 @@ var IGNORE_DIRS = /* @__PURE__ */ new Set([
   "build",
   ".cache"
 ]);
+var DEFAULT_WEIGHTS = {
+  safety: 0.3,
+  reliability: 0.25,
+  evaluation: 0.2,
+  observability: 0.1,
+  governance: 0.15
+};
 function toPosix(p) {
   return p.split(path.sep).join("/");
 }
@@ -353,7 +360,8 @@ function writeRunArtifact(outputFile, run) {
 }
 function runScannerOnce({ targetDir, outputFile, repoRoot }) {
   const corpus = safeReadJson(path.join(repoRoot, "agent-quality", "evals", "workflow-corpus.json"), { workflows: [] });
-  const weights = safeReadJson(path.join(repoRoot, "agent-quality", "scorecard", "weights.json"), { weights: {} }).weights;
+  const rawWeights = safeReadJson(path.join(repoRoot, "agent-quality", "scorecard", "weights.json"), { weights: {} }).weights;
+  const weights = Object.keys(rawWeights).length > 0 ? rawWeights : DEFAULT_WEIGHTS;
   const previousRun = safeReadJson(outputFile, null);
   const scan = scanTargetProject(targetDir);
   const run = buildRunArtifact({ scan, corpus, weights, previousRun });
@@ -395,44 +403,6 @@ function startScannerWatcher({ targetDir, outputFile, repoRoot, debounceMs = 500
       watcher2.close();
     }
   };
-}
-
-// src/core/crypto-e2ee.mjs
-import { createCipheriv, createDecipheriv, randomBytes, pbkdf2Sync } from "node:crypto";
-var ALGO = "aes-256-gcm";
-var IV_BYTES = 12;
-var KEY_BYTES = 32;
-var PBKDF2_ITER = 21e4;
-function generateKey() {
-  return randomBytes(KEY_BYTES).toString("hex");
-}
-function generateSalt() {
-  return randomBytes(16).toString("hex");
-}
-function deriveKey(passphrase, saltHex) {
-  if (typeof passphrase !== "string" || passphrase.length === 0) {
-    throw new TypeError("passphrase must be a non-empty string");
-  }
-  if (typeof saltHex !== "string" || !/^[0-9a-fA-F]{2,}$/.test(saltHex)) {
-    throw new TypeError("saltHex must be a non-empty hex string");
-  }
-  const salt = Buffer.from(saltHex, "hex");
-  const key = pbkdf2Sync(passphrase, salt, PBKDF2_ITER, KEY_BYTES, "sha256");
-  return key.toString("hex");
-}
-function encrypt(keyHex, plaintext) {
-  if (typeof keyHex !== "string" || keyHex.length !== 64) {
-    throw new TypeError("keyHex must be a 64-character hex string");
-  }
-  if (typeof plaintext !== "string") {
-    throw new TypeError("plaintext must be a string");
-  }
-  const key = Buffer.from(keyHex, "hex");
-  const iv = randomBytes(IV_BYTES);
-  const cipher = createCipheriv(ALGO, key, iv);
-  const encrypted = Buffer.concat([cipher.update(plaintext, "utf8"), cipher.final()]);
-  const tag = cipher.getAuthTag();
-  return Buffer.concat([iv, tag, encrypted]).toString("base64");
 }
 
 // src/core/reporter.mjs
@@ -880,7 +850,6 @@ function printPublishResult({ server, project, success, error }) {
   console.log();
   if (success) {
     const dashUrl = `${server}/dashboard?project=${encodeURIComponent(project)}`;
-    console.log(`  ${c.green}[\u2713]${c.reset}  Encrypting result...`);
     console.log(`  ${c.green}[\u2713]${c.reset}  Published to ${c.cyan}${dashUrl}${c.reset}`);
   } else {
     console.log(`  ${c.red}[\u2717]${c.reset}  Publish failed: ${error ?? "unknown error"}`);
@@ -905,14 +874,10 @@ function parseArgs(argv) {
     output: path2.join(ROOT, "agent-quality", "runs", "latest.json"),
     once: false,
     debounceMs: 500,
-    // Phase 2 publish options
     publish: false,
     project: null,
     server: "http://localhost:3000",
-    apiKey: null,
-    key: null,
-    passphrase: null,
-    salt: null
+    apiKey: null
   };
   for (let i = 0; i < argv.length; i++) {
     const token = argv[i];
@@ -957,21 +922,6 @@ function parseArgs(argv) {
       i += 1;
       continue;
     }
-    if (token === "--key" && argv[i + 1]) {
-      args2.key = argv[i + 1];
-      i += 1;
-      continue;
-    }
-    if (token === "--passphrase" && argv[i + 1]) {
-      args2.passphrase = argv[i + 1];
-      i += 1;
-      continue;
-    }
-    if (token === "--salt" && argv[i + 1]) {
-      args2.salt = argv[i + 1];
-      i += 1;
-      continue;
-    }
   }
   return args2;
 }
@@ -1009,36 +959,6 @@ function httpPost(url, payload, headers = {}) {
     req.end();
   });
 }
-function resolveKey(args2) {
-  if (args2.key) {
-    if (!/^[0-9a-fA-F]{64}$/.test(args2.key)) {
-      console.error("error: --key must be a 64-character hex string");
-      process.exit(1);
-    }
-    return { keyHex: args2.key, salt: null };
-  }
-  if (args2.passphrase) {
-    const salt = args2.salt ?? generateSalt();
-    const keyHex2 = deriveKey(args2.passphrase, salt);
-    if (!args2.salt) {
-      console.log(`
-  \u26A0  Auto-generated salt \u2014 save this to re-derive your key:
-`);
-      console.log(`  --salt ${salt}
-`);
-    }
-    return { keyHex: keyHex2, salt };
-  }
-  const keyHex = generateKey();
-  console.log(`
-  \x1B[33m\u26A0  Auto-generated encryption key \u2014 save this before you close the terminal:\x1B[0m
-`);
-  console.log(`  \x1B[2m--key ${keyHex}\x1B[0m
-`);
-  console.log(`  \x1B[2mIf you lose it, your results cannot be decrypted.\x1B[0m
-`);
-  return { keyHex, salt: null };
-}
 var args = parseArgs(process.argv.slice(2));
 if (args.publish && !args.project) {
   console.error("error: --publish requires --project <id>");
@@ -1060,14 +980,11 @@ if (args.once) {
   });
   printScanReport({ run, scan, version: readVersion() });
   if (args.publish) {
-    const { keyHex } = resolveKey(args);
-    const plaintext = JSON.stringify(run);
-    const ciphertext = encrypt(keyHex, plaintext);
     const publishUrl = new URL("/api/publish", args.server).toString();
     try {
       const result = await httpPost(
         publishUrl,
-        { projectId: args.project, ciphertext },
+        { projectId: args.project, run },
         { Authorization: `Bearer ${args.apiKey}` }
       );
       if (result.status === 200 && result.data?.ok) {

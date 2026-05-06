@@ -229,15 +229,15 @@ const server = http.createServer(async (req, res) => {
       return;
     }
     try {
-      const { projectId, ciphertext } = JSON.parse(await readBody(req));
+      const { projectId, run } = JSON.parse(await readBody(req));
       if (!isValidProjectId(projectId)) {
         res.writeHead(400, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ error: "Invalid projectId. Use 1–64 alphanumeric, hyphen, or underscore characters." }));
+        res.end(JSON.stringify({ error: "Invalid projectId. Use 1\u201364 alphanumeric, hyphen, or underscore characters." }));
         return;
       }
-      if (typeof ciphertext !== "string" || ciphertext.length === 0) {
+      if (!run || typeof run !== "object" || Array.isArray(run)) {
         res.writeHead(400, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ error: "ciphertext is required and must be a non-empty string" }));
+        res.end(JSON.stringify({ error: "run is required and must be a JSON object" }));
         return;
       }
 
@@ -252,7 +252,7 @@ const server = http.createServer(async (req, res) => {
         return;
       }
 
-      stmts.upsertRun.run(projectId, uid, ciphertext);
+      stmts.upsertRun.run(projectId, uid, JSON.stringify(run));
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ ok: true, projectId }));
     } catch (err) {
@@ -286,8 +286,10 @@ const server = http.createServer(async (req, res) => {
       res.end(JSON.stringify({ error: "Project not found" }));
       return;
     }
+    let runData;
+    try { runData = JSON.parse(entry.ciphertext); } catch { runData = null; }
     res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ ciphertext: entry.ciphertext, publishedAt: entry.published_at }));
+    res.end(JSON.stringify({ run: runData, publishedAt: entry.published_at }));
     return;
   }
 

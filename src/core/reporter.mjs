@@ -474,7 +474,6 @@ export function printPublishResult({ server, project, success, error }) {
   console.log();
   if (success) {
     const dashUrl = `${server}/dashboard?project=${encodeURIComponent(project)}`;
-    console.log(`  ${c.green}[✓]${c.reset}  Encrypting result...`);
     console.log(`  ${c.green}[✓]${c.reset}  Published to ${c.cyan}${dashUrl}${c.reset}`);
   } else {
     console.log(`  ${c.red}[✗]${c.reset}  Publish failed: ${error ?? "unknown error"}`);

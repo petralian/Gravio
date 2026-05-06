@@ -299,7 +299,7 @@ describe("POST /api/publish + GET /api/runs/:projectId (authenticated)", () => {
   const email = `publish-${Date.now()}@gravio.test`;
   let cookie;
   let apiKey;
-  const ciphertext = Buffer.from("test-e2e-ciphertext").toString("base64");
+  const testRun = { runId: "test-run-001", summary: { overallScore: 75 }, scorecard: { safety: 80 } };
   const projectId = `test-proj-${Date.now()}`;
 
   it("setup: register + create API key", async () => {
@@ -309,10 +309,10 @@ describe("POST /api/publish + GET /api/runs/:projectId (authenticated)", () => {
     assert.ok(apiKey.startsWith("gv_"));
   });
 
-  it("stores an encrypted blob via Bearer key", async () => {
+  it("stores a run via Bearer key", async () => {
     const res = await httpPost(
       `http://localhost:${TEST_PORT}/api/publish`,
-      { projectId, ciphertext },
+      { projectId, run: testRun },
       { Authorization: `Bearer ${apiKey}` },
     );
     assert.strictEqual(res.status, 200);
@@ -320,16 +320,16 @@ describe("POST /api/publish + GET /api/runs/:projectId (authenticated)", () => {
     assert.strictEqual(data.ok, true);
   });
 
-  it("retrieves stored blob via session cookie", async () => {
+  it("retrieves stored run via session cookie", async () => {
     const res = await httpGet(`http://localhost:${TEST_PORT}/api/runs/${projectId}`, { Cookie: cookie });
     assert.strictEqual(res.status, 200);
     const data = JSON.parse(res.body);
-    assert.strictEqual(data.ciphertext, ciphertext);
+    assert.strictEqual(data.run?.runId, testRun.runId);
     assert.ok(typeof data.publishedAt === "string");
   });
 
   it("returns 401 for unauthenticated publish", async () => {
-    const res = await httpPost(`http://localhost:${TEST_PORT}/api/publish`, { projectId: "x", ciphertext: "abc" });
+    const res = await httpPost(`http://localhost:${TEST_PORT}/api/publish`, { projectId: "x", run: { runId: "x" } });
     assert.strictEqual(res.status, 401);
   });
 
@@ -347,7 +347,7 @@ describe("POST /api/publish + GET /api/runs/:projectId (authenticated)", () => {
   it("returns 400 for invalid projectId on publish", async () => {
     const res = await httpPost(
       `http://localhost:${TEST_PORT}/api/publish`,
-      { projectId: "../../evil", ciphertext: "abc" },
+      { projectId: "../../evil", run: { runId: "x" } },
       { Cookie: cookie },
     );
     assert.strictEqual(res.status, 400);
@@ -361,7 +361,7 @@ describe("POST /api/publish + GET /api/runs/:projectId (authenticated)", () => {
     for (const pid of ["limit-proj-1", "limit-proj-2", "limit-proj-3"]) {
       const okRes = await httpPost(
         `http://localhost:${TEST_PORT}/api/publish`,
-        { projectId: pid, ciphertext },
+        { projectId: pid, run: { runId: pid } },
         { Authorization: `Bearer ${limitKey}` },
       );
       assert.strictEqual(okRes.status, 200);
@@ -369,7 +369,7 @@ describe("POST /api/publish + GET /api/runs/:projectId (authenticated)", () => {
 
     const blocked = await httpPost(
       `http://localhost:${TEST_PORT}/api/publish`,
-      { projectId: "limit-proj-4", ciphertext },
+      { projectId: "limit-proj-4", run: { runId: "limit-proj-4" } },
       { Authorization: `Bearer ${limitKey}` },
     );
     assert.strictEqual(blocked.status, 403);
