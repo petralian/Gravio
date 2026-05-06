@@ -2,113 +2,79 @@
 /**
  * gravio-scan.mjs
  *
- * Gravio Scanner CLI — entry point.
- * Usage:
- *   node scripts/gravio-scan.mjs --setup --target .
- *   node scripts/gravio-scan.mjs --authorize --project my-saas --api-key gv_xxx --server https://gravio.dev
- *   node scripts/gravio-scan.mjs --once
- *   node scripts/gravio-scan.mjs --target ../some-project --once
- *
- * Optional encryption modes:
- *   node scripts/gravio-scan.mjs --once --key <64-char-hex>
- *   node scripts/gravio-scan.mjs --once --passphrase "my secret" --salt <hex>
- *
- * First run automatically performs setup unless --no-setup is provided.
+ * Simplified Gravio CLI:
+ *   node gravio.mjs                     # setup/auth/link/scan/publish
+ *   node gravio.mjs --token gv_xxx      # first-time connect + run
+ *   node gravio.mjs link --project id   # relink folder to an existing project
+ *   node gravio.mjs rename new-id       # rename current project id
+ *   node gravio.mjs merge --to target   # merge current project into target
+ *   node gravio.mjs doctor              # show setup/auth/link status
+ *   node gravio.mjs logout              # clear local auth/link
  */
 import path from "node:path";
 import http from "node:http";
 import https from "node:https";
-import { readFileSync, writeFileSync, chmodSync, existsSync, mkdirSync, unlinkSync } from "node:fs";
+import { readdirSync, readFileSync, writeFileSync, chmodSync, existsSync, mkdirSync, unlinkSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { spawn, spawnSync } from "node:child_process";
-import { runScannerOnce, startScannerWatcher } from "../src/core/scanner.mjs";
-import { printScanReport, printWatchUpdate, printPublishResult, printScanStep } from "../src/core/reporter.mjs";
+import { runScannerOnce } from "../src/core/scanner.mjs";
+import { printScanReport, printPublishResult, printScanStep } from "../src/core/reporter.mjs";
 import { deriveKey, encrypt, generateKey } from "../src/core/crypto-e2ee.mjs";
 
-/* Version injected by esbuild at bundle time. Falls back to "dev" when
- * running directly from source (scripts/gravio-scan.mjs). */
 // eslint-disable-next-line no-undef
 const CLI_VERSION = typeof GRAVIO_CLI_VERSION !== "undefined" ? GRAVIO_CLI_VERSION : "dev";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
+const DEFAULT_SERVER = "https://gravio.dev";
 
 function readVersion() {
   try {
     const pkg = JSON.parse(readFileSync(path.join(ROOT, "package.json"), "utf8"));
     return pkg.version ?? "?";
-  } catch { return "?"; }
+  } catch {
+    return "?";
+  }
 }
 
 function parseArgs(argv) {
   const args = {
-    target: ROOT,
-    output: path.join(ROOT, "agent-quality", "runs", "latest.json"),
-    once: false,
-    authorize: false,
-    logout: false,
-    noAutoPublish: false,
-    debounceMs: 500,
-    publish: false,
-    setup: false,
-    noSetup: false,
-    project: null,
+    command: "run",
+    target: process.cwd(),
     server: null,
-    apiKey: null,
+    token: null,
+    project: null,
+    from: null,
+    to: null,
     key: null,
     passphrase: null,
     salt: null,
     noUpdate: false,
     setupVerbose: false,
+    help: false,
   };
+
+  if (argv[0] && !argv[0].startsWith("-")) {
+    args.command = String(argv[0]).toLowerCase();
+    argv = argv.slice(1);
+  }
+
+  if (args.command === "help") {
+    args.help = true;
+    args.command = "run";
+  }
 
   for (let i = 0; i < argv.length; i++) {
     const token = argv[i];
-    if (token === "--once") {
-      args.once = true;
-      continue;
-    }
-    if (token === "--authorize") {
-      args.authorize = true;
-      continue;
-    }
-    if (token === "--logout") {
-      args.logout = true;
-      continue;
-    }
-    if (token === "--no-auto-publish") {
-      args.noAutoPublish = true;
-      continue;
-    }
-    if (token === "--target" && argv[i + 1]) {
-      args.target = path.resolve(argv[i + 1]);
+    if (token === "--server" && argv[i + 1]) {
+      args.server = argv[i + 1];
       i += 1;
       continue;
     }
-    if (token === "--output" && argv[i + 1]) {
-      args.output = path.resolve(argv[i + 1]);
+    if (token === "--token" && argv[i + 1]) {
+      args.token = argv[i + 1];
       i += 1;
-      continue;
-    }
-    if (token === "--debounce" && argv[i + 1]) {
-      const parsed = Number(argv[i + 1]);
-      if (Number.isFinite(parsed) && parsed >= 50) {
-        args.debounceMs = parsed;
-      }
-      i += 1;
-      continue;
-    }
-    if (token === "--publish") {
-      args.publish = true;
-      continue;
-    }
-    if (token === "--setup") {
-      args.setup = true;
-      continue;
-    }
-    if (token === "--no-setup") {
-      args.noSetup = true;
       continue;
     }
     if (token === "--project" && argv[i + 1]) {
@@ -116,13 +82,13 @@ function parseArgs(argv) {
       i += 1;
       continue;
     }
-    if (token === "--server" && argv[i + 1]) {
-      args.server = argv[i + 1];
+    if (token === "--from" && argv[i + 1]) {
+      args.from = argv[i + 1];
       i += 1;
       continue;
     }
-    if (token === "--api-key" && argv[i + 1]) {
-      args.apiKey = argv[i + 1];
+    if (token === "--to" && argv[i + 1]) {
+      args.to = argv[i + 1];
       i += 1;
       continue;
     }
@@ -149,6 +115,15 @@ function parseArgs(argv) {
       args.setupVerbose = true;
       continue;
     }
+    if (token === "--help" || token === "-h") {
+      args.help = true;
+      continue;
+    }
+  }
+
+  if (args.command === "rename" && !args.to && argv.length > 0) {
+    const positional = argv.find((v) => !v.startsWith("-"));
+    if (positional) args.to = positional;
   }
 
   return args;
@@ -156,6 +131,15 @@ function parseArgs(argv) {
 
 function hashHex(str) {
   return createHash("sha256").update(String(str)).digest("hex");
+}
+
+function normalizeProjectId(value) {
+  const cleaned = String(value ?? "").trim().toLowerCase().replace(/[^a-z0-9_-]+/g, "-").replace(/^-+|-+$/g, "");
+  return cleaned.slice(0, 64);
+}
+
+function isValidProjectId(id) {
+  return typeof id === "string" && /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/.test(id);
 }
 
 function authConfigPath(targetDir) {
@@ -166,27 +150,64 @@ function setupStatePath(targetDir) {
   return path.join(path.resolve(targetDir), ".gravio", "setup.json");
 }
 
-function loadAuthConfig(targetDir) {
+function projectStatePath(targetDir) {
+  return path.join(path.resolve(targetDir), ".gravio", "project.json");
+}
+
+function loadJson(filePath) {
   try {
-    const p = authConfigPath(targetDir);
-    if (!existsSync(p)) return null;
-    const parsed = JSON.parse(readFileSync(p, "utf8"));
-    if (!parsed || typeof parsed !== "object") return null;
-    return parsed;
+    if (!existsSync(filePath)) return null;
+    const parsed = JSON.parse(readFileSync(filePath, "utf8"));
+    return parsed && typeof parsed === "object" ? parsed : null;
   } catch {
     return null;
   }
 }
 
-function saveAuthConfig(targetDir, payload) {
-  const p = authConfigPath(targetDir);
-  const dir = path.dirname(p);
+function saveJson(filePath, payload) {
+  const dir = path.dirname(filePath);
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-  writeFileSync(p, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
+  writeFileSync(filePath, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
+}
+
+function loadAuthConfig(targetDir) {
+  return loadJson(authConfigPath(targetDir));
+}
+
+function saveAuthConfig(targetDir, payload) {
+  saveJson(authConfigPath(targetDir), payload);
 }
 
 function deleteAuthConfig(targetDir) {
-  try { unlinkSync(authConfigPath(targetDir)); } catch { /* ignore */ }
+  try {
+    unlinkSync(authConfigPath(targetDir));
+  } catch {
+    // ignore
+  }
+}
+
+function loadSetupState(targetDir) {
+  return loadJson(setupStatePath(targetDir));
+}
+
+function saveSetupState(targetDir, payload) {
+  saveJson(setupStatePath(targetDir), payload);
+}
+
+function loadProjectState(targetDir) {
+  return loadJson(projectStatePath(targetDir));
+}
+
+function saveProjectState(targetDir, payload) {
+  saveJson(projectStatePath(targetDir), payload);
+}
+
+function deleteProjectState(targetDir) {
+  try {
+    unlinkSync(projectStatePath(targetDir));
+  } catch {
+    // ignore
+  }
 }
 
 function ensureGravioIgnored(targetDir) {
@@ -202,23 +223,25 @@ function ensureGravioIgnored(targetDir) {
   writeFileSync(gitignore, next, "utf8");
 }
 
-function loadSetupState(targetDir) {
-  try {
-    const p = setupStatePath(targetDir);
-    if (!existsSync(p)) return null;
-    const parsed = JSON.parse(readFileSync(p, "utf8"));
-    if (!parsed || typeof parsed !== "object") return null;
-    return parsed;
-  } catch {
-    return null;
+function computeFolderFingerprint(targetDir) {
+  const dir = path.resolve(targetDir);
+  const entries = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    if (entry.name === ".git" || entry.name === "node_modules" || entry.name === ".gravio") continue;
+    const kind = entry.isDirectory() ? "d" : "f";
+    entries.push(`${kind}:${entry.name.toLowerCase()}`);
+    if (entries.length >= 120) break;
   }
+  entries.sort();
+  return hashHex(`${path.basename(dir).toLowerCase()}|${entries.join("|")}`).slice(0, 16);
 }
 
-function saveSetupState(targetDir, payload) {
-  const p = setupStatePath(targetDir);
-  const dir = path.dirname(p);
-  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-  writeFileSync(p, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
+function generateAutoProjectId(targetDir) {
+  const baseRaw = normalizeProjectId(path.basename(path.resolve(targetDir)));
+  const base = baseRaw || "project";
+  const suffix = computeFolderFingerprint(targetDir).slice(0, 6);
+  const maxBaseLen = 64 - 1 - suffix.length;
+  return `${base.slice(0, maxBaseLen)}-${suffix}`;
 }
 
 function getNodeMajorVersion() {
@@ -228,12 +251,8 @@ function getNodeMajorVersion() {
 }
 
 function getNodeInstallHint() {
-  if (process.platform === "win32") {
-    return "Install Node.js LTS: winget install OpenJS.NodeJS.LTS";
-  }
-  if (process.platform === "darwin") {
-    return "Install Node.js LTS: brew install node@20 (or download from nodejs.org)";
-  }
+  if (process.platform === "win32") return "Install Node.js LTS: winget install OpenJS.NodeJS.LTS";
+  if (process.platform === "darwin") return "Install Node.js LTS: brew install node@20 (or download from nodejs.org)";
   return "Install Node.js LTS 20+: https://nodejs.org/en/download";
 }
 
@@ -359,16 +378,12 @@ function runInstallStep(targetDir, step, { setupVerbose = false } = {}) {
             alreadySatisfied += 1;
             continue;
           }
-          if (important.test(text)) {
-            process.stdout.write(`       ${text}\n`);
-          }
+          if (important.test(text)) process.stdout.write(`       ${text}\n`);
         }
       });
       stream.on("end", () => {
         const text = pending.trim();
-        if (text && important.test(text)) {
-          process.stdout.write(`       ${text}\n`);
-        }
+        if (text && important.test(text)) process.stdout.write(`       ${text}\n`);
       });
     };
 
@@ -394,14 +409,8 @@ async function runSetup(targetDir, { silentNoWork = false, setupVerbose = false 
   printSetupStage(1, totalStages, "Preflight checks", "Detect package managers and build a dependency plan.");
   const plan = dependencyInstallPlan(targetDir);
   if (!plan.length) {
-    if (!silentNoWork) {
-      process.stdout.write("  No package manager files detected. Skipping dependency install.\n");
-    }
-    saveSetupState(targetDir, {
-      version: 1,
-      completedAt: new Date().toISOString(),
-      installedSteps: [],
-    });
+    if (!silentNoWork) process.stdout.write("  No package manager files detected. Skipping dependency install.\n");
+    saveSetupState(targetDir, { version: 1, completedAt: new Date().toISOString(), installedSteps: [] });
     ensureGravioIgnored(targetDir);
     return true;
   }
@@ -430,32 +439,140 @@ async function runSetup(targetDir, { silentNoWork = false, setupVerbose = false 
   return true;
 }
 
-function resolvePublishContext(args, authCfg) {
-  return {
-    server: args.server ?? authCfg?.server ?? "http://localhost:3000",
-    project: args.project ?? authCfg?.projectId ?? null,
-    apiKey: args.apiKey ?? authCfg?.apiKey ?? null,
+function parseJsonSafe(raw) {
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+function httpPost(url, payload, headers = {}) {
+  return new Promise((resolve, reject) => {
+    const data = JSON.stringify(payload);
+    const parsed = new URL(url);
+    const lib = parsed.protocol === "https:" ? https : http;
+    const req = lib.request(
+      {
+        hostname: parsed.hostname,
+        port: parsed.port || (parsed.protocol === "https:" ? 443 : 80),
+        path: parsed.pathname + parsed.search,
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Content-Length": Buffer.byteLength(data),
+          ...headers,
+        },
+      },
+      (res) => {
+        let body = "";
+        res.on("data", (c) => (body += c));
+        res.on("end", () => resolve({ status: res.statusCode, data: parseJsonSafe(body) ?? body }));
+      }
+    );
+    req.on("error", reject);
+    req.write(data);
+    req.end();
+  });
+}
+
+function httpGet(url, headers = {}) {
+  return new Promise((resolve, reject) => {
+    const parsed = new URL(url);
+    const lib = parsed.protocol === "https:" ? https : http;
+    const req = lib.request(
+      {
+        hostname: parsed.hostname,
+        port: parsed.port || (parsed.protocol === "https:" ? 443 : 80),
+        path: parsed.pathname + parsed.search,
+        method: "GET",
+        headers,
+      },
+      (res) => {
+        const chunks = [];
+        res.on("data", (c) => chunks.push(c));
+        res.on("end", () => resolve({ status: res.statusCode, body: Buffer.concat(chunks).toString("utf8") }));
+      }
+    );
+    req.setTimeout(10_000, () => {
+      req.destroy();
+      reject(new Error("timeout"));
+    });
+    req.on("error", reject);
+    req.end();
+  });
+}
+
+function isNewer(remote, local) {
+  if (!remote || remote === local || local === "dev") return false;
+  const parse = (v) => String(v).split(".").map(Number);
+  const [rA, rB, rC] = parse(remote);
+  const [lA, lB, lC] = parse(local);
+  if (rA !== lA) return rA > lA;
+  if (rB !== lB) return rB > lB;
+  return rC > lC;
+}
+
+async function checkAndUpdate(serverBase) {
+  const isBundled = !path.basename(process.argv[1]).includes("gravio-scan");
+  if (!isBundled) return;
+
+  const c = {
+    dim: "\x1b[2m",
+    bold: "\x1b[1m",
+    reset: "\x1b[0m",
+    bgreen: "\x1b[92m",
+    byellow: "\x1b[93m",
   };
+
+  try {
+    const versionUrl = new URL("/api/cli/version", serverBase).toString();
+    const res = await httpGet(versionUrl);
+    if (res.status !== 200) return;
+    const remoteVersion = parseJsonSafe(res.body)?.version;
+    if (!isNewer(remoteVersion, CLI_VERSION)) return;
+
+    console.log(`\n  ${c.byellow}${c.bold}↑  Update available${c.reset}  ${c.dim}${CLI_VERSION}${c.reset} -> ${c.bgreen}${c.bold}${remoteVersion}${c.reset}`);
+    console.log(`  ${c.dim}Downloading new version...${c.reset}`);
+
+    const downloadUrl = new URL("/cli/gravio.mjs", serverBase).toString();
+    const dlRes = await httpGet(downloadUrl);
+    if (dlRes.status !== 200) return;
+
+    const currentFile = path.resolve(process.argv[1]);
+    writeFileSync(currentFile, dlRes.body, "utf8");
+    try {
+      chmodSync(currentFile, 0o755);
+    } catch {
+      // ignore on Windows
+    }
+
+    await new Promise((resolve) => {
+      const child = spawn(process.execPath, [currentFile, "--no-update", ...process.argv.slice(2)], {
+        stdio: "inherit",
+      });
+      child.on("close", (code) => {
+        resolve();
+        process.exit(code ?? 0);
+      });
+    });
+  } catch {
+    // stay on current version
+  }
 }
 
 function buildEncryptedRunEnvelope(run, options) {
   const now = new Date().toISOString();
-  const failedChecks = (run?.workflowResults ?? [])
-    .filter((w) => w.status === "fail")
-    .map((w) => w.id);
   const publicSummary = {
     runId: run?.runId ?? "run",
     createdAt: run?.createdAt ?? now,
     overallScore: Number.isFinite(run?.summary?.overallScore) ? Number(run.summary.overallScore) : null,
     scorecard: run?.scorecard ?? null,
-    failedChecks: failedChecks.length > 0 ? failedChecks : null,
   };
 
   if (options.key) {
     const key = String(options.key).trim().toLowerCase();
-    if (!/^[0-9a-f]{64}$/.test(key)) {
-      throw new Error("--key must be a 64-character hex string");
-    }
+    if (!/^[0-9a-f]{64}$/.test(key)) throw new Error("--key must be a 64-character hex string");
     return {
       envelope: {
         format: "gravio-run-v1",
@@ -519,261 +636,106 @@ function buildEncryptedRunEnvelope(run, options) {
   };
 }
 
-async function publishEnvelope({ server, project, apiKey, envelope }) {
-  const publishUrl = new URL("/api/publish", server).toString();
-  const result = await httpPost(
-    publishUrl,
-    { projectId: project, run: envelope },
-    { Authorization: `Bearer ${apiKey}` },
-  );
-  return result;
-}
-
-/**
- * POST a JSON payload to a URL, returns the parsed response body.
- * Supports http:// and https:// URLs.
- */
-function httpPost(url, payload, headers = {}) {
-  return new Promise((resolve, reject) => {
-    const data = JSON.stringify(payload);
-    const parsed = new URL(url);
-    const lib = parsed.protocol === "https:" ? https : http;
-    const req = lib.request(
-      {
-        hostname: parsed.hostname,
-        port: parsed.port || (parsed.protocol === "https:" ? 443 : 80),
-        path: parsed.pathname + parsed.search,
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Content-Length": Buffer.byteLength(data),
-          ...headers,
-        },
-      },
-      (res) => {
-        let body = "";
-        res.on("data", (c) => (body += c));
-        res.on("end", () => {
-          try { resolve({ status: res.statusCode, data: JSON.parse(body) }); }
-          catch { resolve({ status: res.statusCode, data: body }); }
-        });
-      }
-    );
-    req.on("error", reject);
-    req.write(data);
-    req.end();
-});
-}
-
-/**
- * GET a URL, returns { status, body } where body is a UTF-8 string.
- */
-function httpGet(url, headers = {}) {
-  return new Promise((resolve, reject) => {
-    const parsed = new URL(url);
-    const lib = parsed.protocol === "https:" ? https : http;
-    const req = lib.request(
-      {
-        hostname: parsed.hostname,
-        port: parsed.port || (parsed.protocol === "https:" ? 443 : 80),
-        path: parsed.pathname + parsed.search,
-        method: "GET",
-        headers,
-      },
-      (res) => {
-        const chunks = [];
-        res.on("data", (c) => chunks.push(c));
-        res.on("end", () => resolve({ status: res.statusCode, body: Buffer.concat(chunks).toString("utf8") }));
-      }
-    );
-    req.setTimeout(10_000, () => { req.destroy(); reject(new Error("timeout")); });
-    req.on("error", reject);
-    req.end();
-  });
-}
-
-/**
- * Return true if `remote` is a higher semver than `local`.
- */
-function isNewer(remote, local) {
-  if (!remote || remote === local || local === "dev") return false;
-  const parse = (v) => String(v).split(".").map(Number);
-  const [rA, rB, rC] = parse(remote);
-  const [lA, lB, lC] = parse(local);
-  if (rA !== lA) return rA > lA;
-  if (rB !== lB) return rB > lB;
-  return rC > lC;
-}
-
-/**
- * Check the server for a newer CLI version and, if found, download it over
- * the current file then re-exec so the user always runs the latest build.
- *
- * Skips automatically when running directly from source (gravio-scan.mjs).
- * Skips silently on any network error so offline users are not blocked.
- */
-async function checkAndUpdate(serverBase) {
-  // Don’t self-update when running from source in development.
-  const isBundled = !path.basename(process.argv[1]).includes("gravio-scan");
-  if (!isBundled) return;
-
-  const c = {
-    cyan: "\x1b[36m", green: "\x1b[32m", dim: "\x1b[2m", bold: "\x1b[1m", reset: "\x1b[0m",
-    bgreen: "\x1b[92m", bcyan: "\x1b[96m", byellow: "\x1b[93m",
-  };
-
-  try {
-    const versionUrl = new URL("/api/cli/version", serverBase).toString();
-    const res = await httpGet(versionUrl);
-    if (res.status !== 200) return;
-
-    let remoteVersion;
-    try { remoteVersion = JSON.parse(res.body).version; } catch { return; }
-    if (!isNewer(remoteVersion, CLI_VERSION)) return;
-
-    console.log(`\n  ${c.byellow}${c.bold}↑  Update available${c.reset}  ${c.dim}${CLI_VERSION}${c.reset} ${c.dim}→${c.reset} ${c.bgreen}${c.bold}${remoteVersion}${c.reset}`);
-    console.log(`  ${c.dim}Downloading new version...${c.reset}`);
-
-    const downloadUrl = new URL("/cli/gravio.mjs", serverBase).toString();
-    const dlRes = await httpGet(downloadUrl);
-    if (dlRes.status !== 200) {
-      console.log(`  ${c.dim}[!] Update download failed (HTTP ${dlRes.status}) — continuing with v${CLI_VERSION}\n${c.reset}`);
-      return;
-    }
-
-    const currentFile = path.resolve(process.argv[1]);
-    writeFileSync(currentFile, dlRes.body, "utf8");
-    try { chmodSync(currentFile, 0o755); } catch { /* ignore on Windows */ }
-
-    console.log(`  ${c.bgreen}${c.bold}✔  Updated to v${remoteVersion}${c.reset}${c.dim}  Restarting...${c.reset}\n`);
-
-    // Re-exec: spawn updated script with same args then exit this process.
-    await new Promise((resolve) => {
-      const child = spawn(process.execPath, [currentFile, "--no-update", ...process.argv.slice(2)], {
-        stdio: "inherit",
-      });
-      child.on("close", (code) => { resolve(); process.exit(code ?? 0); });
-    });
-  } catch {
-    // Network or write failure — silently continue with current version.
+async function ensureAuth(targetDir, server, maybeToken) {
+  const existing = loadAuthConfig(targetDir);
+  const apiKey = String(maybeToken ?? existing?.apiKey ?? "").trim();
+  if (!apiKey) {
+    throw new Error("Missing API key. Sign in on onboarding and use: node gravio.mjs --token <gv_...>");
   }
+
+  const meUrl = new URL("/api/me", server).toString();
+  const me = await httpGet(meUrl, { Authorization: `Bearer ${apiKey}` });
+  if (me.status !== 200) {
+    throw new Error("API key validation failed. Refresh token from onboarding.");
+  }
+
+  saveAuthConfig(targetDir, {
+    version: 2,
+    updatedAt: new Date().toISOString(),
+    server,
+    apiKey,
+  });
+  ensureGravioIgnored(targetDir);
+  return { apiKey };
 }
 
-const args = parseArgs(process.argv.slice(2));
-assertNodeSupported();
-
-const existingAuth = loadAuthConfig(args.target);
-const context = resolvePublishContext(args, existingAuth);
-
-// Auto-update: check server for a newer CLI version before doing anything else.
-// Skips silently if offline or running from source. Pass --no-update to opt out.
-if (!args.noUpdate) {
-  await checkAndUpdate(context.server);
+async function fetchProjects(server, apiKey) {
+  const listUrl = new URL("/api/projects/list", server).toString();
+  const res = await httpGet(listUrl, { Authorization: `Bearer ${apiKey}` });
+  if (res.status !== 200) return [];
+  return parseJsonSafe(res.body)?.projects ?? [];
 }
 
-if (args.logout) {
-  deleteAuthConfig(args.target);
-  process.stdout.write("\n  Local Gravio authorization cleared (.gravio/auth.json removed).\n\n");
-  process.exit(0);
+function ensureProjectLink(targetDir, fallbackProjectId = null) {
+  const linked = loadProjectState(targetDir);
+  if (isValidProjectId(linked?.projectId)) return linked.projectId;
+
+  const oldAuth = loadAuthConfig(targetDir);
+  if (isValidProjectId(oldAuth?.projectId)) {
+    const projectId = oldAuth.projectId;
+    saveProjectState(targetDir, {
+      version: 1,
+      projectId,
+      linkedAt: new Date().toISOString(),
+      folderFingerprint: computeFolderFingerprint(targetDir),
+    });
+    return projectId;
+  }
+
+  const projectId = isValidProjectId(fallbackProjectId)
+    ? fallbackProjectId
+    : generateAutoProjectId(targetDir);
+
+  saveProjectState(targetDir, {
+    version: 1,
+    projectId,
+    linkedAt: new Date().toISOString(),
+    folderFingerprint: computeFolderFingerprint(targetDir),
+  });
+  ensureGravioIgnored(targetDir);
+  return projectId;
 }
 
-if (args.setup) {
-  const ok = await runSetup(args.target, { setupVerbose: args.setupVerbose });
-  process.exit(ok ? 0 : 1);
-}
-
-if (!args.noSetup) {
-  const setupState = loadSetupState(args.target);
-  const setupDone = Boolean(setupState?.completedAt);
+async function handleRun(args) {
+  const setupDone = Boolean(loadSetupState(args.target)?.completedAt);
   if (!setupDone) {
     const ok = await runSetup(args.target, { silentNoWork: true, setupVerbose: args.setupVerbose });
     if (!ok) process.exit(1);
   }
-}
 
-if (args.authorize) {
-  if (!context.project) {
-    process.stderr.write("\n  \x1b[91m\x1b[1m✖  Error\x1b[0m  --authorize requires --project <id>\n\n");
-    process.exit(1);
-  }
-  if (!context.apiKey) {
-    process.stderr.write("\n  \x1b[91m\x1b[1m✖  Error\x1b[0m  --authorize requires --api-key <gv_...>\n\n");
-    process.exit(1);
-  }
+  const existingAuth = loadAuthConfig(args.target);
+  const server = String(args.server ?? existingAuth?.server ?? DEFAULT_SERVER).trim();
 
-  try {
-    const meUrl = new URL("/api/me", context.server).toString();
-    const me = await httpGet(meUrl, { Authorization: `Bearer ${context.apiKey}` });
-    if (me.status !== 200) {
-      process.stderr.write("\n  \x1b[91m\x1b[1m✖  Error\x1b[0m  API key validation failed.\n\n");
-      process.exit(1);
-    }
+  const { apiKey } = await ensureAuth(args.target, server, args.token);
+  const projectId = ensureProjectLink(args.target, args.project);
 
-    const now = new Date().toISOString();
-    saveAuthConfig(args.target, {
-      version: 1,
-      authorizedAt: existingAuth?.authorizedAt ?? now,
-      updatedAt: now,
-      projectId: context.project,
-      server: context.server,
-      apiKey: context.apiKey,
-    });
-    ensureGravioIgnored(args.target);
-    process.stdout.write("\n  \x1b[92m\x1b[1m✔  Authorized\x1b[0m  saved local auth at .gravio/auth.json\n");
-    process.stdout.write("  Future --once scans in this folder will auto-publish.\n\n");
-    process.exit(0);
-  } catch (err) {
-    process.stderr.write(`\n  \x1b[91m\x1b[1m✖  Error\x1b[0m  ${err.message}\n\n`);
-    process.exit(1);
-  }
-}
-
-// Validate publish prerequisites
-const isScanCommand = args.once || (!args.authorize && !args.logout);
-
-if (isScanCommand && !context.project) {
-  process.stderr.write("\n  \x1b[91m\x1b[1m✖  Error\x1b[0m  Scanning requires an authorized project first.\n\n");
-  process.stderr.write("  Run once in this folder:\n");
-  process.stderr.write("    \x1b[97mnode gravio.mjs --authorize --target . --project <id> --api-key gv_...\x1b[0m\n\n");
-  process.exit(1);
-}
-
-if (isScanCommand && !context.apiKey) {
-  process.stderr.write("\n  \x1b[91m\x1b[1m✖  Error\x1b[0m  Scanning requires an API key first.\n\n");
-  process.stderr.write("  \x1b[2mSteps:\x1b[0m\n");
-  process.stderr.write("    1) Sign in  →  \x1b[36mhttps://gravio.dev/login\x1b[0m\n");
-  process.stderr.write("    2) Open onboarding to auto-fill your user-bound token\n");
-  process.stderr.write("    3) Run once: \x1b[97mnode gravio.mjs --authorize --project <id> --api-key gv_...\x1b[0m\n\n");
-  process.exit(1);
-}
-
-if (args.once) {
-  // ── Progress: start ─────────────────────────────────────────────────────
   if (process.stdout.isTTY) {
     console.log();
     printScanStep(0);
   }
 
-  const plainTempOutput = `${args.output}.plain.tmp`;
+  const plainTempOutput = path.join(args.target, ".gravio", "latest.plain.tmp");
   const { run, scan } = runScannerOnce({
     targetDir: args.target,
     outputFile: plainTempOutput,
     repoRoot: ROOT,
   });
-  try { unlinkSync(plainTempOutput); } catch { /* ignore */ }
+  try {
+    unlinkSync(plainTempOutput);
+  } catch {
+    // ignore
+  }
 
   const { envelope, keyMessage } = buildEncryptedRunEnvelope(run, {
-    project: context.project,
-    apiKey: context.apiKey,
+    project: projectId,
+    apiKey,
     key: args.key,
     passphrase: args.passphrase,
     salt: args.salt,
   });
 
-  // ── Progress: done ──────────────────────────────────────────────────────
   if (process.stdout.isTTY) {
-    const SCAN_TOTAL = 8;
-    printScanStep(SCAN_TOTAL);
+    printScanStep(8);
     process.stdout.write("\n");
   }
 
@@ -781,84 +743,225 @@ if (args.once) {
   process.stdout.write("\n  \x1b[2mCloud-only mode:\x1b[0m no local JSON artifact is written.\n");
   process.stdout.write(`  \x1b[2m${keyMessage}\x1b[0m\n`);
 
-  {
-    try {
-      const result = await publishEnvelope({
-        server: context.server,
-        project: context.project,
-        apiKey: context.apiKey,
-        envelope,
-      });
-      if (result.status === 200 && result.data?.ok) {
-        printPublishResult({ server: context.server, project: context.project, success: true });
-      } else if (result.status === 401 || result.status === 403) {
-        printPublishResult({
-          server: context.server, project: context.project, success: false,
-          error: `HTTP ${result.status}: ${result.data?.error ?? "Authentication required"}`,
-        });
-        process.exit(1);
-      } else {
-        printPublishResult({
-          server: context.server, project: context.project, success: false,
-          error: `HTTP ${result.status}: ${result.data?.error ?? JSON.stringify(result.data)}`,
-        });
-        process.exit(1);
-      }
-    } catch (err) {
-      printPublishResult({ server: context.server, project: context.project, success: false, error: err.message });
-      process.exit(1);
-    }
+  const publishUrl = new URL("/api/publish", server).toString();
+  const result = await httpPost(
+    publishUrl,
+    { projectId, run: envelope },
+    { Authorization: `Bearer ${apiKey}` },
+  );
+
+  if (result.status === 200 && result.data?.ok) {
+    printPublishResult({ server, project: projectId, success: true });
+    process.exit(0);
   }
 
+  const reason = typeof result.data === "object" ? result.data?.error : String(result.data);
+  printPublishResult({
+    server,
+    project: projectId,
+    success: false,
+    error: `HTTP ${result.status}: ${reason ?? "Publish failed"}`,
+  });
+  process.exit(1);
+}
+
+async function handleLink(args) {
+  const existingAuth = loadAuthConfig(args.target);
+  const server = String(args.server ?? existingAuth?.server ?? DEFAULT_SERVER).trim();
+  const { apiKey } = await ensureAuth(args.target, server, args.token);
+
+  const requested = normalizeProjectId(args.project);
+  if (!isValidProjectId(requested)) {
+    const projects = await fetchProjects(server, apiKey);
+    const names = projects.slice(0, 8).map((p) => p.project_id).join(", ");
+    throw new Error(`Provide --project <id>. Existing projects: ${names || "none"}`);
+  }
+
+  const projects = await fetchProjects(server, apiKey);
+  const exists = projects.some((p) => p.project_id === requested);
+  if (!exists) {
+    throw new Error(`Project not found on server: ${requested}`);
+  }
+
+  saveProjectState(args.target, {
+    version: 1,
+    projectId: requested,
+    linkedAt: new Date().toISOString(),
+    folderFingerprint: computeFolderFingerprint(args.target),
+  });
+  ensureGravioIgnored(args.target);
+  process.stdout.write(`\n  Linked this folder to project ${requested}.\n\n`);
+}
+
+async function handleRename(args) {
+  const existingAuth = loadAuthConfig(args.target);
+  const server = String(args.server ?? existingAuth?.server ?? DEFAULT_SERVER).trim();
+  const { apiKey } = await ensureAuth(args.target, server, args.token);
+
+  const linkedProjectId = ensureProjectLink(args.target, args.project);
+  const toProjectId = normalizeProjectId(args.to);
+  if (!isValidProjectId(toProjectId)) throw new Error("Provide a valid destination id: node gravio.mjs rename <new-id>");
+
+  const url = new URL("/api/projects/rename", server).toString();
+  const result = await httpPost(
+    url,
+    { fromProjectId: linkedProjectId, toProjectId },
+    { Authorization: `Bearer ${apiKey}` },
+  );
+
+  if (result.status !== 200 || !result.data?.ok) {
+    const err = typeof result.data === "object" ? result.data?.error : String(result.data);
+    throw new Error(`Rename failed: ${err ?? `HTTP ${result.status}`}`);
+  }
+
+  saveProjectState(args.target, {
+    version: 1,
+    projectId: toProjectId,
+    linkedAt: new Date().toISOString(),
+    folderFingerprint: computeFolderFingerprint(args.target),
+  });
+  process.stdout.write(`\n  Renamed project ${linkedProjectId} -> ${toProjectId}.\n\n`);
+}
+
+async function handleMerge(args) {
+  const existingAuth = loadAuthConfig(args.target);
+  const server = String(args.server ?? existingAuth?.server ?? DEFAULT_SERVER).trim();
+  const { apiKey } = await ensureAuth(args.target, server, args.token);
+
+  const linkedProjectId = ensureProjectLink(args.target, args.project);
+  const sourceProjectId = normalizeProjectId(args.from ?? linkedProjectId);
+  const destinationProjectId = normalizeProjectId(args.to);
+
+  if (!isValidProjectId(sourceProjectId) || !isValidProjectId(destinationProjectId)) {
+    throw new Error("Use: node gravio.mjs merge --to <destination-id> [--from <source-id>]");
+  }
+
+  const url = new URL("/api/projects/merge", server).toString();
+  const result = await httpPost(
+    url,
+    { sourceProjectId, destinationProjectId },
+    { Authorization: `Bearer ${apiKey}` },
+  );
+
+  if (result.status !== 200 || !result.data?.ok) {
+    const err = typeof result.data === "object" ? result.data?.error : String(result.data);
+    throw new Error(`Merge failed: ${err ?? `HTTP ${result.status}`}`);
+  }
+
+  const current = loadProjectState(args.target);
+  if (current?.projectId === sourceProjectId) {
+    saveProjectState(args.target, {
+      version: 1,
+      projectId: destinationProjectId,
+      linkedAt: new Date().toISOString(),
+      folderFingerprint: computeFolderFingerprint(args.target),
+    });
+  }
+
+  process.stdout.write(`\n  Merged ${sourceProjectId} -> ${destinationProjectId}.\n\n`);
+}
+
+async function handleDoctor(args) {
+  const setup = loadSetupState(args.target);
+  const auth = loadAuthConfig(args.target);
+  const project = loadProjectState(args.target);
+
+  process.stdout.write("\n  Gravio doctor\n");
+  process.stdout.write(`  Folder: ${path.resolve(args.target)}\n`);
+  process.stdout.write(`  Setup: ${setup?.completedAt ? "ok" : "missing"}\n`);
+  process.stdout.write(`  Auth: ${auth?.apiKey ? "ok" : "missing"}\n`);
+  process.stdout.write(`  Linked project: ${project?.projectId ?? "missing"}\n`);
+
+  if (!auth?.apiKey) process.stdout.write("  Fix: node gravio.mjs --token <gv_...>\n");
+  if (auth?.apiKey && !project?.projectId) process.stdout.write("  Fix: node gravio.mjs link --project <id>\n");
+  process.stdout.write("\n");
+}
+
+function printHelp() {
+  const c = {
+    reset: "\x1b[0m", bold: "\x1b[1m", dim: "\x1b[2m",
+    cyan: "\x1b[96m", green: "\x1b[92m", yellow: "\x1b[93m",
+  };
+  process.stdout.write(`
+  ${c.cyan}${c.bold}gravio CLI${c.reset}  ${c.dim}AI Agent Quality Engine${c.reset}
+
+  ${c.bold}USAGE${c.reset}
+    ${c.green}node gravio.mjs${c.reset}                       Scan and publish (uses saved auth)
+    ${c.green}node gravio.mjs --token <gv_...>${c.reset}      First-time setup, auth, link, scan, and publish
+
+  ${c.bold}ADVANCED COMMANDS${c.reset}
+    ${c.cyan}doctor${c.reset}                                Show setup / auth / link status and repair suggestions
+      ${c.dim}node gravio.mjs doctor${c.reset}
+
+    ${c.cyan}link --project <id>${c.reset}                   Relink this folder to an existing project
+      ${c.dim}node gravio.mjs link --project <project-id>${c.reset}
+
+    ${c.cyan}rename <new-name>${c.reset}                     Rename the current linked project
+      ${c.dim}node gravio.mjs rename <new-name>${c.reset}
+
+    ${c.cyan}merge --to <destination>${c.reset}              Merge current project into destination (finalize in dashboard)
+      ${c.dim}node gravio.mjs merge --to <destination-id>${c.reset}
+
+    ${c.cyan}logout${c.reset}                                Clear local auth and project link
+      ${c.dim}node gravio.mjs logout${c.reset}
+
+  ${c.bold}OPTIONS${c.reset}
+    ${c.dim}--server <url>${c.reset}   Override server  (default: https://gravio.dev)
+    ${c.dim}--help${c.reset}           Show this help
+
+  ${c.dim}Full docs \u2192 https://gravio.dev/onboarding${c.reset}
+
+`);
+}
+
+function handleLogout(args) {
+  deleteAuthConfig(args.target);
+  deleteProjectState(args.target);
+  process.stdout.write("\n  Local Gravio auth and project link cleared (.gravio/auth.json, .gravio/project.json).\n\n");
+}
+
+const args = parseArgs(process.argv.slice(2));
+assertNodeSupported();
+
+if (args.help) {
+  printHelp();
   process.exit(0);
 }
 
-const plainWatchOutput = `${args.output}.plain.tmp`;
-const watcher = startScannerWatcher({
-  targetDir: args.target,
-  outputFile: plainWatchOutput,
-  repoRoot: ROOT,
-  debounceMs: args.debounceMs,
-  logger: console,
-  onScan: async ({ run, scan }) => {
-    try {
-      try { unlinkSync(plainWatchOutput); } catch { /* ignore */ }
-      const { envelope } = buildEncryptedRunEnvelope(run, {
-        project: context.project,
-        apiKey: context.apiKey,
-        key: args.key,
-        passphrase: args.passphrase,
-        salt: args.salt,
-      });
-      await publishEnvelope({
-        server: context.server,
-        project: context.project,
-        apiKey: context.apiKey,
-        envelope,
-      });
-      printWatchUpdate({ run, scan });
-    } catch (error) {
-      console.error(`gravio: auto-publish failed: ${error.message}`);
-    }
-  },
-});
+const auth = loadAuthConfig(args.target);
+const updateServer = String(args.server ?? auth?.server ?? DEFAULT_SERVER).trim();
+if (!args.noUpdate) await checkAndUpdate(updateServer);
 
-console.log(
-  `\n  \x1b[96m\x1b[1m  gravio  \x1b[0m\x1b[2m watch mode\x1b[0m\n` +
-  `\n  \x1b[2mWatching\x1b[0m  \x1b[36m${args.target}\x1b[0m` +
-  `\n  \x1b[2mDebounce  ${args.debounceMs}ms  ·  Ctrl+C to stop\x1b[0m\n`
-);
+if (args.command === "setup") {
+  const ok = await runSetup(args.target, { setupVerbose: args.setupVerbose });
+  process.exit(ok ? 0 : 1);
+}
 
-process.on("SIGINT", () => {
-  watcher.close();
-  try { unlinkSync(plainWatchOutput); } catch { /* ignore */ }
-  console.log("\n  \x1b[2mgravio: stopped\x1b[0m\n");
+if (args.command === "logout") {
+  handleLogout(args);
   process.exit(0);
-});
+}
 
-process.on("SIGTERM", () => {
-  watcher.close();
-  try { unlinkSync(plainWatchOutput); } catch { /* ignore */ }
-  console.log("\n  \x1b[2mgravio: stopped\x1b[0m\n");
-  process.exit(0);
-});
+try {
+  if (args.command === "doctor") {
+    await handleDoctor(args);
+    process.exit(0);
+  }
+  if (args.command === "link") {
+    await handleLink(args);
+    process.exit(0);
+  }
+  if (args.command === "rename") {
+    await handleRename(args);
+    process.exit(0);
+  }
+  if (args.command === "merge") {
+    await handleMerge(args);
+    process.exit(0);
+  }
+
+  await handleRun(args);
+} catch (err) {
+  process.stderr.write(`\n  \x1b[91m\x1b[1m✖  Error\x1b[0m  ${err.message}\n\n`);
+  process.exit(1);
+}

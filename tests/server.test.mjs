@@ -406,6 +406,71 @@ describe("POST /api/publish + GET /api/runs/:projectId (authenticated)", () => {
     assert.strictEqual(data.scans[1].runId, "test-run-001");
   });
 
+  it("lists projects for relink flows", async () => {
+    const res = await httpGet(`http://localhost:${TEST_PORT}/api/projects/list`, { Cookie: cookie });
+    assert.strictEqual(res.status, 200);
+    const data = JSON.parse(res.body);
+    assert.ok(Array.isArray(data.projects));
+    assert.ok(data.projects.some((p) => p.project_id === projectId));
+  });
+
+  it("renames a project id", async () => {
+    const source = `rename-src-${Date.now()}`;
+    const renamed = `rename-dst-${Date.now()}`;
+
+    await httpPost(
+      `http://localhost:${TEST_PORT}/api/publish`,
+      { projectId: source, run: { runId: "rename-run", summary: { overallScore: 73 } } },
+      { Authorization: `Bearer ${apiKey}` },
+    );
+
+    const res = await httpPost(
+      `http://localhost:${TEST_PORT}/api/projects/rename`,
+      { fromProjectId: source, toProjectId: renamed },
+      { Cookie: cookie },
+    );
+    assert.strictEqual(res.status, 200);
+    const data = JSON.parse(res.body);
+    assert.strictEqual(data.ok, true);
+
+    const check = await httpGet(`http://localhost:${TEST_PORT}/api/runs/${renamed}`, { Cookie: cookie });
+    assert.strictEqual(check.status, 200);
+  });
+
+  it("merges source project into destination project", async () => {
+    const source = `merge-src-${Date.now()}`;
+    const dest = `merge-dst-${Date.now()}`;
+
+    await httpPost(
+      `http://localhost:${TEST_PORT}/api/publish`,
+      { projectId: source, run: { runId: "m-src", summary: { overallScore: 61 } } },
+      { Authorization: `Bearer ${apiKey}` },
+    );
+    await httpPost(
+      `http://localhost:${TEST_PORT}/api/publish`,
+      { projectId: dest, run: { runId: "m-dst", summary: { overallScore: 88 } } },
+      { Authorization: `Bearer ${apiKey}` },
+    );
+
+    const mergeRes = await httpPost(
+      `http://localhost:${TEST_PORT}/api/projects/merge`,
+      { sourceProjectId: source, destinationProjectId: dest },
+      { Cookie: cookie },
+    );
+    assert.strictEqual(mergeRes.status, 200);
+    const mergeBody = JSON.parse(mergeRes.body);
+    assert.strictEqual(mergeBody.ok, true);
+
+    const sourceAfter = await httpGet(`http://localhost:${TEST_PORT}/api/runs/${source}`, { Cookie: cookie });
+    assert.strictEqual(sourceAfter.status, 404);
+
+    const destHistory = await httpGet(`http://localhost:${TEST_PORT}/api/runs/${dest}/history`, { Cookie: cookie });
+    assert.strictEqual(destHistory.status, 200);
+    const historyBody = JSON.parse(destHistory.body);
+    assert.ok(historyBody.scans.some((s) => s.runId === "m-src"));
+    assert.ok(historyBody.scans.some((s) => s.runId === "m-dst"));
+  });
+
   it("deletes selected scans with confirmation endpoint", async () => {
     const history = await httpGet(`http://localhost:${TEST_PORT}/api/runs/${projectId}/history`, { Cookie: cookie });
     const scans = JSON.parse(history.body).scans;

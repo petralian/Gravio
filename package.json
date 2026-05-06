@@ -13,7 +13,8 @@
     "scorecard:scan:watch": "node scripts/gravio-scan.mjs",
     "build:cli": "node scripts/build-cli.mjs",
     "secret-scan": "node scripts/secret-scan.mjs",
-    "verify": "npm run secret-scan && npm test && npm run scorecard:check"
+    "verify": "npm run secret-scan && npm test && npm run scorecard:check",
+    "obsidian:mcp": "node scripts/obsidian-mcp-server.mjs"
   },
   "engines": {
     "node": ">=20"

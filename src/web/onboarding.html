@@ -18,7 +18,7 @@
       <p class="m-eyebrow">GETTING STARTED</p>
       <h1 class="ob-title">From zero to first score in 5 minutes</h1>
       <p class="ob-lead">
-        Download the CLI, authorize your folder once with your user-bound API key, then run a local scan. The first scan creates your project automatically — no naming step needed.
+        Download the CLI, run one smart command, and open your dashboard. Gravio auto-discovers setup, auth, project linking, scan, and publish.
       </p>
       <div class="ob-cta-row">
         <button id="ob-start-free" class="m-btn m-btn-neon m-btn-lg" type="button">Create account or sign in</button>
@@ -30,7 +30,7 @@
 
       <div class="ob-unlock-banner" data-anon-only hidden>
         <div class="ob-unlock-text">
-          <strong>Steps 2 &amp; 3 include exact CLI commands.</strong>
+          <strong>Step 2 includes your exact smart command.</strong>
           <span>Create a free account or sign in once to unlock copy-ready commands with your API key pre-filled.</span>
         </div>
         <button class="m-btn m-btn-neon ob-open-auth" type="button">Create account or sign in</button>
@@ -39,57 +39,38 @@
       <article class="ob-step-card">
         <p class="ob-step-num">Step 1</p>
         <h2>Download the Gravio CLI</h2>
-        <p>One file, no install. Drops <code>gravio.mjs</code> into your current folder. Then run setup once to verify Node.js 20+ and install detected repo dependencies.</p>
+        <p>One file, no install. Save <code>gravio.mjs</code> in the project folder you want to scan.</p>
         <p class="ob-os-label">macOS / Linux:</p>
         <pre class="ob-code" id="cmd-download-unix">curl -fsSL https://gravio.dev/cli/gravio.mjs -o gravio.mjs</pre>
         <button class="m-btn m-btn-outline ob-copy" type="button" data-copy-id="cmd-download-unix">Copy command</button>
         <p class="ob-os-label">Windows (PowerShell):</p>
         <pre class="ob-code" id="cmd-download-win">Invoke-WebRequest https://gravio.dev/cli/gravio.mjs -OutFile gravio.mjs</pre>
         <button class="m-btn m-btn-outline ob-copy" type="button" data-copy-id="cmd-download-win">Copy command</button>
-        <p class="ob-os-label">Run setup once (all OS):</p>
-        <pre class="ob-code" id="cmd-setup">node gravio.mjs --setup --target .</pre>
-        <button class="m-btn m-btn-outline ob-copy" type="button" data-copy-id="cmd-setup">Copy command</button>
       </article>
 
       <article class="ob-step-card">
         <p class="ob-step-num">Step 2</p>
-        <h2>Authorize this folder once</h2>
-        <p>Your user-bound API key is auto-filled below. Pick a project name — the project will be created automatically on your first scan.</p>
+        <h2>Run one smart command</h2>
+        <p>This single command handles setup, auth, project linking, local scan, and cloud publish. It skips steps that are already done.</p>
         <div data-auth-only hidden>
-          <label class="ob-inline-label" for="ob-project-id">Project name for this folder</label>
-          <input id="ob-project-id" class="ob-project-input" type="text" value="my-project" autocomplete="off" spellcheck="false" />
-          <pre class="ob-code" id="cmd-authorize">node gravio.mjs --authorize --target . --project my-project --server https://gravio.dev --api-key gv_sign_in_to_auto_fill_token</pre>
-          <button class="m-btn m-btn-outline ob-copy" type="button" data-copy-id="cmd-authorize">Copy command</button>
+          <pre class="ob-code" id="cmd-smartstart">node gravio.mjs --token gv_sign_in_to_auto_fill_token</pre>
+          <button class="m-btn m-btn-outline ob-copy" type="button" data-copy-id="cmd-smartstart" data-auth-only-copy="true">Copy command</button>
         </div>
-        <div class="ob-locked-cmd ob-open-auth" data-anon-only hidden role="button" tabindex="0" aria-label="Sign in to unlock authorize command">
+        <div class="ob-locked-cmd ob-open-auth" data-anon-only hidden role="button" tabindex="0" aria-label="Sign in to unlock command">
           <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true"><rect x="2" y="6" width="9" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.2"/><path d="M4.5 6V4a2 2 0 0 1 4 0v2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
-          Sign in to reveal command with your API key
+          Sign in to reveal your one-command setup
         </div>
-        <p class="ob-step-foot">Authorization is saved locally in <code>.gravio/auth.json</code>. No need to re-authorize on subsequent scans.</p>
+        <p class="ob-step-foot">Project identity is saved in <code>.gravio/project.json</code>. Future runs use the same project automatically.</p>
       </article>
 
       <article class="ob-step-card">
         <p class="ob-step-num">Step 3</p>
-        <h2>Run your local scan</h2>
-        <p>From the same folder where you downloaded <code>gravio.mjs</code>, run:</p>
-        <div data-auth-only hidden>
-          <pre class="ob-code" id="cmd-local">node gravio.mjs --once --target .</pre>
-          <button class="m-btn m-btn-outline ob-copy" type="button" data-copy-id="cmd-local">Copy command</button>
-        </div>
-        <div class="ob-locked-cmd ob-open-auth" data-anon-only hidden role="button" tabindex="0" aria-label="Sign in to unlock scan command">
-          <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true"><rect x="2" y="6" width="9" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.2"/><path d="M4.5 6V4a2 2 0 0 1 4 0v2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
-          Sign in to reveal command
-        </div>
-        <p class="ob-step-foot">First scan: automatically detects it's a new project and creates it. Subsequent scans: detects the existing project and adds results to it. Scans are encrypted and auto-published securely — no local JSON artifact is written.</p>
-      </article>
-
-      <article class="ob-step-card">
-        <p class="ob-step-num">Step 4</p>
         <h2>View your scorecard</h2>
-        <p>Go straight to your dashboard to decrypt and review the score for your project.</p>
+        <p>Open your dashboard to review the project score, trends, and recommendations.</p>
         <div class="ob-cta-row">
           <a href="/dashboard" id="ob-dashboard-link" class="m-btn m-btn-neon">Open dashboard</a>
         </div>
+        <p class="ob-step-foot">Subsequent scans are simple: run <code>node gravio.mjs</code> again in the same folder.</p>
       </article>
     </section>
 

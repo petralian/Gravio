@@ -90,76 +90,425 @@ function extractScoreSummary(runData) {
   };
 }
 
-// Per-check actionable remediation copy. Ordered by business impact (critical first).
-const CHECK_ADVICE = {
-  "secret-scan":          { critical: true,  text: "CRITICAL: Remove committed .env files from git history immediately (git filter-repo or BFG). Rotate any exposed credentials now." },
-  "gitignore-guard":      { critical: true,  text: "Add .env and .env.* to your .gitignore to prevent accidental secret commits on every future push." },
-  "agent-instructions":   { critical: true,  text: "No agent instructions file found. Add AGENTS.md or .github/copilot-instructions.md to define how AI tools must behave in this repo — prevents unbounded agent actions." },
-  "test-coverage":        { critical: true,  text: "No test suite detected. Add tests (Jest, pytest, go test, etc.) — testing is the single biggest reliability signal and worth 35 pts in your Reliability score." },
-  "ci-pipeline":          { critical: false, text: "No CI/CD pipeline found. Add .github/workflows/test.yml to run tests automatically on every push — worth 25 Reliability points and the #1 quality gate for teams." },
-  "type-safety":          { critical: false, text: "No type system detected. Add TypeScript (tsconfig.json) or a Python type checker (mypy/pyright) to catch regressions before runtime." },
-  "eval-suite":           { critical: false, text: "No eval suite found. Create an evals/ directory with representative test cases to measure whether agent quality improves or regresses across releases." },
-  "baseline-tracking":    { critical: false, text: "No regression baseline found. Add a baseline.json or an agent-quality/runs/ directory to track score deltas over time and catch regressions before deploy." },
-  "observability-config": { critical: false, text: "No structured logging or monitoring detected. Add OpenTelemetry, Winston/Pino (Node), or structlog (Python) to make agent failures diagnosable in production." },
-  "run-artifacts":        { critical: false, text: "Agent run outputs are not being persisted. Create an agent-quality/runs/ directory and write run artifacts after each scan to build an audit trail." },
-  "readme-docs":          { critical: false, text: "Missing README.md. Document what this agent does, how to run it, and what it's authorized to do — essential for team onboarding and trust." },
-  "changelog-hygiene":    { critical: false, text: "No CHANGELOG.md found. Track releases so you can correlate score drops with specific code changes." },
-  "agent-skill-catalog":  { critical: false, text: "No reusable prompt assets found. Create a skills/ or .github/prompts/ directory to standardize prompts across team members and reduce prompt drift." },
-  "agent-orchestration":  { critical: false, text: "No multi-agent orchestration config found. If using multiple AI agents, define coordination rules in AGENTS.md to prevent conflicting actions." },
+const DIM_ORDER = ["safety", "reliability", "evaluation", "observability", "governance", "agentic"];
+const READY_TO_SHIP_TARGET = {
+  safety: 90,
+  reliability: 85,
+  evaluation: 85,
+  observability: 80,
+  governance: 80,
+  agentic: 80,
 };
+
+const DIMENSION_GUIDE = {
+  safety: {
+    label: "Safety",
+    summary: "Prevent secret leaks and high-risk security regressions before merge.",
+    actions: [
+      "Add secret scanning to CI (gitleaks or trufflehog) and fail builds on new leaks.",
+      "Ensure .gitignore blocks .env and .env.* patterns across all app roots.",
+      "Rotate any key that was ever committed, even if removed later.",
+    ],
+    commands: [
+      "npm run secret-scan",
+      "git ls-files | findstr /R \"\\.env$ \\.env\\.\"",
+    ],
+    doneWhen: "No committed secrets, ignore rules verified, secret scan gate passing in CI.",
+  },
+  reliability: {
+    label: "Reliability",
+    summary: "Make regressions visible early with automated tests, CI, and type checks.",
+    actions: [
+      "Cover critical paths with tests (happy path, failure path, auth edge cases).",
+      "Run tests on every PR via GitHub Actions and block merge on failures.",
+      "Enable type checking (TypeScript, mypy, or pyright) in CI.",
+    ],
+    commands: [
+      "npm test",
+      "node --test tests/server.test.mjs",
+    ],
+    doneWhen: "Tests and CI are mandatory gates and type checks are enforced on pull requests.",
+  },
+  evaluation: {
+    label: "Evaluation",
+    summary: "Measure quality over time with representative evals and baseline tracking.",
+    actions: [
+      "Create eval cases that mirror your top real user workflows.",
+      "Store a baseline run and compare score deltas every release.",
+      "Treat eval regressions as release blockers.",
+    ],
+    commands: [
+      "npm run scorecard:check",
+      "node scripts/new-run.mjs",
+    ],
+    doneWhen: "Eval corpus exists, baseline is tracked, and regressions trigger a release hold.",
+  },
+  observability: {
+    label: "Observability",
+    summary: "Capture enough runtime evidence to debug failures quickly.",
+    actions: [
+      "Emit structured logs with correlation IDs across request boundaries.",
+      "Persist run artifacts and traces in agent-quality/runs for audits.",
+      "Track failure rates and latency trends for scan and publish flows.",
+    ],
+    commands: [
+      "node gravio.mjs doctor",
+      "dir agent-quality\\runs",
+    ],
+    doneWhen: "Structured logs and persisted artifacts are available for every production issue.",
+  },
+  governance: {
+    label: "Governance",
+    summary: "Keep repository behavior legible with documentation and change history.",
+    actions: [
+      "Maintain README, CHANGELOG, and ownership docs as required merge artifacts.",
+      "Document release decisions and operational constraints.",
+      "Keep onboarding docs aligned with actual CLI behavior.",
+    ],
+    commands: [
+      "type README.md",
+      "type CHANGELOG.md",
+    ],
+    doneWhen: "Operational docs are complete, current, and reviewed during releases.",
+  },
+  agentic: {
+    label: "Agentic",
+    summary: "Define repeatable AI-agent behavior with guardrails and reusable prompts.",
+    actions: [
+      "Add AGENTS.md or .github/copilot-instructions.md with explicit safety rules.",
+      "Create reusable prompts/skills for recurring tasks.",
+      "Record run outputs and decisions so AI actions are auditable.",
+    ],
+    commands: [
+      "dir .github",
+      "dir skills",
+    ],
+    doneWhen: "Agent instructions, reusable prompt assets, and run artifacts are all present.",
+  },
+};
+
+const CHECK_PLAYBOOK = {
+  "secret-scan": {
+    dimension: "safety",
+    priority: "critical",
+    title: "Remove committed secrets and rotate credentials",
+    why: "Committed secrets are an immediate production compromise risk.",
+    actions: [
+      "Purge leaked secrets from git history using git-filter-repo or BFG.",
+      "Rotate all exposed keys, tokens, and passwords immediately.",
+      "Add CI secret scan gate so future leaks fail before merge.",
+    ],
+    commands: ["npm run secret-scan"],
+  },
+  "gitignore-guard": {
+    dimension: "safety",
+    priority: "high",
+    title: "Harden .gitignore secret coverage",
+    why: ".env files are a common accidental leak source.",
+    actions: [
+      "Ensure .gitignore includes .env and .env.* patterns.",
+      "Verify no tracked env files remain in git index.",
+      "Add pre-commit checks for secret-containing files.",
+    ],
+    commands: ["git ls-files | findstr /R \"\\.env$ \\.env\\.\""],
+  },
+  "test-coverage": {
+    dimension: "reliability",
+    priority: "critical",
+    title: "Establish a minimum automated test suite",
+    why: "Without tests, regressions reach production undetected.",
+    actions: [
+      "Create tests for auth, publish, and dashboard API behavior.",
+      "Require passing tests for every pull request.",
+      "Add regression tests for each escaped production bug.",
+    ],
+    commands: ["npm test"],
+  },
+  "ci-pipeline": {
+    dimension: "reliability",
+    priority: "high",
+    title: "Enable CI pipeline quality gates",
+    why: "CI creates a consistent pre-merge contract for quality.",
+    actions: [
+      "Add a GitHub Actions workflow that runs tests and secret scan.",
+      "Fail PR checks on test, lint, or typecheck errors.",
+      "Surface artifacts/logs for failed jobs.",
+    ],
+    commands: ["npm run verify"],
+  },
+  "type-safety": {
+    dimension: "reliability",
+    priority: "medium",
+    title: "Add type safety checks",
+    why: "Type contracts prevent an entire class of runtime defects.",
+    actions: [
+      "Adopt TypeScript or a type checker for high-risk modules.",
+      "Run type checks in CI on every push.",
+      "Prioritize request/response and data-boundary typing first.",
+    ],
+    commands: ["npm run build"],
+  },
+  "eval-suite": {
+    dimension: "evaluation",
+    priority: "high",
+    title: "Create representative eval suite",
+    why: "You cannot improve what you do not measure repeatedly.",
+    actions: [
+      "Create eval scenarios covering top production workflows.",
+      "Include failure-mode and edge-case prompts.",
+      "Track pass/fail trend over time.",
+    ],
+    commands: ["npm run scorecard:check"],
+  },
+  "baseline-tracking": {
+    dimension: "evaluation",
+    priority: "high",
+    title: "Track score baselines and regressions",
+    why: "Baseline drift hides quality decay until it becomes expensive.",
+    actions: [
+      "Persist baseline.json for known-good runs.",
+      "Compare every new run against baseline deltas.",
+      "Block releases on major quality drops.",
+    ],
+    commands: ["node scripts/new-run.mjs"],
+  },
+  "observability-config": {
+    dimension: "observability",
+    priority: "high",
+    title: "Add structured telemetry",
+    why: "Production failures need traces and structured logs for fast diagnosis.",
+    actions: [
+      "Emit structured logs with request and run IDs.",
+      "Instrument key paths with tracing spans.",
+      "Monitor error-rate and latency trends.",
+    ],
+    commands: ["node gravio.mjs doctor"],
+  },
+  "run-artifacts": {
+    dimension: "observability",
+    priority: "medium",
+    title: "Persist run artifacts for audits",
+    why: "Without artifacts, root-cause analysis is guesswork.",
+    actions: [
+      "Persist run outputs in agent-quality/runs with timestamps.",
+      "Retain enough history for trend analysis.",
+      "Link run artifacts to deploy and release identifiers.",
+    ],
+    commands: ["dir agent-quality\\runs"],
+  },
+  "readme-docs": {
+    dimension: "governance",
+    priority: "medium",
+    title: "Document runtime and ownership expectations",
+    why: "Missing docs slows onboarding and causes unsafe operational drift.",
+    actions: [
+      "Keep README accurate for setup, run, and deploy flows.",
+      "Document responsibilities and escalation paths.",
+      "Define release readiness requirements.",
+    ],
+    commands: ["type README.md"],
+  },
+  "changelog-hygiene": {
+    dimension: "governance",
+    priority: "medium",
+    title: "Track release-level quality changes",
+    why: "Changelogs help correlate regressions with code changes.",
+    actions: [
+      "Add release entries for quality-relevant changes.",
+      "Record migration and rollout notes.",
+      "Tie score changes to release notes.",
+    ],
+    commands: ["type CHANGELOG.md"],
+  },
+  "agent-instructions": {
+    dimension: "agentic",
+    priority: "critical",
+    title: "Define explicit AI agent instructions",
+    why: "Agent guardrails reduce unsafe automation and inconsistent outputs.",
+    actions: [
+      "Add AGENTS.md or .github/copilot-instructions.md with strict operating rules.",
+      "Define no-go actions and review requirements.",
+      "Keep instructions versioned with code changes.",
+    ],
+    commands: ["dir .github"],
+  },
+  "agent-skill-catalog": {
+    dimension: "agentic",
+    priority: "high",
+    title: "Create reusable prompt and skill assets",
+    why: "Reusable assets reduce drift and improve consistency across agents.",
+    actions: [
+      "Create a skills/prompt catalog for frequent workflows.",
+      "Version and review prompts like production code.",
+      "Define success criteria per skill.",
+    ],
+    commands: ["dir skills"],
+  },
+  "agent-orchestration": {
+    dimension: "agentic",
+    priority: "high",
+    title: "Define multi-agent orchestration contract",
+    why: "Uncoordinated agents can conflict and degrade quality.",
+    actions: [
+      "Document orchestration and ownership boundaries in AGENTS.md.",
+      "Set deterministic handoff and conflict resolution rules.",
+      "Audit agent outputs and escalation paths.",
+    ],
+    commands: ["type AGENTS.md"],
+  },
+};
+
+function toTitleCaseDimension(dim) {
+  const meta = DIMENSION_GUIDE[dim];
+  return meta?.label ?? String(dim ?? "").replace(/^[a-z]/, (m) => m.toUpperCase());
+}
+
+function normalizeScore(value) {
+  const n = Number(value);
+  return Number.isFinite(n) ? Math.round(n) : null;
+}
+
+function statusFromGap(gap) {
+  if (gap <= 0) return "ready";
+  if (gap <= 10) return "near";
+  if (gap <= 24) return "at-risk";
+  return "critical";
+}
+
+function buildDimensionPlan(scorecard) {
+  return DIM_ORDER.map((dim) => {
+    const current = normalizeScore(scorecard?.[dim]);
+    const target = READY_TO_SHIP_TARGET[dim] ?? 80;
+    const gap = current === null ? target : Math.max(0, target - current);
+    const guide = DIMENSION_GUIDE[dim];
+    return {
+      dimension: dim,
+      label: toTitleCaseDimension(dim),
+      current,
+      target,
+      gap,
+      status: statusFromGap(gap),
+      summary: guide?.summary ?? "Improve this dimension to reduce release risk.",
+      actions: guide?.actions ?? [],
+      commands: guide?.commands ?? [],
+      doneWhen: guide?.doneWhen ?? "This dimension is stable across repeated scans.",
+    };
+  }).sort((a, b) => b.gap - a.gap);
+}
+
+function synthesizeActionFromDimension(item) {
+  return {
+    source: "dimension",
+    dimension: item.dimension,
+    priority: item.status === "critical" ? "critical" : (item.status === "at-risk" ? "high" : "medium"),
+    title: `${item.label}: close ${item.gap}-point gap to ready-to-ship target`,
+    why: item.summary,
+    actions: item.actions.slice(0, 3),
+    commands: item.commands.slice(0, 2),
+    expectedLift: item.gap,
+  };
+}
+
+function buildActionPlan(runData, dimensionPlan) {
+  const failedChecks = runData?.publicSummary?.failedChecks;
+  const checkActions = Array.isArray(failedChecks)
+    ? failedChecks.map((id) => ({ id, ...CHECK_PLAYBOOK[id] })).filter((x) => x.dimension)
+    : [];
+
+  const normalizedChecks = checkActions.map((item) => ({
+    source: "check",
+    checkId: item.id,
+    dimension: item.dimension,
+    priority: item.priority,
+    title: item.title,
+    why: item.why,
+    actions: item.actions,
+    commands: item.commands,
+    expectedLift: null,
+  }));
+
+  const byDimFromChecks = new Set(normalizedChecks.map((x) => x.dimension));
+  const topDimActions = dimensionPlan
+    .filter((item) => item.gap > 0)
+    .filter((item) => !byDimFromChecks.has(item.dimension))
+    .slice(0, 4)
+    .map((item) => synthesizeActionFromDimension(item));
+
+  const merged = [...normalizedChecks, ...topDimActions];
+  const priorityRank = { critical: 0, high: 1, medium: 2, low: 3 };
+  return merged
+    .sort((a, b) => {
+      const p = (priorityRank[a.priority] ?? 9) - (priorityRank[b.priority] ?? 9);
+      if (p !== 0) return p;
+      return (b.expectedLift ?? 0) - (a.expectedLift ?? 0);
+    })
+    .slice(0, 8);
+}
+
+function buildReadyChecklist(dimensionPlan, overallScore) {
+  const items = dimensionPlan.map((item) => ({
+    id: `dim-${item.dimension}`,
+    label: `${item.label} >= ${item.target}`,
+    passed: Number.isFinite(item.current) && item.current >= item.target,
+    current: item.current,
+    target: item.target,
+  }));
+
+  items.unshift({
+    id: "overall",
+    label: "Overall score >= 85",
+    passed: Number.isFinite(overallScore) && overallScore >= 85,
+    current: normalizeScore(overallScore),
+    target: 85,
+  });
+
+  return items;
+}
 
 function recommendationsFromRun(runData, limitedDetails) {
   if (limitedDetails) {
-    return [
-      "Keep scan cadence consistent and monitor score trend week over week.",
-      "Upgrade to Pro or Team to unlock per-check remediation guidance.",
-    ];
+    return {
+      version: 2,
+      tier: "limited",
+      headline: "Detailed remediation is available on Pro and Team.",
+      summary: "Your free-tier report shows trend and score only. Upgrade to unlock per-dimension action plans and ready-to-ship checklists.",
+      quickActions: [
+        "Run scans weekly and watch trend direction.",
+        "Prioritize the two lowest dimensions first.",
+        "Upgrade to Pro/Team for detailed remediation guidance.",
+      ],
+      actionPlan: [],
+      dimensionPlan: [],
+      readyChecklist: [],
+    };
   }
 
   const scorecard = runData?.scorecard ?? runData?.publicSummary?.scorecard ?? {};
-  const failedChecks = runData?.publicSummary?.failedChecks ?? null;
+  const overallScore = Number(runData?.summary?.overallScore ?? runData?.publicSummary?.overallScore ?? NaN);
+  const dimensionPlan = buildDimensionPlan(scorecard);
+  const actionPlan = buildActionPlan(runData, dimensionPlan);
+  const readyChecklist = buildReadyChecklist(dimensionPlan, overallScore);
+  const failed = readyChecklist.filter((i) => !i.passed).length;
+  const nextMilestone = failed === 0
+    ? "Ready to ship"
+    : `${failed} gate${failed === 1 ? "" : "s"} remaining`;
 
-  // If we have specific failed check IDs, give precise actionable advice per check.
-  if (Array.isArray(failedChecks) && failedChecks.length > 0) {
-    // Sort: critical failures first, then by check order in CHECK_ADVICE
-    const adviceOrder = Object.keys(CHECK_ADVICE);
-    const sorted = [...failedChecks].sort((a, b) => {
-      const aC = CHECK_ADVICE[a]?.critical ? 0 : 1;
-      const bC = CHECK_ADVICE[b]?.critical ? 0 : 1;
-      if (aC !== bC) return aC - bC;
-      return adviceOrder.indexOf(a) - adviceOrder.indexOf(b);
-    });
-
-    const recs = sorted
-      .map((id) => CHECK_ADVICE[id]?.text)
-      .filter(Boolean)
-      .slice(0, 5); // cap at 5 to avoid overwhelming the UI
-
-    if (recs.length > 0) return recs;
-  }
-
-  // Fallback: derive from lowest dimension scores when check IDs unavailable (older scans).
-  const dims = ["safety", "reliability", "evaluation", "observability", "governance", "agentic"];
-  const DIM_ADVICE = {
-    safety:        (s) => `Safety score is ${s}/100 — audit committed files for secrets and ensure .gitignore covers all .env patterns.`,
-    reliability:   (s) => `Reliability is ${s}/100 — add a test suite and CI pipeline to automatically catch regressions on every push.`,
-    evaluation:    (s) => `Evaluation score is ${s}/100 — create an evals/ directory with representative test cases and a baseline.json to track regressions.`,
-    observability: (s) => `Observability is ${s}/100 — add structured logging (Winston, Pino, structlog) and persist run artifacts to diagnose agent failures.`,
-    governance:    (s) => `Governance is ${s}/100 — add README.md, CHANGELOG.md, and AGENTS.md to document what this agent does and how it is controlled.`,
-    agentic:       (s) => `Agentic readiness is ${s}/100 — define agent instructions, create reusable prompt assets, and persist run outputs for audit trails.`,
+  return {
+    version: 2,
+    tier: "full",
+    headline: nextMilestone,
+    summary: Number.isFinite(overallScore)
+      ? `Current overall score is ${Math.round(overallScore)}/100. Close the highest gaps first to reach ready-to-ship status.`
+      : "Score detected, but overall score summary is unavailable. Focus on closing dimension gaps below.",
+    quickActions: [
+      "Fix all critical/high items before medium items.",
+      "After each fix batch, run one scan and compare score deltas.",
+      "Promote new quality checks into CI so score gains remain stable.",
+    ],
+    actionPlan,
+    dimensionPlan,
+    readyChecklist,
   };
-
-  const ranked = dims
-    .map((k) => ({ key: k, value: Number(scorecard[k] ?? NaN) }))
-    .filter((x) => Number.isFinite(x.value) && x.value < 80) // only surface genuinely weak dims
-    .sort((a, b) => a.value - b.value)
-    .slice(0, 3);
-
-  if (ranked.length > 0) {
-    return ranked.map((d) => DIM_ADVICE[d.key]?.(Math.round(d.value)) ?? `Improve ${d.key} (current score ${Math.round(d.value)}/100).`);
-  }
-
-  return ["All major dimensions are scoring above 80. Focus on maintaining test coverage and scan cadence."];
 }
 
 function summarizeScans(scans) {
@@ -430,6 +779,115 @@ const server = http.createServer(async (req, res) => {
     });
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ runs }));
+    return;
+  }
+
+  // ── API: GET /api/projects/list — alias for CLI relink flows ───────────
+  if (req.method === "GET" && req.url === "/api/projects/list") {
+    const user = getAuthUser(req);
+    if (!user) {
+      res.writeHead(401, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Not authenticated" }));
+      return;
+    }
+    const uid = user.uid ?? user.id;
+    const projects = stmts.listRunsForUser.all(uid).map((row) => ({
+      project_id: row.project_id,
+      scan_count: row.scan_count,
+      last_scan_at: row.last_scan_at,
+    }));
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ projects }));
+    return;
+  }
+
+  // ── API: POST /api/projects/rename ─────────────────────────────────────
+  if (req.method === "POST" && req.url === "/api/projects/rename") {
+    const user = getAuthUser(req);
+    if (!user) {
+      res.writeHead(401, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Not authenticated" }));
+      return;
+    }
+    try {
+      const { fromProjectId, toProjectId } = JSON.parse(await readBody(req));
+      if (!isValidProjectId(fromProjectId) || !isValidProjectId(toProjectId)) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Invalid project ID" }));
+        return;
+      }
+      if (fromProjectId === toProjectId) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Source and destination must be different" }));
+        return;
+      }
+
+      const uid = user.uid ?? user.id;
+      const fromCount = Number(stmts.countRunsForProjectUser.get(fromProjectId, uid)?.c ?? 0);
+      const toCount = Number(stmts.countRunsForProjectUser.get(toProjectId, uid)?.c ?? 0);
+      if (fromCount === 0) {
+        res.writeHead(404, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Source project not found" }));
+        return;
+      }
+      if (toCount > 0) {
+        res.writeHead(409, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Target project already exists. Use merge instead." }));
+        return;
+      }
+
+      const changed = stmts.renameProjectRunsForUser.run(toProjectId, fromProjectId, uid).changes;
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ ok: true, projectId: toProjectId, movedRuns: changed }));
+    } catch (err) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: err.message }));
+    }
+    return;
+  }
+
+  // ── API: POST /api/projects/merge ──────────────────────────────────────
+  if (req.method === "POST" && req.url === "/api/projects/merge") {
+    const user = getAuthUser(req);
+    if (!user) {
+      res.writeHead(401, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Not authenticated" }));
+      return;
+    }
+    try {
+      const { sourceProjectId, destinationProjectId } = JSON.parse(await readBody(req));
+      if (!isValidProjectId(sourceProjectId) || !isValidProjectId(destinationProjectId)) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Invalid project ID" }));
+        return;
+      }
+      if (sourceProjectId === destinationProjectId) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Source and destination must be different" }));
+        return;
+      }
+
+      const uid = user.uid ?? user.id;
+      const sourceCount = Number(stmts.countRunsForProjectUser.get(sourceProjectId, uid)?.c ?? 0);
+      const destCount = Number(stmts.countRunsForProjectUser.get(destinationProjectId, uid)?.c ?? 0);
+      if (sourceCount === 0) {
+        res.writeHead(404, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Source project not found" }));
+        return;
+      }
+      if (destCount === 0) {
+        res.writeHead(404, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Destination project not found" }));
+        return;
+      }
+
+      const changed = stmts.renameProjectRunsForUser.run(destinationProjectId, sourceProjectId, uid).changes;
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ ok: true, destinationProjectId, movedRuns: changed }));
+    } catch (err) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: err.message }));
+    }
     return;
   }
 

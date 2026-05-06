@@ -1,6 +1,6 @@
 "use strict";
 /**
- * Onboarding page — modal + project-name controller.
+ * Onboarding page — modal + smart command controller.
  * Header / sign-in / sign-out are owned by site-chrome.js.
  * This script listens for the "site:auth" event from the chrome and
  * updates the in-page CTA + status line accordingly.
@@ -11,8 +11,7 @@ let onboardingCliToken = null;
 
 const elStartFree = document.getElementById("ob-start-free");
 const elAuthOk = document.getElementById("ob-auth-ok");
-const elProjectId = document.getElementById("ob-project-id");
-const elCmdAuthorize = document.getElementById("cmd-authorize");
+const elCmdSmartStart = document.getElementById("cmd-smartstart");
 
 const elModalWrap = document.getElementById("ob-auth-modal-wrap");
 const elModalBackdrop = document.getElementById("ob-auth-backdrop");
@@ -22,17 +21,10 @@ const tabRegister = document.getElementById("ob-tab-register");
 const panelLogin = document.getElementById("ob-panel-login");
 const panelRegister = document.getElementById("ob-panel-register");
 
-function getProjectId() {
-  const raw = (elProjectId?.value ?? "").trim();
-  const cleaned = raw.toLowerCase().replace(/[^a-z0-9_-]+/g, "-").replace(/^-+|-+$/g, "");
-  return cleaned || "my-first-project";
-}
-
-function updateProjectCommands() {
-  const projectId = getProjectId();
+function updateSmartCommand() {
   const tokenPart = onboardingCliToken ?? "gv_sign_in_to_auto_fill_token";
-  if (elCmdAuthorize) {
-    elCmdAuthorize.textContent = `node gravio.mjs --authorize --target . --project ${projectId} --server https://gravio.dev --api-key ${tokenPart}`;
+  if (elCmdSmartStart) {
+    elCmdSmartStart.textContent = `node gravio.mjs --token ${tokenPart}`;
   }
 }
 
@@ -72,16 +64,16 @@ async function applyAuthState(user) {
   currentUser = user;
   if (user) {
     onboardingCliToken = await fetchOnboardingCliToken();
-    updateProjectCommands();
+    updateSmartCommand();
     if (elStartFree) elStartFree.textContent = "Account connected";
     if (onboardingCliToken) {
-      setAuthStatusMessage(`Signed in as ${user.email}. Your Step 2 command is auto-filled with a user-bound auth token.`);
+      setAuthStatusMessage(`Signed in as ${user.email}. Your Step 2 command is auto-filled with a user-bound token.`);
     } else {
       setAuthStatusMessage(`Signed in as ${user.email}. Continue with steps below.`);
     }
   } else {
     onboardingCliToken = null;
-    updateProjectCommands();
+    updateSmartCommand();
     if (elStartFree) elStartFree.textContent = "Create account or sign in";
     clearAuthStatusMessage();
   }
@@ -222,8 +214,7 @@ document.getElementById("ob-form-register")?.addEventListener("submit", async (e
   }
 });
 
-elProjectId?.addEventListener("input", updateProjectCommands);
-updateProjectCommands();
+updateSmartCommand();
 
 function setCopied(btn, copied) {
   const label = copied ? "Copied" : "Copy command";
@@ -231,7 +222,7 @@ function setCopied(btn, copied) {
 }
 
 async function copyFromPre(preId, btn) {
-  if (!currentUser) {
+  if (btn?.dataset.authOnlyCopy === "true" && !currentUser) {
     openAuthModal();
     return;
   }

@@ -44,7 +44,7 @@ async function loadApiKeys() {
 function renderKeyList(keys) {
   const list = $("st-keys-list");
   if (!keys.length) {
-    list.innerHTML = `<li class="db-key-empty">No API keys yet. Generate one above to use with the CLI.</li>`;
+    list.innerHTML = `<li class="db-key-empty">No API keys yet. Generate one above — it will be auto-filled next time you open onboarding.</li>`;
     return;
   }
   list.innerHTML = keys.map((k) => `

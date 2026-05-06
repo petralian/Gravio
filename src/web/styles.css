@@ -2655,6 +2655,49 @@ button#evaluate-btn:hover {
 }
 .db-runscans-link:hover { text-decoration: underline; }
 
+/* Advanced command reference list */
+.db-cmd-ref {
+  margin-top: 36px;
+  padding-top: 28px;
+  border-top: 1px solid var(--border);
+}
+.db-cmd-ref-heading {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-3);
+  margin: 0 0 14px;
+}
+.db-cmd-ref-list {
+  display: flex;
+  flex-direction: column;
+}
+.db-cmd-ref-item {
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border);
+}
+.db-cmd-ref-item:last-child { border-bottom: none; }
+.db-cmd-ref-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+.db-cmd-ref-name {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--neon-cyan);
+  flex-shrink: 0;
+}
+.db-cmd-ref-purpose {
+  font-size: 13px;
+  color: var(--text-2);
+  line-height: 1.5;
+}
+
 /* ─── RESPONSIVE ─── */
 @media (max-width: 960px) {
   .m-hero {

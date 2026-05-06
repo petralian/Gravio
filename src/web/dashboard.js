@@ -329,6 +329,10 @@ function renderWorkspaceScans(scans) {
 function renderWorkspaceRunScans(projectId, hasScans) {
   const panel = $("db-tab-runscans");
   const pid   = esc(projectId);
+  const mergeOptions = state.projects
+    .filter((p) => p.project_id !== projectId)
+    .map((p) => `<option value="${esc(p.project_id)}">${esc(p.project_id)}</option>`)
+    .join("");
 
   const statusHtml = hasScans
     ? `<div class="db-runscans-status db-runscans-ok">
@@ -343,6 +347,8 @@ function renderWorkspaceRunScans(projectId, hasScans) {
   panel.innerHTML = `
     <div class="db-runscans">
       ${statusHtml}
+
+      <!-- ─ Primary flow ─ -->
       <div class="db-runscans-steps">
 
         <div class="db-runscans-step">
@@ -366,36 +372,277 @@ function renderWorkspaceRunScans(projectId, hasScans) {
         <div class="db-runscans-step">
           <div class="db-runscans-step-num">2</div>
           <div class="db-runscans-step-body">
-            <h3 class="db-runscans-h3">Authorize this folder <span class="db-runscans-note">(once per machine / folder)</span></h3>
-            <p class="db-runscans-p">Your project ID is pre-filled. Need your API key? <a href="/settings" class="db-runscans-link">Get it in Settings &#8594;</a></p>
+            <h3 class="db-runscans-h3">First-time connect &amp; scan</h3>
+            <p class="db-runscans-p">Auto-runs setup, auth, link, scan, and publish in one command.</p>
             <div class="db-runscans-cmd-row">
-              <pre class="db-runscans-cmd" id="rs-cmd-auth">node gravio.mjs --authorize --target . --project ${pid} --server https://gravio.dev --api-key YOUR_API_KEY</pre>
+              <pre class="db-runscans-cmd" id="rs-cmd-auth">node gravio.mjs --token YOUR_API_KEY</pre>
               <button class="m-btn m-btn-outline m-btn-sm db-rs-copy" data-copy-id="rs-cmd-auth" type="button">Copy</button>
             </div>
-            <p class="db-runscans-foot">Authorization is saved in <code>.gravio/auth.json</code>. No need to re-authorize on the same machine.</p>
+            <p class="db-runscans-foot">Need your key? <a href="/settings" class="db-runscans-link">Settings &#8594;</a></p>
           </div>
         </div>
 
         <div class="db-runscans-step">
           <div class="db-runscans-step-num">3</div>
           <div class="db-runscans-step-body">
-            <h3 class="db-runscans-h3">Run a scan</h3>
-            <p class="db-runscans-p">Run from the root of your project folder. Results publish to this dashboard automatically.</p>
+            <h3 class="db-runscans-h3">Subsequent scans</h3>
+            <p class="db-runscans-p">From the same folder — auth and link are already saved.</p>
             <div class="db-runscans-cmd-row">
-              <pre class="db-runscans-cmd" id="rs-cmd-scan">node gravio.mjs --once --target .</pre>
+              <pre class="db-runscans-cmd" id="rs-cmd-scan">node gravio.mjs</pre>
               <button class="m-btn m-btn-outline m-btn-sm db-rs-copy" data-copy-id="rs-cmd-scan" type="button">Copy</button>
             </div>
           </div>
         </div>
 
       </div>
+
+      <!-- ─ Advanced commands ─ -->
+      <div class="db-cmd-ref">
+        <p class="db-cmd-ref-heading">Advanced commands</p>
+        <p class="db-runscans-p" style="margin-bottom:14px">Run these from the folder containing <code>gravio.mjs</code>. Use <code>node gravio.mjs --help</code> to see this list in your terminal.</p>
+
+        <div class="db-cmd-ref-list">
+
+          <div class="db-cmd-ref-item">
+            <div class="db-cmd-ref-meta">
+              <span class="db-cmd-ref-name">doctor</span>
+              <span class="db-cmd-ref-purpose">Show setup / auth / link status and repair suggestions.</span>
+            </div>
+            <div class="db-runscans-cmd-row">
+              <pre class="db-runscans-cmd" id="rs-cmd-doctor">node gravio.mjs doctor</pre>
+              <button class="m-btn m-btn-outline m-btn-sm db-rs-copy" data-copy-id="rs-cmd-doctor" type="button">Copy</button>
+            </div>
+          </div>
+
+          <div class="db-cmd-ref-item">
+            <div class="db-cmd-ref-meta">
+              <span class="db-cmd-ref-name">link</span>
+              <span class="db-cmd-ref-purpose">Relink this folder to an existing project if the local link file was removed.</span>
+            </div>
+            <div class="db-runscans-cmd-row">
+              <pre class="db-runscans-cmd" id="rs-cmd-link">node gravio.mjs link --project ${pid}</pre>
+              <button class="m-btn m-btn-outline m-btn-sm db-rs-copy" data-copy-id="rs-cmd-link" type="button">Copy</button>
+            </div>
+          </div>
+
+          <div class="db-cmd-ref-item">
+            <div class="db-cmd-ref-meta">
+              <span class="db-cmd-ref-name">rename</span>
+              <span class="db-cmd-ref-purpose">Rename the current linked project. Or use the form below.</span>
+            </div>
+            <div class="db-runscans-cmd-row">
+              <pre class="db-runscans-cmd" id="rs-cmd-rename">node gravio.mjs rename &lt;new-name&gt;</pre>
+              <button class="m-btn m-btn-outline m-btn-sm db-rs-copy" data-copy-id="rs-cmd-rename" type="button">Copy</button>
+            </div>
+          </div>
+
+          <div class="db-cmd-ref-item">
+            <div class="db-cmd-ref-meta">
+              <span class="db-cmd-ref-name">merge</span>
+              <span class="db-cmd-ref-purpose">Guided merge helper. Best finalized using the controls below.</span>
+            </div>
+            <div class="db-runscans-cmd-row">
+              <pre class="db-runscans-cmd" id="rs-cmd-merge">node gravio.mjs merge --to &lt;destination-id&gt;</pre>
+              <button class="m-btn m-btn-outline m-btn-sm db-rs-copy" data-copy-id="rs-cmd-merge" type="button">Copy</button>
+            </div>
+          </div>
+
+          <div class="db-cmd-ref-item">
+            <div class="db-cmd-ref-meta">
+              <span class="db-cmd-ref-name">logout</span>
+              <span class="db-cmd-ref-purpose">Clear local auth and project link from this folder.</span>
+            </div>
+            <div class="db-runscans-cmd-row">
+              <pre class="db-runscans-cmd" id="rs-cmd-logout">node gravio.mjs logout</pre>
+              <button class="m-btn m-btn-outline m-btn-sm db-rs-copy" data-copy-id="rs-cmd-logout" type="button">Copy</button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- ─ Project management ─ -->
+      <div class="db-cmd-ref" style="margin-top:32px">
+        <p class="db-cmd-ref-heading">Project management</p>
+
+        <div class="db-runscans-p" style="margin-bottom:6px">Rename project: <code>${pid}</code></div>
+        <div class="db-runscans-cmd-row" style="margin-bottom:18px">
+          <input id="rs-rename-input" class="db-search-input" type="text" value="${pid}" autocomplete="off" spellcheck="false" />
+          <button class="m-btn m-btn-outline m-btn-sm" id="rs-rename-btn" type="button">Rename</button>
+        </div>
+
+        <div class="db-runscans-p" style="margin-bottom:6px">Merge <code>${pid}</code> into another project (moves all scans):</div>
+        <div class="db-runscans-cmd-row">
+          <select id="rs-merge-to" class="db-sort-select" ${mergeOptions ? "" : "disabled"}>
+            <option value="">Choose destination project</option>
+            ${mergeOptions}
+          </select>
+          <button class="m-btn m-btn-outline m-btn-sm" id="rs-merge-btn" type="button" ${mergeOptions ? "" : "disabled"}>Merge</button>
+        </div>
+        ${mergeOptions ? "" : `<p class="db-runscans-foot">You need at least two projects to use merge.</p>`}
+      </div>
+
     </div>
   `;
 }
 
+async function renameCurrentProject(newProjectId) {
+  const fromProjectId = state.selectedProject;
+  const toProjectId = String(newProjectId ?? "").trim();
+  clearError(elWsError);
+  if (!fromProjectId || !isValidProjectId(toProjectId)) {
+    showError(elWsError, "Enter a valid project id.");
+    return;
+  }
+  if (fromProjectId === toProjectId) {
+    showError(elWsError, "Project id is unchanged.");
+    return;
+  }
+
+  const res = await fetch("/api/projects/rename", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ fromProjectId, toProjectId }),
+  });
+  const body = await res.json();
+  if (!res.ok) {
+    showError(elWsError, body.error ?? "Rename failed.");
+    return;
+  }
+
+  await loadProjects();
+  await openProject(toProjectId);
+  switchTab("runscans");
+}
+
+async function mergeCurrentProject(destinationProjectId) {
+  const sourceProjectId = state.selectedProject;
+  const to = String(destinationProjectId ?? "").trim();
+  clearError(elWsError);
+  if (!sourceProjectId || !isValidProjectId(to)) {
+    showError(elWsError, "Choose a valid destination project.");
+    return;
+  }
+  if (sourceProjectId === to) {
+    showError(elWsError, "Choose a different destination project.");
+    return;
+  }
+
+  const res = await fetch("/api/projects/merge", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ sourceProjectId, destinationProjectId: to }),
+  });
+  const body = await res.json();
+  if (!res.ok) {
+    showError(elWsError, body.error ?? "Merge failed.");
+    return;
+  }
+
+  await loadProjects();
+  await openProject(to);
+  switchTab("runscans");
+}
+
 function renderWorkspaceRecs(scans) {
   const recList = $("db-recs-list");
-  const recMap  = new Map();
+  const latest = scans[0];
+  const recs = latest?.recommendations;
+
+  if (!latest || !recs) {
+    recList.innerHTML = `<li class="db-recs-empty">No recommendations at this time. Keep scanning regularly to maintain trend visibility.</li>`;
+    return;
+  }
+
+  if (recs && typeof recs === "object" && !Array.isArray(recs) && Number(recs.version) >= 2) {
+    const quickActions = Array.isArray(recs.quickActions) ? recs.quickActions : [];
+    const actionPlan = Array.isArray(recs.actionPlan) ? recs.actionPlan : [];
+    const dimensionPlan = Array.isArray(recs.dimensionPlan) ? recs.dimensionPlan : [];
+    const readyChecklist = Array.isArray(recs.readyChecklist) ? recs.readyChecklist : [];
+
+    const priorityClass = (priority) => {
+      const p = String(priority ?? "").toLowerCase();
+      if (p === "critical") return "db-priority-critical";
+      if (p === "high") return "db-priority-high";
+      if (p === "medium") return "db-priority-medium";
+      return "db-priority-low";
+    };
+
+    const statusClass = (status) => {
+      const s = String(status ?? "").toLowerCase();
+      if (s === "ready") return "db-dim-ready";
+      if (s === "near") return "db-dim-near";
+      if (s === "at-risk") return "db-dim-risk";
+      return "db-dim-critical";
+    };
+
+    recList.innerHTML = `
+      <li class="db-rec-hero">
+        <p class="db-rec-hero-title">${esc(recs.headline ?? "Remediation plan")}</p>
+        <p class="db-rec-hero-text">${esc(recs.summary ?? "")}</p>
+      </li>
+      ${quickActions.length ? `
+        <li class="db-rec-block">
+          <p class="db-rec-block-title">Quick wins</p>
+          <ul class="db-rec-bullets">
+            ${quickActions.map((item) => `<li>${esc(item)}</li>`).join("")}
+          </ul>
+        </li>` : ""}
+      ${actionPlan.length ? `
+        <li class="db-rec-block">
+          <p class="db-rec-block-title">Priority actions</p>
+          <div class="db-rec-action-grid">
+            ${actionPlan.map((item) => `
+              <article class="db-rec-action-card">
+                <div class="db-rec-action-head">
+                  <span class="db-priority-chip ${priorityClass(item.priority)}">${esc(item.priority ?? "medium")}</span>
+                  <span class="db-rec-dim-chip">${esc(item.dimension ?? "general")}</span>
+                </div>
+                <p class="db-rec-action-title">${esc(item.title ?? "Recommended action")}</p>
+                <p class="db-rec-action-why">${esc(item.why ?? "")}</p>
+                ${Array.isArray(item.actions) && item.actions.length ? `
+                  <ul class="db-rec-bullets">
+                    ${item.actions.map((step) => `<li>${esc(step)}</li>`).join("")}
+                  </ul>` : ""}
+                ${Array.isArray(item.commands) && item.commands.length ? `
+                  <div class="db-rec-cmds">
+                    ${item.commands.map((cmd) => `<code>${esc(cmd)}</code>`).join("")}
+                  </div>` : ""}
+              </article>`).join("")}
+          </div>
+        </li>` : ""}
+      ${dimensionPlan.length ? `
+        <li class="db-rec-block">
+          <p class="db-rec-block-title">Dimension roadmap</p>
+          <div class="db-dim-grid">
+            ${dimensionPlan.map((dim) => `
+              <article class="db-dim-card">
+                <div class="db-dim-head">
+                  <span class="db-dim-name">${esc(dim.label ?? dim.dimension ?? "Dimension")}</span>
+                  <span class="db-dim-status ${statusClass(dim.status)}">${esc(dim.status ?? "at-risk")}</span>
+                </div>
+                <p class="db-dim-scores">${esc(String(dim.current ?? "—"))}/100 -> target ${esc(String(dim.target ?? "—"))}</p>
+                <p class="db-dim-summary">${esc(dim.summary ?? "")}</p>
+              </article>`).join("")}
+          </div>
+        </li>` : ""}
+      ${readyChecklist.length ? `
+        <li class="db-rec-block">
+          <p class="db-rec-block-title">Ready-to-ship checklist</p>
+          <ul class="db-ready-list">
+            ${readyChecklist.map((item) => `
+              <li class="${item.passed ? "db-ready-pass" : "db-ready-fail"}">
+                <span class="db-ready-icon" aria-hidden="true">${item.passed ? "✓" : "!"}</span>
+                <span class="db-ready-label">${esc(item.label ?? "Gate")}</span>
+                <span class="db-ready-score">${esc(String(item.current ?? "—"))}/${esc(String(item.target ?? "—"))}</span>
+              </li>`).join("")}
+          </ul>
+        </li>` : ""}
+    `;
+    return;
+  }
+
+  const recMap = new Map();
   for (const s of scans.slice(0, 10)) {
     for (const r of (s.recommendations ?? [])) {
       const key = String(r);
@@ -529,6 +776,34 @@ function bindEvents() {
 
   // Copy buttons in the Run Scans tab (panel persists; content is re-rendered per project)
   $("db-tab-runscans").addEventListener("click", (e) => {
+    const renameBtn = e.target.closest("#rs-rename-btn");
+    if (renameBtn) {
+      const val = $("rs-rename-input")?.value ?? "";
+      renameCurrentProject(val);
+      return;
+    }
+
+    const mergeBtn = e.target.closest("#rs-merge-btn");
+    if (mergeBtn) {
+      if (mergeBtn.dataset.confirming !== "true") {
+        mergeBtn.dataset.confirming = "true";
+        mergeBtn.textContent = "Confirm merge";
+        setTimeout(() => {
+          if (mergeBtn.dataset.confirming === "true") {
+            delete mergeBtn.dataset.confirming;
+            mergeBtn.textContent = "Merge into destination";
+          }
+        }, 4000);
+        return;
+      }
+
+      delete mergeBtn.dataset.confirming;
+      mergeBtn.textContent = "Merge into destination";
+      const to = $("rs-merge-to")?.value ?? "";
+      mergeCurrentProject(to);
+      return;
+    }
+
     const btn = e.target.closest(".db-rs-copy");
     if (!btn) return;
     const pre = document.getElementById(btn.dataset.copyId);

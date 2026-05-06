@@ -1,0 +1,9 @@
+{
+  "servers": {
+    "gravio-obsidian": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["${workspaceFolder}/scripts/obsidian-mcp-server.mjs"]
+    }
+  }
+}

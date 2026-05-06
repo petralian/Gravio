@@ -194,6 +194,12 @@ export const stmts = {
      GROUP BY project_id
      ORDER BY last_scan_at DESC`,
   ),
+  countRunsForProjectUser: db.prepare(
+    `SELECT COUNT(*) AS c FROM runs WHERE project_id=? AND user_id=?`,
+  ),
+  renameProjectRunsForUser: db.prepare(
+    `UPDATE runs SET project_id=? WHERE project_id=? AND user_id=?`,
+  ),
   deleteScanByIdForUserProject: db.prepare(
     `DELETE FROM runs WHERE id=? AND user_id=? AND project_id=?`,
   ),
