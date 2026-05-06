@@ -333,45 +333,58 @@
       var priceEl = document.getElementById('team-price');
       var teamButtonEl = document.getElementById('team-checkout-link');
 
-      slider.addEventListener('input', function () {
-        var seats = parseInt(this.value, 10);
+      function updateTeamPricing() {
+        var seats = parseInt(slider.value, 10);
+        if (!Number.isFinite(seats)) seats = 2;
         var addons = Math.max(0, seats - 2);
         countEl.textContent = seats;
         priceEl.textContent = '$' + (59 + addons * 19);
         if (teamButtonEl) {
           teamButtonEl.textContent = 'Buy Gravio Team (' + seats + ' seats)';
+          teamButtonEl.setAttribute('data-seats', String(seats));
         }
-      });
+      }
+
+      slider.addEventListener('input', updateTeamPricing);
+      slider.addEventListener('change', updateTeamPricing);
 
       if (teamButtonEl) {
-        teamButtonEl.addEventListener('click', async function (event) {
+        teamButtonEl.addEventListener('click', function (event) {
           event.preventDefault();
           var fallbackUrl = teamButtonEl.getAttribute('href');
-          var originalLabel = teamButtonEl.textContent;
           teamButtonEl.textContent = 'Preparing checkout...';
           teamButtonEl.setAttribute('aria-disabled', 'true');
-          try {
-            var seats = parseInt(slider.value, 10);
-            var response = await fetch('/api/billing/team-checkout', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ seats: seats })
-            });
-            var data = await response.json();
-            if (!response.ok || !data.checkoutUrl) {
-              throw new Error(data.error || 'Unable to prepare checkout');
-            }
-            window.location.href = data.checkoutUrl;
-          } catch (err) {
+          var seats = parseInt(slider.value, 10);
+
+          // If fetch is unavailable, use static fallback checkout.
+          if (typeof fetch !== 'function') {
             window.location.href = fallbackUrl;
+            return;
           }
+
+          fetch('/api/billing/team-checkout', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ seats: seats })
+          })
+            .then(function (response) {
+              return response.json().then(function (data) {
+                return { ok: response.ok, data: data };
+              });
+            })
+            .then(function (result) {
+              if (!result.ok || !result.data || !result.data.checkoutUrl) {
+                throw new Error((result.data && result.data.error) || 'Unable to prepare checkout');
+              }
+              window.location.href = result.data.checkoutUrl;
+            })
+            .catch(function () {
+              window.location.href = fallbackUrl;
+            });
         });
       });
 
-      var initialSeats = parseInt(slider.value, 10);
-      if (teamButtonEl) {
-        teamButtonEl.textContent = 'Buy Gravio Team (' + initialSeats + ' seats)';
-      }
+      updateTeamPricing();
     })();
   </script>
 </body>
