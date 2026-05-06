@@ -8,6 +8,7 @@
 import { describe, it, before, after } from "node:test";
 import assert from "node:assert/strict";
 import http from "node:http";
+import crypto from "node:crypto";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -688,5 +689,114 @@ describe("Admin — user plan management", () => {
       );
       assert.strictEqual(r.status, 200, `Project ${pid} should succeed for pro user`);
     }
+  });
+});
+
+describe("POST /api/webhooks/lemonsqueezy", () => {
+  const WEBHOOK_SECRET = "test-webhook-secret-abc123";
+
+  function makeBody(eventName, email, plan) {
+    return JSON.stringify({
+      meta: { event_name: eventName, custom_data: { plan } },
+      data: { attributes: { user_email: email } },
+    });
+  }
+
+  function sign(body, secret) {
+    return crypto.createHmac("sha256", secret).update(body).digest("hex");
+  }
+
+  function webhookPost(body, sig, extraHeaders = {}) {
+    return new Promise((resolve, reject) => {
+      const req = http.request(
+        {
+          hostname: "localhost", port: TEST_PORT, path: "/api/webhooks/lemonsqueezy",
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Content-Length": Buffer.byteLength(body),
+            ...(sig ? { "X-Signature": sig } : {}),
+            ...extraHeaders,
+          },
+        },
+        (res) => { let d = ""; res.on("data", (c) => (d += c)); res.on("end", () => resolve({ status: res.statusCode, body: d })); }
+      );
+      req.setTimeout(10_000, () => req.destroy(new Error("timeout")));
+      req.on("error", reject);
+      req.write(body);
+      req.end();
+    });
+  }
+
+  before(() => {
+    process.env.LEMON_WEBHOOK_SECRET = WEBHOOK_SECRET;
+  });
+
+  after(() => {
+    delete process.env.LEMON_WEBHOOK_SECRET;
+  });
+
+  it("rejects request with wrong signature — 401", async () => {
+    const body = makeBody("order_created", "nobody@gravio.test", "pro");
+    const res = await webhookPost(body, "deadbeef");
+    assert.strictEqual(res.status, 401);
+  });
+
+  it("rejects request with missing signature — 401", async () => {
+    const body = makeBody("order_created", "nobody@gravio.test", "pro");
+    const res = await webhookPost(body, "");
+    assert.strictEqual(res.status, 401);
+  });
+
+  it("returns 200 for valid signature with unknown event name", async () => {
+    const body = makeBody("subscription_cancelled", "nobody@gravio.test", "pro");
+    const sig = sign(body, WEBHOOK_SECRET);
+    const res = await webhookPost(body, sig);
+    assert.strictEqual(res.status, 200);
+    assert.deepStrictEqual(JSON.parse(res.body), { ok: true });
+  });
+
+  it("upgrades plan for order_created with valid signature and known user", async () => {
+    // Register a user to upgrade
+    const email = `webhook-user-${Date.now()}@gravio.test`;
+    const cookie = await registerAndGetCookie(email, "pass1234");
+    const meBefore = JSON.parse((await httpGet(`http://localhost:${TEST_PORT}/api/me`, { Cookie: cookie })).body);
+    assert.strictEqual(meBefore.plan, "free", "user starts on free");
+
+    const body = makeBody("order_created", email, "pro");
+    const sig = sign(body, WEBHOOK_SECRET);
+    const res = await webhookPost(body, sig);
+    assert.strictEqual(res.status, 200);
+
+    const meAfter = JSON.parse((await httpGet(`http://localhost:${TEST_PORT}/api/me`, { Cookie: cookie })).body);
+    assert.strictEqual(meAfter.plan, "pro", "user plan upgraded to pro");
+  });
+
+  it("upgrades plan for subscription_payment_success", async () => {
+    const email = `webhook-sub-${Date.now()}@gravio.test`;
+    const cookie = await registerAndGetCookie(email, "pass1234");
+
+    const body = makeBody("subscription_payment_success", email, "team");
+    const sig = sign(body, WEBHOOK_SECRET);
+    const res = await webhookPost(body, sig);
+    assert.strictEqual(res.status, 200);
+
+    const meAfter = JSON.parse((await httpGet(`http://localhost:${TEST_PORT}/api/me`, { Cookie: cookie })).body);
+    assert.strictEqual(meAfter.plan, "team", "user plan upgraded to team");
+  });
+
+  it("returns 200 silently when email not in DB", async () => {
+    const body = makeBody("order_created", "ghost@gravio.test", "pro");
+    const sig = sign(body, WEBHOOK_SECRET);
+    const res = await webhookPost(body, sig);
+    assert.strictEqual(res.status, 200);
+    assert.deepStrictEqual(JSON.parse(res.body), { ok: true });
+  });
+
+  it("returns 200 silently for unrecognised plan value", async () => {
+    const body = makeBody("order_created", "ghost2@gravio.test", "enterprise");
+    const sig = sign(body, WEBHOOK_SECRET);
+    const res = await webhookPost(body, sig);
+    assert.strictEqual(res.status, 200);
   });
 });
