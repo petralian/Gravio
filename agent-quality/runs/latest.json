@@ -1,17 +1,17 @@
 {
-  "runId": "scan-mosbg4gl",
-  "createdAt": "2026-05-05T07:37:47.157Z",
+  "runId": "scan-motk6phd",
+  "createdAt": "2026-05-06T04:30:10.562Z",
   "summary": {
-    "overallScore": 100,
+    "overallScore": 57.25,
     "workflowPassRate": 1,
-    "safetyScore": 100
+    "safetyScore": 80
   },
   "scorecard": {
-    "safety": 100,
-    "reliability": 100,
-    "evaluation": 100,
-    "observability": 100,
-    "governance": 100
+    "safety": 80,
+    "reliability": 35,
+    "evaluation": 75,
+    "observability": 20,
+    "governance": 50
   },
   "workflowResults": [
     {
@@ -21,7 +21,7 @@
         "notesRead": true,
         "handoffRead": true,
         "repoMemoryRead": true,
-        "kickoffSummary": "scanner-daemon auto-evidence"
+        "kickoffSummary": "gravio-scanner auto-evidence"
       }
     },
     {
@@ -183,21 +183,21 @@
   ],
   "traces": [
     {
-      "trace_id": "ff6f9c73fa7145aaba2054a0040d7f78",
-      "span_id": "0d5a3b8e84b742e8",
+      "trace_id": "db264d4e33724279a9f1736b140754ed",
+      "span_id": "0d650e2c0a0f49b9",
       "name": "agent.quality.scanner.daemon",
       "kind": "internal",
-      "start_time_unix_nano": 1777966667157000000,
-      "end_time_unix_nano": 1777966667157000000,
+      "start_time_unix_nano": 1778041810562000000,
+      "end_time_unix_nano": 1778041810562000000,
       "status": "ok",
       "attributes": {
         "gen_ai.operation.name": "agent.run",
-        "gen_ai.request.model": "scanner-daemon-v1",
+        "gen_ai.request.model": "gravio-scanner-v1",
         "gen_ai.usage.input_tokens": 0,
         "gen_ai.usage.output_tokens": 0,
-        "vouch.agent.run_id": "scan-mosbg4gl",
+        "vouch.agent.run_id": "scan-motk6phd",
         "vouch.agent.workflow_id": "trace-capture",
-        "vouch.agent.session_id": "scan-mosbg4gl",
+        "vouch.agent.session_id": "scan-motk6phd",
         "vouch.agent.files_changed": 1,
         "vouch.agent.deploy_needed": false
       }
@@ -205,9 +205,9 @@
   ],
   "scanner": {
     "targetDir": "D:\\VS Code Projects\\Agent Scorecard",
-    "scannedAt": "2026-05-05T07:37:47.156Z",
-    "totalFiles": 35,
-    "trackedFileCount": 31,
+    "scannedAt": "2026-05-06T04:30:10.561Z",
+    "totalFiles": 50,
+    "trackedFileCount": 48,
     "envFilesDetected": 0,
     "committedEnvFiles": []
   }

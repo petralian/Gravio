@@ -16,12 +16,21 @@
 import path from "node:path";
 import http from "node:http";
 import https from "node:https";
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { runScannerOnce, startScannerWatcher } from "../src/core/scanner.mjs";
 import { generateKey, generateSalt, deriveKey, encrypt } from "../src/core/crypto-e2ee.mjs";
+import { printScanReport, printWatchUpdate, printPublishResult } from "../src/core/reporter.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
+
+function readVersion() {
+  try {
+    const pkg = JSON.parse(readFileSync(path.join(ROOT, "package.json"), "utf8"));
+    return pkg.version ?? "?";
+  } catch { return "?"; }
+}
 
 function parseArgs(argv) {
   const args = {
@@ -163,9 +172,9 @@ function resolveKey(args) {
   }
   // No key provided — generate and print once
   const keyHex = generateKey();
-  console.log(`\n  ⚠  Auto-generated encryption key — save this to decrypt your results:\n`);
-  console.log(`  --key ${keyHex}\n`);
-  console.log(`  Store it securely. If you lose it, your results cannot be decrypted.\n`);
+  console.log(`\n  \x1b[33m⚠  Auto-generated encryption key — save this before you close the terminal:\x1b[0m\n`);
+  console.log(`  \x1b[2m--key ${keyHex}\x1b[0m\n`);
+  console.log(`  \x1b[2mIf you lose it, your results cannot be decrypted.\x1b[0m\n`);
   return { keyHex, salt: null };
 }
 
@@ -193,17 +202,13 @@ if (args.once) {
     repoRoot: ROOT,
   });
 
-  console.log(`gravio-scan: complete`);
-  console.log(`target: ${scan.targetDir}`);
-  console.log(`output: ${args.output}`);
-  console.log(`runId: ${run.runId}`);
+  printScanReport({ run, scan, version: readVersion() });
 
   if (args.publish) {
     const { keyHex } = resolveKey(args);
     const plaintext = JSON.stringify(run);
     const ciphertext = encrypt(keyHex, plaintext);
 
-    console.log(`\nPublishing to ${args.server}/api/publish ...`);
     const publishUrl = new URL("/api/publish", args.server).toString();
 
     try {
@@ -213,21 +218,22 @@ if (args.once) {
         { Authorization: `Bearer ${args.apiKey}` },
       );
       if (result.status === 200 && result.data?.ok) {
-        console.log(`\n  ✓ Published successfully`);
-        console.log(`  Project: ${args.project}`);
-        console.log(`  Retrieve: ${args.server}/api/runs/${encodeURIComponent(args.project)}`);
-        console.log(`  Dashboard: ${args.server}/dashboard?project=${encodeURIComponent(args.project)}\n`);
+        printPublishResult({ server: args.server, project: args.project, success: true });
       } else if (result.status === 401 || result.status === 403) {
-        console.error(`  ✗ Publish blocked (HTTP ${result.status}): ${result.data?.error ?? "Authentication required"}`);
-        console.error("\n  Sign in and create a valid API key:");
-        console.error("  https://gravio-platform.fly.dev/login\n");
+        printPublishResult({
+          server: args.server, project: args.project, success: false,
+          error: `HTTP ${result.status}: ${result.data?.error ?? "Authentication required"}`,
+        });
         process.exit(1);
       } else {
-        console.error(`  ✗ Publish failed (HTTP ${result.status}): ${result.data?.error ?? JSON.stringify(result.data)}`);
+        printPublishResult({
+          server: args.server, project: args.project, success: false,
+          error: `HTTP ${result.status}: ${result.data?.error ?? JSON.stringify(result.data)}`,
+        });
         process.exit(1);
       }
     } catch (err) {
-      console.error(`  ✗ Publish error: ${err.message}`);
+      printPublishResult({ server: args.server, project: args.project, success: false, error: err.message });
       process.exit(1);
     }
   }
@@ -241,12 +247,10 @@ const watcher = startScannerWatcher({
   repoRoot: ROOT,
   debounceMs: args.debounceMs,
   logger: console,
+  onScan: printWatchUpdate,
 });
 
-console.log("gravio-scan: watching for changes (Ctrl+C to stop)");
-console.log(`target: ${args.target}`);
-console.log(`output: ${args.output}`);
-console.log(`debounceMs: ${args.debounceMs}`);
+console.log(`\n  \x1b[2mGravio scanner watching ${args.target}  (Ctrl+C to stop)\x1b[0m\n`);
 
 process.on("SIGINT", () => {
   watcher.close();

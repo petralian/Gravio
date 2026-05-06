@@ -109,26 +109,129 @@ export function scanTargetProject(targetDir) {
   const allFiles = listFilesRecursive(resolvedTarget).sort();
   const trackedFiles = gitTrackedFiles(resolvedTarget);
 
+  // ─── SAFETY ──────────────────────────────────────────────────────────────
   const envFiles = allFiles.filter((rel) => isEnvFileName(path.basename(rel)));
   const committedEnvFiles = trackedFiles.filter((rel) => isEnvFileName(path.basename(rel)));
 
+  const gitignorePath = path.join(resolvedTarget, ".gitignore");
+  const gitignoreExists = existsSync(gitignorePath);
+  let gitignoreCoversEnv = false;
+  if (gitignoreExists) {
+    try {
+      const gi = readFileSync(gitignorePath, "utf8");
+      gitignoreCoversEnv = /^\s*\.env/m.test(gi) || /^\s*\*\.env/m.test(gi);
+    } catch { /* ignore */ }
+  }
+
+  const securityPolicyExists = allFiles.some((f) => /^SECURITY\.md$/i.test(f));
+
+  // ─── RELIABILITY ─────────────────────────────────────────────────────────
+  const testSignal = detectTestSignal(resolvedTarget, allFiles);
+
+  const cicdExists = allFiles.some(
+    (f) =>
+      (f.startsWith(".github/workflows/") && (f.endsWith(".yml") || f.endsWith(".yaml"))) ||
+      f === ".circleci/config.yml" ||
+      f === ".travis.yml" ||
+      f === "Jenkinsfile" ||
+      f === ".gitlab-ci.yml"
+  );
+
+  const packageJsonPath = path.join(resolvedTarget, "package.json");
+  const packageJson = safeReadJson(packageJsonPath, null);
+  const allDeps = Object.keys({
+    ...(packageJson?.dependencies ?? {}),
+    ...(packageJson?.devDependencies ?? {}),
+  });
+
+  const RETRY_PACKAGES = ["p-retry", "axios-retry", "cockatiel", "async-retry", "retry", "got"];
+  const hasRetryDependency = RETRY_PACKAGES.some((p) => allDeps.includes(p));
+
+  const hasTypeSafety =
+    existsSync(path.join(resolvedTarget, "tsconfig.json")) ||
+    existsSync(path.join(resolvedTarget, "jsconfig.json")) ||
+    Boolean(packageJson?.scripts?.typecheck) ||
+    Boolean(packageJson?.scripts?.["type-check"]) ||
+    allDeps.includes("typescript");
+
+  // ─── EVALUATION ──────────────────────────────────────────────────────────
+  const EVAL_DIRS = ["evals", "eval", "agent-quality/evals"];
+  const evalCorpusFiles = allFiles.filter(
+    (f) => EVAL_DIRS.some((d) => f.startsWith(d + "/")) && f.endsWith(".json")
+  );
+  const evalCorpusExists = evalCorpusFiles.length > 0;
+  const evalCorpusFileCount = evalCorpusFiles.length;
+
+  const hasBaseline = allFiles.some(
+    (f) => f.includes("baseline.json") || f.includes("/baseline/")
+  );
+
+  const hasEvalScript = Object.keys(packageJson?.scripts ?? {}).some(
+    (s) => s === "eval" || s === "evals" || s === "bench" || s === "benchmark" || s.includes("eval")
+  );
+
+  const hasGoldenDatasets = allFiles.some(
+    (f) =>
+      f.includes(".golden.") ||
+      f.includes("/fixtures/") ||
+      f.includes("/test-data/") ||
+      f.includes("/golden/")
+  );
+
+  // ─── OBSERVABILITY ────────────────────────────────────────────────────────
+  const OTEL_PREFIXES = ["@opentelemetry/", "langsmith", "langfuse", "@honeycombio/", "dd-trace"];
+  const hasOtelDependency = allDeps.some((d) =>
+    OTEL_PREFIXES.some((prefix) => d.startsWith(prefix))
+  );
+
+  const LOG_PACKAGES = ["winston", "pino", "bunyan", "morgan", "loglevel", "log4js", "tslog", "@aws-lambda-powertools/logger"];
+  const hasStructuredLogging = LOG_PACKAGES.some((p) => allDeps.includes(p));
+
+  const hasRunArtifacts = allFiles.some(
+    (f) => f.includes("/runs/") && f.endsWith(".json")
+  );
+
+  // ─── GOVERNANCE ──────────────────────────────────────────────────────────
+  const readmeExists = allFiles.some((f) => /^readme\.md$/i.test(f));
+  const licenseExists = allFiles.some((f) => /^license(\.md|\.txt)?$/i.test(f));
+  const hasVersion = Boolean(packageJson?.version && packageJson.version !== "");
   const hasChangelog = allFiles.includes("CHANGELOG.md");
   const hasNotes = allFiles.includes(".claude/NOTES.md") || allFiles.includes("NOTES.md");
   const hasNextSession = allFiles.includes(".claude/NEXT_SESSION.md") || allFiles.includes("NEXT_SESSION.md");
-
-  const testSignal = detectTestSignal(resolvedTarget, allFiles);
 
   return {
     targetDir: resolvedTarget,
     scannedAt: new Date().toISOString(),
     totalFiles: allFiles.length,
     trackedFileCount: trackedFiles.length,
+    // safety
     envFiles,
     committedEnvFiles,
+    gitignoreExists,
+    gitignoreCoversEnv,
+    securityPolicyExists,
+    // reliability
+    testSignal,
+    cicdExists,
+    hasRetryDependency,
+    hasTypeSafety,
+    // evaluation
+    evalCorpusExists,
+    evalCorpusFileCount,
+    hasBaseline,
+    hasEvalScript,
+    hasGoldenDatasets,
+    // observability
+    hasOtelDependency,
+    hasStructuredLogging,
+    hasRunArtifacts,
+    // governance
+    readmeExists,
+    licenseExists,
+    hasVersion,
     hasChangelog,
     hasNotes,
     hasNextSession,
-    testSignal,
   };
 }
 
@@ -212,30 +315,37 @@ function buildAdversarialResults(previousRun) {
   }));
 }
 
-function scoreDimensions(corpus, workflowResults) {
-  const categoryMap = new Map();
-  for (const workflow of corpus.workflows) {
-    if (!categoryMap.has(workflow.category)) {
-      categoryMap.set(workflow.category, { total: 0, passed: 0 });
-    }
-    const bucket = categoryMap.get(workflow.category);
-    bucket.total += 1;
+function computeRichScorecard(scan) {
+  let safety = 0;
+  if (scan.committedEnvFiles.length === 0) safety += 50;
+  if (scan.gitignoreCoversEnv)             safety += 30;
+  if (scan.securityPolicyExists)           safety += 20;
 
-    const result = workflowResults.find((w) => w.id === workflow.id);
-    if (result?.status === "pass") bucket.passed += 1;
-  }
+  let reliability = 0;
+  if (scan.testSignal.testSignal)  reliability += 35;
+  if (scan.cicdExists)             reliability += 35;
+  if (scan.hasTypeSafety)          reliability += 20;
+  if (scan.hasRetryDependency)     reliability += 10;
 
-  const scorecard = {};
-  for (const dim of DIMENSIONS) {
-    const bucket = categoryMap.get(dim);
-    if (!bucket || bucket.total === 0) {
-      scorecard[dim] = 100;
-      continue;
-    }
-    scorecard[dim] = Number(((bucket.passed / bucket.total) * 100).toFixed(2));
-  }
+  let evaluation = 0;
+  if (scan.evalCorpusExists)   evaluation += 50;
+  if (scan.hasBaseline)        evaluation += 25;
+  if (scan.hasEvalScript)      evaluation += 15;
+  if (scan.hasGoldenDatasets)  evaluation += 10;
 
-  return scorecard;
+  let observability = 0;
+  if (scan.hasOtelDependency)     observability += 50;
+  if (scan.hasStructuredLogging)  observability += 30;
+  if (scan.hasRunArtifacts)       observability += 20;
+
+  let governance = 0;
+  if (scan.readmeExists)   governance += 30;
+  if (scan.hasChangelog)   governance += 30;
+  if (scan.licenseExists)  governance += 20;
+  if (scan.hasVersion)     governance += 10;
+  if (scan.hasNotes)       governance += 10;
+
+  return { safety, reliability, evaluation, observability, governance };
 }
 
 function summarize(scorecard, workflowResults, weights) {
@@ -256,7 +366,7 @@ function summarize(scorecard, workflowResults, weights) {
 export function buildRunArtifact({ scan, corpus, weights, previousRun }) {
   const runId = `scan-${Date.now().toString(36)}`;
   const workflowResults = buildWorkflowResults(corpus, scan, previousRun);
-  const scorecard = scoreDimensions(corpus, workflowResults);
+  const scorecard = computeRichScorecard(scan);
   const summary = summarize(scorecard, workflowResults, weights);
 
   const startedNano = Date.now() * 1_000_000;
@@ -323,7 +433,7 @@ export function runScannerOnce({ targetDir, outputFile, repoRoot }) {
   return { run, scan };
 }
 
-export function startScannerWatcher({ targetDir, outputFile, repoRoot, debounceMs = 500, logger = console }) {
+export function startScannerWatcher({ targetDir, outputFile, repoRoot, debounceMs = 500, logger = console, onScan = null }) {
   const resolvedTarget = path.resolve(targetDir);
   const resolvedOutput = path.resolve(outputFile);
   const outputInsideTarget = resolvedOutput.startsWith(`${resolvedTarget}${path.sep}`);
@@ -333,7 +443,11 @@ export function startScannerWatcher({ targetDir, outputFile, repoRoot, debounceM
 
   const executeScan = () => {
     const { run, scan } = runScannerOnce({ targetDir: resolvedTarget, outputFile: resolvedOutput, repoRoot });
-    logger.log(`gravio-scanner: wrote ${resolvedOutput} (${run.runId}, files=${scan.totalFiles})`);  
+    if (onScan) {
+      onScan({ run, scan });
+    } else {
+      logger.log(`gravio-scanner: wrote ${resolvedOutput} (${run.runId}, files=${scan.totalFiles})`);
+    }
   };
 
   executeScan();
