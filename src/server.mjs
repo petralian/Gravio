@@ -656,6 +656,51 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // ── Upgrade redirects — configurable via LEMON_PRO_URL / LEMON_TEAM_URL env vars ─
+  if (req.method === "GET" && (urlPath === "/upgrade/pro" || urlPath === "/upgrade/team")) {
+    const key = urlPath === "/upgrade/pro" ? "LEMON_PRO_URL" : "LEMON_TEAM_URL";
+    const dest = process.env[key] || "mailto:hello@gravio.dev";
+    res.writeHead(302, { Location: dest });
+    res.end();
+    return;
+  }
+
+  // ── POST /api/webhooks/lemonsqueezy — signature-verified event receiver ──
+  if (req.method === "POST" && urlPath === "/api/webhooks/lemonsqueezy") {
+    const secret = process.env.LEMON_WEBHOOK_SECRET;
+    if (!secret) {
+      res.writeHead(501, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "webhook not configured" }));
+      return;
+    }
+    let body = "";
+    req.on("data", (chunk) => { body += chunk; });
+    req.on("end", async () => {
+      // Verify HMAC-SHA256 signature
+      const sig = req.headers["x-signature"];
+      const { createHmac } = await import("node:crypto");
+      const expected = createHmac("sha256", secret).update(body).digest("hex");
+      if (sig !== expected) {
+        res.writeHead(401, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "invalid signature" }));
+        return;
+      }
+      let event;
+      try { event = JSON.parse(body); } catch {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "invalid json" }));
+        return;
+      }
+      const eventName = event?.meta?.event_name ?? "unknown";
+      // TODO: handle order_created / subscription_created / subscription_cancelled
+      // to update user plan in db (stmts.setUserPlan)
+      console.log("[lemonsqueezy webhook]", eventName, event?.data?.id ?? "");
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ received: true }));
+    });
+    return;
+  }
+
   // ── Health check ─────────────────────────────────────────────────────────
   if (req.method === "GET" && req.url === "/health") {
     res.writeHead(200, { "Content-Type": "application/json" });
@@ -665,6 +710,7 @@ const server = http.createServer(async (req, res) => {
 
   // ── Page routes (strip query string before matching) ────────────────────
   const urlPath = req.url.split("?")[0].replace(/\/+$/, "") || "/";
+
 
   if (req.method === "GET" && urlPath === "/login") {
     serveStatic(res, path.join(WEB_DIR, "login.html"));
