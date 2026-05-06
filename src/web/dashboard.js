@@ -58,6 +58,9 @@ const DIM_LABELS = {
       return;
     }
     currentUser = await res.json();
+    if (currentUser.role === "admin") {
+      document.getElementById("db-admin-back").removeAttribute("hidden");
+    }
     loadProjects();
     loadApiKeys();
   } catch {

@@ -37,6 +37,11 @@ function isPaidOrAdmin(user) {
   return user?.role === "admin" || user?.plan === "pro" || user?.plan === "team";
 }
 
+// Plan-only check — used where admin should test under their own plan restrictions
+function isPaid(user) {
+  return user?.plan === "pro" || user?.plan === "team";
+}
+
 function scoreBand(score) {
   if (!Number.isFinite(score)) return "Unknown";
   if (score >= 90) return "Excellent";
@@ -60,6 +65,81 @@ function toFreeTierGenericRun(runData) {
     },
     limitedDetails: true,
     upgradeMessage: "Upgrade to Pro or Team to view remediation details and fix guidance.",
+  };
+}
+
+function safeJsonParse(raw) {
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+function extractScoreSummary(runData) {
+  const publicSummary = runData?.publicSummary;
+  const summary = runData?.summary;
+  const overall = Number(publicSummary?.overallScore ?? summary?.overallScore ?? NaN);
+  const runId = publicSummary?.runId ?? runData?.runId ?? "run";
+  const createdAt = publicSummary?.createdAt ?? runData?.createdAt ?? null;
+  return {
+    runId,
+    createdAt,
+    overallScore: Number.isFinite(overall) ? Number(overall.toFixed(2)) : null,
+    rating: scoreBand(overall),
+  };
+}
+
+function recommendationsFromRun(runData, limitedDetails) {
+  if (limitedDetails) {
+    return [
+      "Keep scan cadence consistent and monitor score trend week over week.",
+      "Upgrade to Pro or Team to unlock dimension-level remediation guidance.",
+    ];
+  }
+
+  const scorecard = runData?.scorecard ?? {};
+  const dims = ["safety", "reliability", "evaluation", "observability", "governance", "agentic"];
+  const ranked = dims
+    .map((k) => ({ key: k, value: Number(scorecard[k] ?? NaN) }))
+    .filter((x) => Number.isFinite(x.value))
+    .sort((a, b) => a.value - b.value)
+    .slice(0, 2);
+
+  if (ranked.length === 0) {
+    return ["Publish full scorecard payloads to unlock targeted recommendations."];
+  }
+
+  return ranked.map((d) => `Prioritize ${d.key} improvements next (current score ${Math.round(d.value)}).`);
+}
+
+function summarizeScans(scans) {
+  const scored = scans.filter((s) => Number.isFinite(s.overallScore));
+  if (scored.length === 0) {
+    return {
+      totalScans: scans.length,
+      lastScanAt: scans[0]?.publishedAt ?? null,
+      averageScore: null,
+      bestScore: null,
+      trendDelta: null,
+      trendDirection: "stable",
+    };
+  }
+
+  const avg = scored.reduce((acc, s) => acc + s.overallScore, 0) / scored.length;
+  const best = Math.max(...scored.map((s) => s.overallScore));
+  const latest = scored[0]?.overallScore ?? null;
+  const previous = scored[1]?.overallScore ?? latest;
+  const delta = (latest !== null && previous !== null) ? Number((latest - previous).toFixed(2)) : null;
+  const trendDirection = delta === null ? "stable" : (delta > 0 ? "up" : (delta < 0 ? "down" : "stable"));
+
+  return {
+    totalScans: scans.length,
+    lastScanAt: scans[0]?.publishedAt ?? null,
+    averageScore: Number(avg.toFixed(2)),
+    bestScore: Number(best.toFixed(2)),
+    trendDelta: delta,
+    trendDirection,
   };
 }
 
@@ -261,7 +341,19 @@ const server = http.createServer(async (req, res) => {
       res.end(JSON.stringify({ error: "Not authenticated" }));
       return;
     }
-    const runs = stmts.listRunsForUser.all(user.uid ?? user.id);
+    const uid = user.uid ?? user.id;
+    const runs = stmts.listRunsForUser.all(uid).map((row) => {
+      const latestEntry = stmts.getLatestRun.get(row.project_id, uid);
+      const parsed = latestEntry ? safeJsonParse(latestEntry.ciphertext) : null;
+      const summary = extractScoreSummary(parsed);
+      return {
+        project_id: row.project_id,
+        last_scan_at: row.last_scan_at,
+        scan_count: row.scan_count,
+        latest_score: summary.overallScore,
+        latest_rating: summary.rating,
+      };
+    });
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ runs }));
     return;
@@ -289,8 +381,8 @@ const server = http.createServer(async (req, res) => {
       }
 
       const uid = user.uid ?? user.id;
-      stmts.upsertRun.run(projectId, uid, JSON.stringify(run));
-      if (!isPaidOrAdmin(user)) {
+      stmts.insertRun.run(projectId, uid, JSON.stringify(run));
+      if (!isPaid(user)) {
         // Free tier is cloud-only and keeps only the latest 3 cloud records.
         stmts.trimRunsForFreeUser.run(uid, uid);
       }
@@ -303,8 +395,107 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // ── API: GET /api/runs/:projectId/history ───────────────────────────────
+  const runHistoryMatch = req.method === "GET" && /^\/api\/runs\/([^/?]+)\/history$/.exec(req.url);
+  if (runHistoryMatch) {
+    const user = getAuthUser(req);
+    if (!user) {
+      res.writeHead(401, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Not authenticated" }));
+      return;
+    }
+
+    const projectId = decodeURIComponent(runHistoryMatch[1]);
+    if (!isValidProjectId(projectId)) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Invalid projectId" }));
+      return;
+    }
+
+    const uid = user.uid ?? user.id;
+    const limited = !isPaidOrAdmin(user);
+    const rows = stmts.listProjectScansForUser.all(projectId, uid);
+    if (!rows.length) {
+      res.writeHead(404, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Project not found" }));
+      return;
+    }
+
+    const scans = rows.map((row) => {
+      const parsed = safeJsonParse(row.ciphertext);
+      const summary = extractScoreSummary(parsed);
+      return {
+        id: row.id,
+        projectId: row.project_id,
+        publishedAt: row.published_at,
+        runId: summary.runId,
+        overallScore: summary.overallScore,
+        rating: summary.rating,
+        limitedDetails: limited,
+        summary: {
+          overallScore: summary.overallScore,
+          rating: summary.rating,
+        },
+        recommendations: recommendationsFromRun(limited ? null : parsed, limited),
+      };
+    });
+
+    const aggregate = summarizeScans(scans);
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({
+      projectId,
+      limitedDetails: limited,
+      scans,
+      stats: aggregate,
+    }));
+    return;
+  }
+
+  // ── API: POST /api/runs/delete ──────────────────────────────────────────
+  if (req.method === "POST" && req.url === "/api/runs/delete") {
+    const user = getAuthUser(req);
+    if (!user) {
+      res.writeHead(401, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Not authenticated" }));
+      return;
+    }
+
+    let body;
+    try {
+      body = JSON.parse(await readBody(req));
+    } catch {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Invalid JSON" }));
+      return;
+    }
+
+    const { projectId, scanIds } = body ?? {};
+    if (!isValidProjectId(projectId)) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Invalid projectId" }));
+      return;
+    }
+    if (!Array.isArray(scanIds) || scanIds.length === 0) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "scanIds must be a non-empty array" }));
+      return;
+    }
+
+    const uid = user.uid ?? user.id;
+    let deleted = 0;
+    for (const rawId of scanIds) {
+      const id = Number(rawId);
+      if (!Number.isInteger(id) || id <= 0) continue;
+      deleted += stmts.deleteScanByIdForUserProject.run(id, uid, projectId).changes;
+    }
+
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ ok: true, deleted }));
+    return;
+  }
+
   // ── API: GET /api/runs/:projectId ────────────────────────────────────────
-  const runsMatch = req.method === "GET" && /^\/api\/runs\/([^/?]+)/.exec(req.url);
+  const runsMatch = req.method === "GET" && /^\/api\/runs\/([^/?]+)$/.exec(req.url);
   if (runsMatch) {
     const user = getAuthUser(req);
     if (!user) {
@@ -320,8 +511,8 @@ const server = http.createServer(async (req, res) => {
     }
     const uid = user.uid ?? user.id;
     const entry = user.role === "admin"
-      ? stmts.getRunAdmin.get(projectId)
-      : stmts.getRun.get(projectId, uid);
+      ? stmts.getLatestRunAdmin.get(projectId)
+      : stmts.getLatestRun.get(projectId, uid);
     if (!entry) {
       res.writeHead(404, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ error: "Project not found" }));
@@ -329,9 +520,9 @@ const server = http.createServer(async (req, res) => {
     }
     let runData;
     try { runData = JSON.parse(entry.ciphertext); } catch { runData = null; }
-    const outputRun = isPaidOrAdmin(user) ? runData : toFreeTierGenericRun(runData);
+    const outputRun = isPaid(user) ? runData : toFreeTierGenericRun(runData);
     res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ run: outputRun, publishedAt: entry.published_at, limitedDetails: !isPaidOrAdmin(user) }));
+    res.end(JSON.stringify({ run: outputRun, publishedAt: entry.published_at, limitedDetails: !isPaid(user) }));
     return;
   }
 

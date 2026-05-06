@@ -10,147 +10,108 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
 </head>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gravio — Dashboard</title>
+  <meta name="description" content="View your codebase quality scorecard on the Gravio dashboard." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
 <body class="dashboard">
 
   <div data-site-header></div>
 
   <main class="db-main m-container">
 
-    <!-- ─── PAGE HEADER ─── -->
     <div class="db-header">
-      <p class="m-eyebrow">ZERO-KNOWLEDGE DASHBOARD</p>
-      <h1 class="db-h1">Decrypt your codebase scorecard</h1>
+      <p class="m-eyebrow">USER DASHBOARD</p>
+      <h1 class="db-h1">Your scanning workspace</h1>
       <p class="db-lead">
-        Free tier shows generic cloud ratings. Pro and Team unlock detailed fix guidance with client-side decryption.
+        Track last scans, project trends, and recommendations. Create API keys for CLI publishing.
       </p>
-      <div class="db-zk-badge">
-        <span class="t-pass">⚿</span>
-        <span>Client-side decryption only — server never sees your plaintext</span>
-      </div>
     </div>
 
-    <!-- ─── DECRYPT FORM ─── -->
-    <section class="db-form-card" id="form-section">
-      <div class="db-form-row">
-        <div class="db-field">
-          <label for="db-project-id">Project ID</label>
-          <input type="text" id="db-project-id" placeholder="my-project" autocomplete="off" spellcheck="false" />
-          <p class="db-field-hint">The ID you used when running <code>node gravio.mjs --authorize --project &lt;id&gt; --api-key &lt;key&gt;</code></p>
-        </div>
+    <section class="db-overview" id="db-overview">
+      <div class="db-stat-card">
+        <p class="db-stat-label">Last scan done</p>
+        <p class="db-stat-value" id="db-last-scan">—</p>
       </div>
-
-      <!-- Key mode toggle -->
-      <div class="db-key-mode" role="radiogroup" aria-label="Key input mode">
-        <button class="db-mode-btn" id="mode-hex" type="button" aria-pressed="false">Raw hex key</button>
-        <button class="db-mode-btn" id="mode-passphrase" type="button" aria-pressed="false">Passphrase + salt</button>
-        <button class="db-mode-btn db-mode-active" id="mode-api" type="button" aria-pressed="true">API key</button>
+      <div class="db-stat-card">
+        <p class="db-stat-label">Projects</p>
+        <p class="db-stat-value" id="db-project-count">0</p>
       </div>
-
-      <!-- Panel: raw key -->
-      <div class="db-key-panel" id="panel-hex">
-        <div class="db-field">
-          <label for="db-key-hex">Encryption key (64-char hex)</label>
-          <input type="password" id="db-key-hex" placeholder="e.g. 3a7f9b... (64 characters)" autocomplete="off" spellcheck="false" />
-          <p class="db-field-hint">Printed by the Gravio scanner when the key was auto-generated. Keep it secret.</p>
-        </div>
+      <div class="db-stat-card">
+        <p class="db-stat-label">Total scans</p>
+        <p class="db-stat-value" id="db-scan-count">0</p>
       </div>
-
-      <!-- Panel: passphrase -->
-      <div class="db-key-panel db-panel-hidden" id="panel-passphrase">
-        <div class="db-form-row">
-          <div class="db-field">
-            <label for="db-passphrase">Passphrase</label>
-            <input type="password" id="db-passphrase" placeholder="Your passphrase" autocomplete="off" />
-          </div>
-          <div class="db-field">
-            <label for="db-salt">Salt (hex)</label>
-            <input type="text" id="db-salt" placeholder="32-char hex salt" autocomplete="off" spellcheck="false" />
-            <p class="db-field-hint">Printed by the Gravio scanner alongside the passphrase prompt.</p>
-          </div>
-        </div>
-      </div>
-
-      <!-- Panel: API key -->
-      <div class="db-key-panel" id="panel-api">
-        <div class="db-field">
-          <label for="db-api-key">API key (gv_...)</label>
-          <input type="password" id="db-api-key" placeholder="gv_your_api_key_here" autocomplete="off" spellcheck="false" />
-          <p class="db-field-hint">Use the same API key you used from the CLI when publishing encrypted runs.</p>
-        </div>
-      </div>
-
-      <p class="db-error" id="db-error" hidden></p>
-      <button class="m-btn m-btn-neon m-btn-lg db-submit" id="db-submit" type="button">
-        <span id="db-submit-label">Decrypt &amp; load scorecard →</span>
-      </button>
     </section>
 
-    <!-- ─── RESULTS ─── -->
-    <section class="db-results" id="db-results" hidden>
-
-      <!-- Score banner -->
-      <div class="db-score-banner">
-        <div>
-          <p class="db-score-label">Overall Score</p>
-          <div class="db-score-value" id="db-score-value">—</div>
-        </div>
-        <div class="db-banner-right">
-          <div class="badge" id="db-pass-badge">—</div>
-          <div class="db-meta" id="db-run-id"></div>
-          <div class="db-meta" id="db-published-at"></div>
-        </div>
-      </div>
-
-      <!-- Top metrics -->
-      <div class="db-metrics-row">
-        <div class="metric">
-          <span class="metric-label">Workflow pass rate</span>
-          <span class="metric-value" id="db-wpr">—</span>
-        </div>
-        <div class="metric">
-          <span class="metric-label">Safety score</span>
-          <span class="metric-value" id="db-safety">—</span>
-        </div>
-        <div class="metric">
-          <span class="metric-label">Critical failures</span>
-          <span class="metric-value" id="db-critical">—</span>
-        </div>
-      </div>
-
-      <!-- Gates -->
-      <h2 class="db-section-h2">Gate results</h2>
-      <ul class="gates-list" id="db-gates"></ul>
-
-      <!-- Dimensions -->
-      <h2 class="db-section-h2">Dimension scores</h2>
-      <div class="dimensions-grid" id="db-dimensions"></div>
-
-      <!-- Raw JSON accordion -->
-      <details class="db-raw-details">
-        <summary class="db-raw-summary">Raw run JSON</summary>
-        <textarea class="db-raw-json" id="db-raw-json" readonly spellcheck="false"></textarea>
-      </details>
-
-      <!-- Reload -->
-      <div class="db-reload-row">
-        <button class="m-btn m-btn-outline" id="db-reload" type="button">← Load a different project</button>
-      </div>
-
-    </section>
-
-    <!-- ─── MY PROJECTS ─── -->
     <section class="db-projects-section" id="db-projects-section" hidden>
-      <h2 class="db-section-h2">My projects</h2>
-      <p class="db-lead" style="margin-bottom:16px">Click a project to load your scorecard.</p>
+      <h2 class="db-section-h2">Projects</h2>
+      <p class="db-lead db-mini-lead">Select a project to view scan history, trends, summary, and recommendations.</p>
       <ul class="db-projects-list" id="db-projects-list"></ul>
     </section>
 
-    <!-- ─── API KEYS ─── -->
+    <section class="db-project-detail" id="db-project-detail" hidden>
+      <div class="db-project-detail-head">
+        <h2 class="db-section-h2">Project details</h2>
+        <p class="db-project-code" id="db-selected-project">—</p>
+      </div>
+
+      <div class="db-detail-stats">
+        <div class="db-detail-chip"><span>Total scans</span><strong id="db-detail-total">0</strong></div>
+        <div class="db-detail-chip"><span>Best score</span><strong id="db-detail-best">—</strong></div>
+        <div class="db-detail-chip"><span>Average score</span><strong id="db-detail-avg">—</strong></div>
+        <div class="db-detail-chip"><span>Trend</span><strong id="db-detail-trend">—</strong></div>
+      </div>
+
+      <div class="db-summary-box">
+        <h3 class="db-subtitle">Summary</h3>
+        <p id="db-summary-text">No scans loaded yet.</p>
+      </div>
+
+      <div class="db-summary-box">
+        <h3 class="db-subtitle">Recommendations</h3>
+        <ul id="db-recommendations" class="db-recommendations-list"></ul>
+      </div>
+
+      <h3 class="db-subtitle">Scans</h3>
+      <p class="db-error" id="db-error" hidden></p>
+      <div class="db-scan-actions">
+        <button class="m-btn m-btn-outline" id="db-delete-selected" type="button">Delete selected scans</button>
+      </div>
+      <div class="db-delete-confirm" id="db-delete-confirm" hidden>
+        <p>Are you sure you want to delete selected scans? This cannot be undone.</p>
+        <div class="db-delete-confirm-actions">
+          <button class="m-btn m-btn-neon" id="db-confirm-delete" type="button">Yes, delete</button>
+          <button class="m-btn m-btn-outline" id="db-cancel-delete" type="button">Cancel</button>
+        </div>
+      </div>
+      <div class="db-scan-table-wrap">
+        <table class="db-scan-table">
+          <thead>
+            <tr>
+              <th>Select</th>
+              <th>Run</th>
+              <th>Published</th>
+              <th>Score</th>
+              <th>Rating</th>
+            </tr>
+          </thead>
+          <tbody id="db-scan-rows"></tbody>
+        </table>
+      </div>
+    </section>
+
     <section class="db-apikeys-section" id="db-apikeys-section" hidden>
       <h2 class="db-section-h2">API keys</h2>
-      <p class="db-lead" style="margin-bottom:16px">
-        Authorize once with <code class="db-inline-code">node gravio.mjs --authorize --project &lt;id&gt; --api-key &lt;key&gt;</code>, then run <code class="db-inline-code">node gravio.mjs --once</code>.
-        Keys are shown once — copy immediately.
+      <p class="db-lead db-mini-lead">
+        Create an API key, authorize once in your repo, then scan and publish from CLI.
       </p>
       <div class="db-key-actions">
         <input type="text" id="db-key-label" placeholder="Key label (optional)" class="db-key-label-input" />
@@ -166,6 +127,25 @@
       <ul class="db-keys-list" id="db-keys-list"></ul>
     </section>
 
+    <section class="db-apikeys-section" id="db-e2ee-section" hidden>
+      <h2 class="db-section-h2">Optional encrypted run tools</h2>
+      <details>
+        <summary class="db-raw-summary">Open E2EE decrypt tool</summary>
+        <div class="db-form-card" style="margin-top: 14px;">
+          <div class="db-field">
+            <label for="db-e2ee-project">Project ID</label>
+            <input type="text" id="db-e2ee-project" placeholder="my-project" autocomplete="off" spellcheck="false" />
+          </div>
+          <div class="db-field">
+            <label for="db-e2ee-key">API key (gv_...)</label>
+            <input type="password" id="db-e2ee-key" placeholder="gv_..." autocomplete="off" spellcheck="false" />
+          </div>
+          <button class="m-btn m-btn-outline" id="db-e2ee-load" type="button">Load encrypted latest run</button>
+          <textarea class="db-raw-json" id="db-e2ee-output" readonly spellcheck="false" style="min-height:180px;"></textarea>
+        </div>
+      </details>
+    </section>
+
   </main>
 
   <div data-site-footer></div>
@@ -174,3 +154,4 @@
   <script src="dashboard.js"></script>
 </body>
 </html>
+        <input type="text" id="db-key-label" placeholder="Key label (optional)" class="db-key-label-input" />
