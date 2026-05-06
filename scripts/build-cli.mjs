@@ -49,7 +49,7 @@ await build({
   // Inject the version constant so the CLI knows its own version at runtime.
   define: { GRAVIO_CLI_VERSION: JSON.stringify(CLI_VERSION_STRING) },
   legalComments: "none",
-  minify: false,
+  minify: true,
   sourcemap: false,
   logLevel: "info",
 });
