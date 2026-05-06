@@ -440,11 +440,15 @@ function resolvePublishContext(args, authCfg) {
 
 function buildEncryptedRunEnvelope(run, options) {
   const now = new Date().toISOString();
+  const failedChecks = (run?.workflowResults ?? [])
+    .filter((w) => w.status === "fail")
+    .map((w) => w.id);
   const publicSummary = {
     runId: run?.runId ?? "run",
     createdAt: run?.createdAt ?? now,
     overallScore: Number.isFinite(run?.summary?.overallScore) ? Number(run.summary.overallScore) : null,
     scorecard: run?.scorecard ?? null,
+    failedChecks: failedChecks.length > 0 ? failedChecks : null,
   };
 
   if (options.key) {

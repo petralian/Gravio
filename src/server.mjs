@@ -90,27 +90,76 @@ function extractScoreSummary(runData) {
   };
 }
 
+// Per-check actionable remediation copy. Ordered by business impact (critical first).
+const CHECK_ADVICE = {
+  "secret-scan":          { critical: true,  text: "CRITICAL: Remove committed .env files from git history immediately (git filter-repo or BFG). Rotate any exposed credentials now." },
+  "gitignore-guard":      { critical: true,  text: "Add .env and .env.* to your .gitignore to prevent accidental secret commits on every future push." },
+  "agent-instructions":   { critical: true,  text: "No agent instructions file found. Add AGENTS.md or .github/copilot-instructions.md to define how AI tools must behave in this repo — prevents unbounded agent actions." },
+  "test-coverage":        { critical: true,  text: "No test suite detected. Add tests (Jest, pytest, go test, etc.) — testing is the single biggest reliability signal and worth 35 pts in your Reliability score." },
+  "ci-pipeline":          { critical: false, text: "No CI/CD pipeline found. Add .github/workflows/test.yml to run tests automatically on every push — worth 25 Reliability points and the #1 quality gate for teams." },
+  "type-safety":          { critical: false, text: "No type system detected. Add TypeScript (tsconfig.json) or a Python type checker (mypy/pyright) to catch regressions before runtime." },
+  "eval-suite":           { critical: false, text: "No eval suite found. Create an evals/ directory with representative test cases to measure whether agent quality improves or regresses across releases." },
+  "baseline-tracking":    { critical: false, text: "No regression baseline found. Add a baseline.json or an agent-quality/runs/ directory to track score deltas over time and catch regressions before deploy." },
+  "observability-config": { critical: false, text: "No structured logging or monitoring detected. Add OpenTelemetry, Winston/Pino (Node), or structlog (Python) to make agent failures diagnosable in production." },
+  "run-artifacts":        { critical: false, text: "Agent run outputs are not being persisted. Create an agent-quality/runs/ directory and write run artifacts after each scan to build an audit trail." },
+  "readme-docs":          { critical: false, text: "Missing README.md. Document what this agent does, how to run it, and what it's authorized to do — essential for team onboarding and trust." },
+  "changelog-hygiene":    { critical: false, text: "No CHANGELOG.md found. Track releases so you can correlate score drops with specific code changes." },
+  "agent-skill-catalog":  { critical: false, text: "No reusable prompt assets found. Create a skills/ or .github/prompts/ directory to standardize prompts across team members and reduce prompt drift." },
+  "agent-orchestration":  { critical: false, text: "No multi-agent orchestration config found. If using multiple AI agents, define coordination rules in AGENTS.md to prevent conflicting actions." },
+};
+
 function recommendationsFromRun(runData, limitedDetails) {
   if (limitedDetails) {
     return [
       "Keep scan cadence consistent and monitor score trend week over week.",
-      "Upgrade to Pro or Team to unlock dimension-level remediation guidance.",
+      "Upgrade to Pro or Team to unlock per-check remediation guidance.",
     ];
   }
 
   const scorecard = runData?.scorecard ?? runData?.publicSummary?.scorecard ?? {};
-  const dims = ["safety", "reliability", "evaluation", "observability", "governance", "agentic"];
-  const ranked = dims
-    .map((k) => ({ key: k, value: Number(scorecard[k] ?? NaN) }))
-    .filter((x) => Number.isFinite(x.value))
-    .sort((a, b) => a.value - b.value)
-    .slice(0, 2);
+  const failedChecks = runData?.publicSummary?.failedChecks ?? null;
 
-  if (ranked.length === 0) {
-    return ["Publish full scorecard payloads to unlock targeted recommendations."];
+  // If we have specific failed check IDs, give precise actionable advice per check.
+  if (Array.isArray(failedChecks) && failedChecks.length > 0) {
+    // Sort: critical failures first, then by check order in CHECK_ADVICE
+    const adviceOrder = Object.keys(CHECK_ADVICE);
+    const sorted = [...failedChecks].sort((a, b) => {
+      const aC = CHECK_ADVICE[a]?.critical ? 0 : 1;
+      const bC = CHECK_ADVICE[b]?.critical ? 0 : 1;
+      if (aC !== bC) return aC - bC;
+      return adviceOrder.indexOf(a) - adviceOrder.indexOf(b);
+    });
+
+    const recs = sorted
+      .map((id) => CHECK_ADVICE[id]?.text)
+      .filter(Boolean)
+      .slice(0, 5); // cap at 5 to avoid overwhelming the UI
+
+    if (recs.length > 0) return recs;
   }
 
-  return ranked.map((d) => `Prioritize ${d.key} improvements next (current score ${Math.round(d.value)}).`);
+  // Fallback: derive from lowest dimension scores when check IDs unavailable (older scans).
+  const dims = ["safety", "reliability", "evaluation", "observability", "governance", "agentic"];
+  const DIM_ADVICE = {
+    safety:        (s) => `Safety score is ${s}/100 — audit committed files for secrets and ensure .gitignore covers all .env patterns.`,
+    reliability:   (s) => `Reliability is ${s}/100 — add a test suite and CI pipeline to automatically catch regressions on every push.`,
+    evaluation:    (s) => `Evaluation score is ${s}/100 — create an evals/ directory with representative test cases and a baseline.json to track regressions.`,
+    observability: (s) => `Observability is ${s}/100 — add structured logging (Winston, Pino, structlog) and persist run artifacts to diagnose agent failures.`,
+    governance:    (s) => `Governance is ${s}/100 — add README.md, CHANGELOG.md, and AGENTS.md to document what this agent does and how it is controlled.`,
+    agentic:       (s) => `Agentic readiness is ${s}/100 — define agent instructions, create reusable prompt assets, and persist run outputs for audit trails.`,
+  };
+
+  const ranked = dims
+    .map((k) => ({ key: k, value: Number(scorecard[k] ?? NaN) }))
+    .filter((x) => Number.isFinite(x.value) && x.value < 80) // only surface genuinely weak dims
+    .sort((a, b) => a.value - b.value)
+    .slice(0, 3);
+
+  if (ranked.length > 0) {
+    return ranked.map((d) => DIM_ADVICE[d.key]?.(Math.round(d.value)) ?? `Improve ${d.key} (current score ${Math.round(d.value)}/100).`);
+  }
+
+  return ["All major dimensions are scoring above 80. Focus on maintaining test coverage and scan cadence."];
 }
 
 function summarizeScans(scans) {
