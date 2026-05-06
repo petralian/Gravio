@@ -72,11 +72,48 @@ function closeAuthModal() {
   elModalWrap?.setAttribute("hidden", "");
 }
 
+async function loadExistingProjects() {
+  const wrap = document.getElementById("ob-existing-projects");
+  const pillsEl = document.getElementById("ob-project-pills");
+  if (!wrap || !pillsEl) return;
+  try {
+    const res = await fetch("/api/runs/list");
+    if (!res.ok) return;
+    const data = await res.json();
+    const projects = data.runs ?? [];
+    if (projects.length === 0) { wrap.setAttribute("hidden", ""); return; }
+    pillsEl.innerHTML = "";
+    projects.forEach(({ project_id, scan_count }) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "ob-project-pill";
+      btn.textContent = project_id;
+      if (scan_count != null) {
+        const count = document.createElement("span");
+        count.style.cssText = "opacity:0.5;font-size:11px";
+        count.textContent = `\u00b7 ${scan_count} scan${scan_count === 1 ? "" : "s"}`;
+        btn.appendChild(count);
+      }
+      btn.addEventListener("click", () => {
+        if (elProjectId) {
+          elProjectId.value = project_id;
+          updateProjectCommands();
+        }
+        document.querySelectorAll(".ob-project-pill").forEach((p) => p.classList.remove("ob-pill-active"));
+        btn.classList.add("ob-pill-active");
+      });
+      pillsEl.appendChild(btn);
+    });
+    wrap.removeAttribute("hidden");
+  } catch { /* non-critical, ignore */ }
+}
+
 async function applyAuthState(user) {
   currentUser = user;
   if (user) {
     onboardingCliToken = await fetchOnboardingCliToken();
     updateProjectCommands();
+    await loadExistingProjects();
     if (elStartFree) elStartFree.textContent = "Account connected";
     if (onboardingCliToken) {
       setAuthStatusMessage(`Signed in as ${user.email}. Your Step 3 command is auto-filled with a user-bound auth token.`);
@@ -86,6 +123,8 @@ async function applyAuthState(user) {
   } else {
     onboardingCliToken = null;
     updateProjectCommands();
+    const wrap = document.getElementById("ob-existing-projects");
+    if (wrap) wrap.setAttribute("hidden", "");
     if (elStartFree) elStartFree.textContent = "Create account or sign in";
     clearAuthStatusMessage();
   }

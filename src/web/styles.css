@@ -1262,6 +1262,38 @@ body.onboarding-page {
   box-shadow: 0 0 0 3px rgba(0, 229, 255, 0.12);
 }
 
+.ob-project-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 4px;
+}
+.ob-project-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--surface-3);
+  border: 1px solid var(--border-bright);
+  border-radius: 99px;
+  padding: 5px 12px;
+  font-size: 12px;
+  font-family: var(--font-mono);
+  color: var(--text-2);
+  cursor: pointer;
+  transition: border-color 0.14s, color 0.14s, background 0.14s;
+  white-space: nowrap;
+}
+.ob-project-pill:hover {
+  border-color: var(--neon-cyan-border);
+  color: var(--neon-cyan);
+  background: var(--neon-cyan-bg);
+}
+.ob-project-pill.ob-pill-active {
+  border-color: var(--neon-cyan);
+  color: var(--neon-cyan);
+  background: var(--neon-cyan-bg);
+}
+
 .ob-code {
   background: #060606;
   border: 1px solid var(--border-bright);

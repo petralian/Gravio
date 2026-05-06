@@ -34,6 +34,10 @@
         <p>This name is reused in every command below and auto-populates in your publish command.</p>
         <label class="ob-inline-label" for="ob-project-id">Project name</label>
         <input id="ob-project-id" class="ob-project-input" type="text" value="my-first-project" autocomplete="off" spellcheck="false" />
+        <div id="ob-existing-projects" data-auth-only hidden>
+          <p class="ob-inline-label" style="margin-top:14px">Your existing projects</p>
+          <div id="ob-project-pills" class="ob-project-pills"></div>
+        </div>
       </article>
 
       <div class="ob-unlock-banner" data-anon-only hidden>
