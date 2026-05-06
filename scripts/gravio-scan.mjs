@@ -60,6 +60,7 @@ function parseArgs(argv) {
     passphrase: null,
     salt: null,
     noUpdate: false,
+    setupVerbose: false,
   };
 
   for (let i = 0; i < argv.length; i++) {
@@ -142,6 +143,10 @@ function parseArgs(argv) {
     }
     if (token === "--no-update") {
       args.noUpdate = true;
+      continue;
+    }
+    if (token === "--setup-verbose") {
+      args.setupVerbose = true;
       continue;
     }
   }
@@ -247,36 +252,146 @@ function dependencyInstallPlan(targetDir) {
   const has = (file) => existsSync(path.join(dir, file));
 
   if (has("package.json")) {
-    if (has("pnpm-lock.yaml")) plan.push({ cmd: "pnpm", args: ["install", "--frozen-lockfile"] });
-    else if (has("yarn.lock")) plan.push({ cmd: "yarn", args: ["install", "--frozen-lockfile"] });
-    else if (has("package-lock.json")) plan.push({ cmd: "npm", args: ["ci"] });
-    else plan.push({ cmd: "npm", args: ["install"] });
+    if (has("pnpm-lock.yaml")) {
+      plan.push({
+        cmd: "pnpm",
+        args: ["install", "--frozen-lockfile"],
+        stage: "Install Node dependencies",
+        reason: "Match Node packages to your lockfile so scans run consistently.",
+      });
+    } else if (has("yarn.lock")) {
+      plan.push({
+        cmd: "yarn",
+        args: ["install", "--frozen-lockfile"],
+        stage: "Install Node dependencies",
+        reason: "Match Node packages to your lockfile so scans run consistently.",
+      });
+    } else if (has("package-lock.json")) {
+      plan.push({
+        cmd: "npm",
+        args: ["ci"],
+        stage: "Install Node dependencies",
+        reason: "Use pinned Node package versions from package-lock.json.",
+      });
+    } else {
+      plan.push({
+        cmd: "npm",
+        args: ["install"],
+        stage: "Install Node dependencies",
+        reason: "Install required Node packages from package.json.",
+      });
+    }
   }
 
   if (has("requirements.txt")) {
-    if (process.platform === "win32") plan.push({ cmd: "py", args: ["-m", "pip", "install", "-r", "requirements.txt"] });
-    else plan.push({ cmd: "python3", args: ["-m", "pip", "install", "-r", "requirements.txt"] });
+    if (process.platform === "win32") {
+      plan.push({
+        cmd: "py",
+        args: ["-m", "pip", "install", "--disable-pip-version-check", "--progress-bar", "off", "-r", "requirements.txt"],
+        stage: "Install Python dependencies",
+        reason: "Install Python packages needed by your project tooling.",
+      });
+    } else {
+      plan.push({
+        cmd: "python3",
+        args: ["-m", "pip", "install", "--disable-pip-version-check", "--progress-bar", "off", "-r", "requirements.txt"],
+        stage: "Install Python dependencies",
+        reason: "Install Python packages needed by your project tooling.",
+      });
+    }
   }
 
   return plan;
 }
 
-function runInstallStep(targetDir, step) {
-  const pretty = `${step.cmd} ${step.args.join(" ")}`;
-  process.stdout.write(`  Running: ${pretty}\n`);
-  const res = spawnSync(step.cmd, step.args, {
-    cwd: path.resolve(targetDir),
-    stdio: "inherit",
-    shell: process.platform === "win32",
-  });
-  return res.status === 0;
+function isPipStep(step) {
+  if (!step) return false;
+  if (step.cmd === "py" || step.cmd === "python3" || step.cmd === "python") {
+    return step.args[0] === "-m" && step.args[1] === "pip";
+  }
+  return false;
 }
 
-function runSetup(targetDir, { silentNoWork = false } = {}) {
+function printSetupStage(index, total, title, reason) {
+  process.stdout.write(`\n  ${index}. ${title}\n`);
+  if (reason) process.stdout.write(`     Why: ${reason}\n`);
+  process.stdout.write(`     Progress: step ${index}/${total}\n`);
+}
+
+function runInstallStep(targetDir, step, { setupVerbose = false } = {}) {
+  return new Promise((resolve) => {
+    const pretty = `${step.cmd} ${step.args.join(" ")}`;
+    process.stdout.write(`     Running: ${pretty}\n`);
+
+    const pipFiltered = isPipStep(step) && !setupVerbose;
+    if (!pipFiltered) {
+      const res = spawnSync(step.cmd, step.args, {
+        cwd: path.resolve(targetDir),
+        stdio: "inherit",
+        shell: process.platform === "win32",
+      });
+      resolve(res.status === 0);
+      return;
+    }
+
+    process.stdout.write("     Note: pip may replace package versions to satisfy pinned compatibility.\n");
+    process.stdout.write("     This affects only the virtual environment, not your source files.\n");
+
+    const child = spawn(step.cmd, step.args, {
+      cwd: path.resolve(targetDir),
+      stdio: ["ignore", "pipe", "pipe"],
+      shell: process.platform === "win32",
+    });
+
+    let alreadySatisfied = 0;
+    const important = /^(Collecting|Using cached|Downloading|Installing collected packages|Attempting uninstall|Found existing installation|Uninstalling|Successfully installed|ERROR:|WARNING:)/;
+    const consumeStream = (stream) => {
+      let pending = "";
+      stream.setEncoding("utf8");
+      stream.on("data", (chunk) => {
+        pending += chunk;
+        const lines = pending.split(/\r?\n/);
+        pending = lines.pop() ?? "";
+        for (const line of lines) {
+          const text = line.trim();
+          if (!text) continue;
+          if (text.startsWith("Requirement already satisfied:")) {
+            alreadySatisfied += 1;
+            continue;
+          }
+          if (important.test(text)) {
+            process.stdout.write(`       ${text}\n`);
+          }
+        }
+      });
+      stream.on("end", () => {
+        const text = pending.trim();
+        if (text && important.test(text)) {
+          process.stdout.write(`       ${text}\n`);
+        }
+      });
+    };
+
+    consumeStream(child.stdout);
+    consumeStream(child.stderr);
+
+    child.on("close", (code) => {
+      if (alreadySatisfied > 0) {
+        process.stdout.write(`     pip summary: ${alreadySatisfied} dependencies were already satisfied.\n`);
+      }
+      resolve(code === 0);
+    });
+  });
+}
+
+async function runSetup(targetDir, { silentNoWork = false, setupVerbose = false } = {}) {
   assertNodeSupported();
   process.stdout.write("\n  \x1b[96m\x1b[1mGravio setup\x1b[0m\n");
   process.stdout.write(`  Folder: ${path.resolve(targetDir)}\n`);
+  process.stdout.write("  Setup stages are shown before each action so changes are easy to follow.\n");
 
+  const totalStages = 3;
+  printSetupStage(1, totalStages, "Preflight checks", "Detect package managers and build a dependency plan.");
   const plan = dependencyInstallPlan(targetDir);
   if (!plan.length) {
     if (!silentNoWork) {
@@ -291,13 +406,20 @@ function runSetup(targetDir, { silentNoWork = false } = {}) {
     return true;
   }
 
+  printSetupStage(2, totalStages, "Install dependencies", "Run project dependency installers in a predictable order.");
   for (const step of plan) {
-    if (!runInstallStep(targetDir, step)) {
+    process.stdout.write(`     Stage: ${step.stage}\n`);
+    process.stdout.write(`     Detail: ${step.reason}\n`);
+    if (isPipStep(step)) {
+      process.stdout.write("     Why uninstall messages happen: pip reconciles conflicting versions to match requirements.txt.\n");
+    }
+    if (!await runInstallStep(targetDir, step, { setupVerbose })) {
       process.stderr.write(`\n  \x1b[91m\x1b[1m✖  Setup failed\x1b[0m while running ${step.cmd}.\n\n`);
       return false;
     }
   }
 
+  printSetupStage(3, totalStages, "Finalize", "Save setup state and protect local Gravio config from being committed.");
   saveSetupState(targetDir, {
     version: 1,
     completedAt: new Date().toISOString(),
@@ -322,6 +444,7 @@ function buildEncryptedRunEnvelope(run, options) {
     runId: run?.runId ?? "run",
     createdAt: run?.createdAt ?? now,
     overallScore: Number.isFinite(run?.summary?.overallScore) ? Number(run.summary.overallScore) : null,
+    scorecard: run?.scorecard ?? null,
   };
 
   if (options.key) {
@@ -551,7 +674,7 @@ if (args.logout) {
 }
 
 if (args.setup) {
-  const ok = runSetup(args.target);
+  const ok = await runSetup(args.target, { setupVerbose: args.setupVerbose });
   process.exit(ok ? 0 : 1);
 }
 
@@ -559,7 +682,7 @@ if (!args.noSetup) {
   const setupState = loadSetupState(args.target);
   const setupDone = Boolean(setupState?.completedAt);
   if (!setupDone) {
-    const ok = runSetup(args.target, { silentNoWork: true });
+    const ok = await runSetup(args.target, { silentNoWork: true, setupVerbose: args.setupVerbose });
     if (!ok) process.exit(1);
   }
 }

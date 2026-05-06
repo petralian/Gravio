@@ -98,7 +98,7 @@ function recommendationsFromRun(runData, limitedDetails) {
     ];
   }
 
-  const scorecard = runData?.scorecard ?? {};
+  const scorecard = runData?.scorecard ?? runData?.publicSummary?.scorecard ?? {};
   const dims = ["safety", "reliability", "evaluation", "observability", "governance", "agentic"];
   const ranked = dims
     .map((k) => ({ key: k, value: Number(scorecard[k] ?? NaN) }))
