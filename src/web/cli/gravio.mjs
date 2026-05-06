@@ -521,30 +521,70 @@ var c = {
   reset: "\x1B[0m",
   bold: "\x1B[1m",
   dim: "\x1B[2m",
-  cyan: "\x1B[96m",
-  green: "\x1B[32m",
+  italic: "\x1B[3m",
+  under: "\x1B[4m",
+  // Standard foreground
+  black: "\x1B[30m",
   red: "\x1B[31m",
+  green: "\x1B[32m",
   yellow: "\x1B[33m",
+  blue: "\x1B[34m",
+  magenta: "\x1B[35m",
+  cyan: "\x1B[36m",
   white: "\x1B[97m",
-  gray: "\x1B[90m"
+  gray: "\x1B[90m",
+  // Bright foreground
+  bred: "\x1B[91m",
+  bgreen: "\x1B[92m",
+  byellow: "\x1B[93m",
+  bblue: "\x1B[94m",
+  bmagenta: "\x1B[95m",
+  bcyan: "\x1B[96m",
+  // Background
+  bgBlack: "\x1B[40m",
+  bgRed: "\x1B[41m",
+  bgGreen: "\x1B[42m",
+  bgBlue: "\x1B[44m",
+  bgCyan: "\x1B[46m"
+};
+var DIM_COLOR = {
+  safety: c.bred,
+  reliability: c.bgreen,
+  evaluation: c.bblue,
+  observability: c.bmagenta,
+  governance: c.byellow
 };
 function scoreColor(score) {
-  if (score >= 90) return c.green;
-  if (score >= 70) return c.cyan;
-  if (score >= 50) return c.yellow;
-  return c.red;
+  if (score >= 90) return c.bgreen;
+  if (score >= 70) return c.bcyan;
+  if (score >= 50) return c.byellow;
+  return c.bred;
 }
 function sevColor(sev) {
-  if (sev === "critical") return c.red;
-  if (sev === "high") return c.yellow;
-  return c.dim;
+  if (sev === "critical") return c.bred;
+  if (sev === "high") return c.byellow;
+  if (sev === "medium") return c.cyan;
+  return c.gray;
 }
-function bar(score, width = 20) {
+function sevBadge(sev) {
+  const col = sevColor(sev);
+  const label = sev.toUpperCase().padEnd(8);
+  return `${col}${c.bold} ${label}${c.reset}`;
+}
+function gradeLabel(score) {
+  if (score >= 90) return `${c.bgreen}${c.bold}A${c.reset}`;
+  if (score >= 80) return `${c.bgreen}${c.bold}B${c.reset}`;
+  if (score >= 70) return `${c.byellow}${c.bold}C${c.reset}`;
+  if (score >= 60) return `${c.byellow}${c.bold}D${c.reset}`;
+  return `${c.bred}${c.bold}F${c.reset}`;
+}
+function bar(score, width = 22) {
   const filled = Math.max(0, Math.min(width, Math.round(score / 100 * width)));
-  return "\u2588".repeat(filled) + "\u2591".repeat(width - filled);
+  const col = scoreColor(score);
+  return `${col}${"\u2588".repeat(filled)}${c.reset}${c.dim}${"\u2591".repeat(width - filled)}${c.reset}`;
 }
-function hr(len = 72) {
-  return `${c.dim}${"\u2500".repeat(len)}${c.reset}`;
+function hr(char = "\u2500", len = 74, color = c.dim) {
+  return `${color}${char.repeat(len)}${c.reset}`;
 }
 function rpad(str, len) {
   return str + " ".repeat(Math.max(0, len - str.length));
@@ -567,17 +607,17 @@ function wrapText(text, maxLen) {
   if (cur.trim()) lines.push(cur.trimEnd());
   return lines;
 }
-function today() {
+function timestamp() {
   const d = /* @__PURE__ */ new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 var DIM_ORDER = ["safety", "reliability", "evaluation", "observability", "governance"];
-var DIM_LABELS = {
-  safety: "Safety",
-  reliability: "Reliability",
-  evaluation: "Evaluation",
-  observability: "Observability",
-  governance: "Governance"
+var DIM_META = {
+  safety: { label: "Safety", icon: "\u{1F6E1} ", weight: "30%" },
+  reliability: { label: "Reliability", icon: "\u26A1 ", weight: "25%" },
+  evaluation: { label: "Evaluation", icon: "\u{1F9EA} ", weight: "20%" },
+  observability: { label: "Observability", icon: "\u{1F4E1} ", weight: "10%" },
+  governance: { label: "Governance", icon: "\u{1F4CB} ", weight: "15%" }
 };
 function buildCatalog(scan) {
   const {
@@ -836,34 +876,53 @@ var HEADER_CHECK_IDS = [
   "gitignore-env",
   "test-signal",
   "cicd-pipeline",
+  "type-safety",
   "eval-corpus",
   "otel-tracing",
   "changelog",
   "readme"
 ];
 function printCheckLines(catalog, scan) {
+  let passCount = 0;
+  let failCount = 0;
   for (const id of HEADER_CHECK_IDS) {
     const check = catalog.find((ch) => ch.id === id);
     if (!check) continue;
-    const icon = check.pass ? `${c.green}[\u2713]${c.reset}` : `${c.red}[\u2717]${c.reset}`;
-    const label = rpad(check.label, 22);
-    const detail = check.pass ? `${c.gray}${check.brief}${c.reset}` : `${c.yellow}${check.brief}${c.reset}`;
-    console.log(`  ${icon}  ${label}${detail}`);
+    if (check.pass) {
+      passCount++;
+      const icon = `${c.bgreen}\u2714${c.reset}`;
+      const label = `${c.white}${rpad(check.label, 24)}${c.reset}`;
+      const brief = `${c.gray}${check.brief}${c.reset}`;
+      console.log(`  ${icon}  ${label}${brief}`);
+    } else {
+      failCount++;
+      const sevCol = sevColor(check.severity);
+      const icon = `${sevCol}\u2716${c.reset}`;
+      const label = `${c.bold}${rpad(check.label, 24)}${c.reset}`;
+      const brief = `${sevCol}${check.brief}${c.reset}`;
+      const badge = `  ${sevCol}${c.dim}[${check.severity}]${c.reset}`;
+      console.log(`  ${icon}  ${label}${brief}${badge}`);
+    }
   }
   const gitOk = scan.trackedFileCount > 0;
-  const gitIcon = gitOk ? `${c.green}[\u2713]${c.reset}` : `${c.dim}[~]${c.reset}`;
+  const gitIcon = gitOk ? `${c.bgreen}\u2714${c.reset}` : `${c.dim}~${c.reset}`;
+  const gitLabel = `${c.white}${rpad("Git hygiene", 24)}${c.reset}`;
   const gitInfo = gitOk ? `${c.gray}${scan.trackedFileCount} files tracked${c.reset}` : `${c.dim}no git tracking detected${c.reset}`;
-  console.log(`  ${gitIcon}  ${rpad("Git hygiene", 22)}${gitInfo}`);
+  console.log(`  ${gitIcon}  ${gitLabel}${gitInfo}`);
+  return { passCount, failCount };
 }
 function printDimensionBars(scorecard) {
   console.log();
   for (const dim of DIM_ORDER) {
     const score = scorecard[dim] ?? 0;
-    const label = rpad(DIM_LABELS[dim], 13);
-    const col = scoreColor(score);
-    const filled = bar(score);
+    const meta = DIM_META[dim];
+    const col = DIM_COLOR[dim];
+    const barStr = bar(score);
     const scoreStr = lpad(String(Math.round(score)), 3);
-    console.log(`  ${c.white}${label}${c.reset}  ${col}${filled}${c.reset}  ${col}${c.bold}${scoreStr}${c.reset}`);
+    const grade = gradeLabel(score);
+    const label = `${col}${rpad(meta.label, 14)}${c.reset}`;
+    const weight = `${c.dim}${meta.weight}${c.reset}`;
+    console.log(`  ${meta.icon} ${label}  ${barStr}  ${scoreColor(score)}${c.bold}${scoreStr}${c.reset}  ${grade}  ${weight}`);
   }
   console.log();
 }
@@ -871,35 +930,48 @@ var SEV_ORDER = ["critical", "high", "medium", "low"];
 function printIssues(catalog) {
   const failing = catalog.filter((ch) => !ch.pass);
   if (failing.length === 0) {
-    console.log(`  ${c.green}\u2713${c.reset}  All checks passed \u2014 no issues to report.`);
+    console.log();
+    console.log(`  ${c.bgreen}${c.bold}\u2726  Perfect scan \u2014 all checks passed.${c.reset}`);
     return;
+  }
+  const critCount = failing.filter((ch) => ch.severity === "critical").length;
+  if (critCount > 0) {
+    console.log();
+    console.log(`  ${c.bgRed}${c.white}${c.bold}  \u26A0  CRITICAL \u2014 immediate action required  ${c.reset}`);
   }
   for (const dim of DIM_ORDER) {
     const issues = failing.filter((ch) => ch.dim === dim).sort((a, b) => SEV_ORDER.indexOf(a.severity) - SEV_ORDER.indexOf(b.severity));
     if (issues.length === 0) continue;
+    const meta = DIM_META[dim];
+    const dimCol = DIM_COLOR[dim];
+    console.log();
+    console.log(`  ${dimCol}${c.bold}${meta.icon} ${meta.label.toUpperCase()}${c.reset}  ${c.dim}${"\u2500".repeat(54)}${c.reset}`);
     for (const issue of issues) {
-      const sevCol = sevColor(issue.severity);
-      const sevLabel = issue.severity.toUpperCase();
-      const dimTitle = DIM_LABELS[dim].toUpperCase();
       console.log();
-      console.log(
-        `  ${c.bold}${c.white}${dimTitle}${c.reset}  ${c.dim}${"\u2500".repeat(Math.max(0, 44 - dimTitle.length))}${c.reset}  ${sevCol}[${sevLabel}]${c.reset}`
-      );
+      console.log(`  ${sevBadge(issue.severity)} ${c.bold}${c.white}${issue.title}${c.reset}`);
       console.log();
-      console.log(`  ${c.bold}${issue.title}${c.reset}`);
-      const wrapped = wrapText(issue.why, 68);
-      for (const line of wrapped) {
+      for (const line of wrapText(issue.why, 66)) {
         console.log(`  ${c.dim}${line}${c.reset}`);
       }
       console.log();
-      console.log(`  ${c.cyan}Fix \u25B8${c.reset}`);
+      console.log(`  ${c.cyan}${c.bold}How to fix${c.reset}  ${c.dim}${"\xB7".repeat(54)}${c.reset}`);
       for (const line of issue.fix.split("\n")) {
-        console.log(`  ${c.gray}\u2502${c.reset}  ${line}`);
+        if (line.startsWith("#")) {
+          console.log(`  ${c.dim}${line}${c.reset}`);
+        } else if (line.startsWith("\u26A0")) {
+          console.log(`  ${c.byellow}${c.bold}${line}${c.reset}`);
+        } else if (line === "") {
+          console.log();
+        } else {
+          console.log(`  ${c.bcyan}\u2502${c.reset}  ${c.white}${line}${c.reset}`);
+        }
       }
       if (issue.docs) {
         console.log();
-        console.log(`  ${c.dim}Docs \u25B8 ${issue.docs}${c.reset}`);
+        console.log(`  ${c.dim}\u{1F4D6}  ${issue.docs}${c.reset}`);
       }
+      console.log();
+      console.log(`  ${c.dim}${"\xB7".repeat(72)}${c.reset}`);
     }
   }
 }
@@ -908,62 +980,116 @@ function printScanReport({ run, scan, version = "?" }) {
   const scorecard = run.scorecard ?? {};
   const overall = run.summary?.overallScore ?? 0;
   const criticalFails = catalog.filter((ch) => !ch.pass && ch.severity === "critical").length;
+  const highFails = catalog.filter((ch) => !ch.pass && ch.severity === "high").length;
   const totalIssues = catalog.filter((ch) => !ch.pass).length;
+  const totalChecks = HEADER_CHECK_IDS.length + 1;
   const overallPassed = overall >= 87 && criticalFails === 0;
   console.log();
-  console.log(hr());
+  console.log(hr("\u2550"));
   console.log();
   console.log(
-    `  ${c.cyan}${c.bold}gravio${c.reset}` + " ".repeat(38) + `${c.dim}Gravio v${version}  ${today()}${c.reset}`
+    `  ${c.bcyan}${c.bold}  gravio  ${c.reset}${c.dim}AI Agent Quality Engine${c.reset}` + " ".repeat(22) + `${c.dim}v${version}  ${timestamp()}${c.reset}`
   );
   console.log();
-  console.log(`  Scanning  ${c.cyan}${scan.targetDir}${c.reset}`);
-  console.log(`  ${c.dim}${scan.totalFiles} files \xB7 ${scan.trackedFileCount} tracked${c.reset}`);
+  console.log(`  ${c.dim}Target   ${c.reset}${c.cyan}${scan.targetDir}${c.reset}`);
+  console.log(`  ${c.dim}Files    ${c.reset}${c.white}${scan.totalFiles}${c.reset}${c.dim} total \xB7 ${scan.trackedFileCount} git-tracked${c.reset}`);
   console.log();
-  printCheckLines(catalog, scan);
+  console.log(hr("\u2550"));
+  console.log();
+  console.log(`  ${c.bold}${c.white}Checks${c.reset}  ${c.dim}Running ${totalChecks} quality gates${c.reset}`);
+  console.log();
+  const { passCount, failCount } = printCheckLines(catalog, scan);
+  console.log();
+  const passStr = `${c.bgreen}${c.bold}\u2714 ${passCount} passed${c.reset}`;
+  const failStr = failCount > 0 ? `  ${c.bred}${c.bold}\u2716 ${failCount} failed${c.reset}` : "";
+  console.log(`  ${passStr}${failStr}  ${c.dim}\xB7 ${scan.totalFiles} files scanned${c.reset}`);
   console.log();
   console.log(hr());
+  console.log();
+  console.log(`  ${c.bold}${c.white}Scores${c.reset}  ${c.dim}Five dimensions of agent quality${c.reset}`);
   printDimensionBars(scorecard);
   console.log(hr());
   console.log();
-  const passLabel = overallPassed ? `${c.green}${c.bold} PASS ${c.reset}` : `${c.red}${c.bold} FAIL ${c.reset}`;
-  const critStr = criticalFails > 0 ? `  ${c.red}\xB7  ${criticalFails} critical risk${criticalFails !== 1 ? "s" : ""}${c.reset}` : `  ${c.dim}\xB7  0 critical risks${c.reset}`;
-  const issueStr = totalIssues > 0 ? `  ${c.dim}\xB7  ${totalIssues} issue${totalIssues !== 1 ? "s" : ""}${c.reset}` : "";
+  const grade = gradeLabel(overall);
+  const passLabel = overallPassed ? `${c.bgGreen}${c.black}${c.bold}  PASS  ${c.reset}` : `${c.bgRed}${c.white}${c.bold}  FAIL  ${c.reset}`;
   console.log(
-    `  Score: ${c.cyan}${c.bold}${overall.toFixed(1)}${c.reset} / 100  \xB7  ${passLabel}${critStr}${issueStr}`
+    `  ${c.dim}Overall score${c.reset}   ${scoreColor(overall)}${c.bold}${overall.toFixed(1)}${c.reset}${c.dim} / 100${c.reset}   ${grade}   ${passLabel}`
   );
+  console.log();
+  const critStr = criticalFails > 0 ? `${c.bred}${c.bold}\u26A0 ${criticalFails} critical${c.reset}` : `${c.bgreen}\u2714 0 critical${c.reset}`;
+  const highStr = highFails > 0 ? `  ${c.byellow}\u26A0 ${highFails} high${c.reset}` : `  ${c.dim}0 high${c.reset}`;
+  const issueStr = totalIssues > 0 ? `  ${c.dim}${totalIssues} issue${totalIssues !== 1 ? "s" : ""} total${c.reset}` : `  ${c.dim}0 issues${c.reset}`;
+  console.log(`  ${critStr}${highStr}${issueStr}`);
   console.log();
   console.log(hr());
   if (totalIssues > 0) {
     console.log();
-    console.log(
-      `  ${c.bold}${c.white}Issues  (${totalIssues})${c.reset}  ${c.dim}${"\u2500".repeat(56)}${c.reset}`
-    );
+    console.log(`  ${c.bold}${c.white}Issues${c.reset}  ${c.dim}${totalIssues} thing${totalIssues !== 1 ? "s" : ""} to fix${c.reset}`);
     printIssues(catalog);
+    console.log(hr());
+  } else {
+    console.log();
+    console.log(`  ${c.bgreen}${c.bold}\u2726  Excellent \u2014 all checks passed. Your agent is production-grade.${c.reset}`);
     console.log();
     console.log(hr());
   }
+  console.log();
+  console.log(`  ${c.dim}Next  ${c.reset}${c.cyan}gravio.dev/dashboard${c.reset}${c.dim}  \u2192  view trends & history${c.reset}`);
   console.log();
 }
 function printWatchUpdate({ run, scan }) {
   const scorecard = run.scorecard ?? {};
   const overall = run.summary?.overallScore ?? 0;
+  const passed = overall >= 87;
+  const passLabel = passed ? `${c.bgGreen}${c.black}${c.bold} PASS ${c.reset}` : `${c.bgRed}${c.white}${c.bold} FAIL ${c.reset}`;
+  const dims = DIM_ORDER.map((d) => {
+    const score = Math.round(scorecard[d] ?? 0);
+    const meta = DIM_META[d];
+    return `${meta.icon}${DIM_COLOR[d]}${score}${c.reset}`;
+  }).join("  ");
   const now = /* @__PURE__ */ new Date();
   const time = [now.getHours(), now.getMinutes(), now.getSeconds()].map((n) => String(n).padStart(2, "0")).join(":");
-  const passed = overall >= 87;
-  const passLabel = passed ? `${c.green}PASS${c.reset}` : `${c.red}FAIL${c.reset}`;
-  const dims = DIM_ORDER.map((d) => `${d.slice(0, 3)}: ${scoreColor(scorecard[d] ?? 0)}${Math.round(scorecard[d] ?? 0)}${c.reset}`).join("  ");
   console.log(
-    `  ${c.dim}[${time}]${c.reset}  Score: ${c.cyan}${c.bold}${overall.toFixed(1)}${c.reset}/100  ${passLabel}  ${c.dim}${dims}${c.reset}`
+    `
+  ${c.dim}[${time}]${c.reset}  ${scoreColor(overall)}${c.bold}${overall.toFixed(1)}${c.reset}${c.dim}/100${c.reset}  ${passLabel}  ${dims}  ${c.dim}${scan.totalFiles} files${c.reset}`
+  );
+}
+function printScanStep(step) {
+  const SCAN_STEPS = [
+    "Reading file tree",
+    "Checking git tracking",
+    "Analysing safety signals",
+    "Analysing reliability signals",
+    "Analysing evaluation signals",
+    "Analysing observability signals",
+    "Analysing governance signals",
+    "Computing scorecard"
+  ];
+  if (!process.stdout.isTTY) return;
+  const total = SCAN_STEPS.length;
+  const cur = Math.min(step, total);
+  const pct = Math.round(cur / total * 100);
+  const barW = 28;
+  const filled = Math.round(cur / total * barW);
+  const b = `${c.cyan}${"\u2588".repeat(filled)}${c.reset}${c.dim}${"\u2591".repeat(barW - filled)}${c.reset}`;
+  const label = step < total ? SCAN_STEPS[step] ?? "" : "Complete";
+  process.stdout.write(
+    `\r  ${b}  ${c.dim}${lpad(String(pct), 3)}%${c.reset}  ${c.gray}${label}${" ".repeat(36)}${c.reset}`
   );
 }
 function printPublishResult({ server, project, success, error }) {
   console.log();
   if (success) {
-    const dashUrl = `${server}/dashboard?project=${encodeURIComponent(project)}`;
-    console.log(`  ${c.green}[\u2713]${c.reset}  Published to ${c.cyan}${dashUrl}${c.reset}`);
+    const dashUrl = `${server}/dashboard`;
+    console.log(`  ${c.bgreen}${c.bold}\u2714  Published${c.reset}  ${c.dim}\u2192${c.reset}  ${c.cyan}${c.under}${dashUrl}${c.reset}`);
+    console.log(`  ${c.dim}Project${c.reset}  ${c.white}${project}${c.reset}`);
+    console.log();
+    console.log(`  ${c.dim}Open your dashboard to view trends, history, and issue details.${c.reset}`);
   } else {
-    console.log(`  ${c.red}[\u2717]${c.reset}  Publish failed: ${error ?? "unknown error"}`);
+    console.log(`  ${c.bred}${c.bold}\u2716  Publish failed${c.reset}  ${c.dim}${error ?? "unknown error"}${c.reset}`);
+    console.log();
+    console.log(`  ${c.dim}Check your --api-key and --server flags, then try again.${c.reset}`);
+    console.log(`  ${c.dim}Create an API key at ${c.reset}${c.cyan}gravio.dev/dashboard${c.reset}`);
   }
   console.log();
 }
@@ -1114,7 +1240,16 @@ function isNewer(remote, local) {
 async function checkAndUpdate(serverBase) {
   const isBundled = !path2.basename(process.argv[1]).includes("gravio-scan");
   if (!isBundled) return;
-  const c2 = { cyan: "\x1B[36m", green: "\x1B[32m", dim: "\x1B[2m", bold: "\x1B[1m", reset: "\x1B[0m" };
+  const c2 = {
+    cyan: "\x1B[36m",
+    green: "\x1B[32m",
+    dim: "\x1B[2m",
+    bold: "\x1B[1m",
+    reset: "\x1B[0m",
+    bgreen: "\x1B[92m",
+    bcyan: "\x1B[96m",
+    byellow: "\x1B[93m"
+  };
   try {
     const versionUrl = new URL("/api/cli/version", serverBase).toString();
     const res = await httpGet(versionUrl);
@@ -1127,12 +1262,12 @@ async function checkAndUpdate(serverBase) {
     }
     if (!isNewer(remoteVersion, CLI_VERSION)) return;
     console.log(`
-  ${c2.cyan}[\u2191]${c2.reset}  ${c2.bold}Gravio CLI update available${c2.reset}: ${c2.dim}${CLI_VERSION}${c2.reset} \u2192 ${c2.bold}${c2.green}${remoteVersion}${c2.reset}`);
-    console.log(`  ${c2.dim}Downloading...${c2.reset}`);
+  ${c2.byellow}${c2.bold}\u2191  Update available${c2.reset}  ${c2.dim}${CLI_VERSION}${c2.reset} ${c2.dim}\u2192${c2.reset} ${c2.bgreen}${c2.bold}${remoteVersion}${c2.reset}`);
+    console.log(`  ${c2.dim}Downloading new version...${c2.reset}`);
     const downloadUrl = new URL("/cli/gravio.mjs", serverBase).toString();
     const dlRes = await httpGet(downloadUrl);
     if (dlRes.status !== 200) {
-      console.log(`  ${c2.dim}[!] Update download failed (HTTP ${dlRes.status}) \u2014 continuing with current version
+      console.log(`  ${c2.dim}[!] Update download failed (HTTP ${dlRes.status}) \u2014 continuing with v${CLI_VERSION}
 ${c2.reset}`);
       return;
     }
@@ -1142,7 +1277,7 @@ ${c2.reset}`);
       chmodSync(currentFile, 493);
     } catch {
     }
-    console.log(`  ${c2.green}[\u2713]${c2.reset}  Updated to ${c2.bold}${c2.green}${remoteVersion}${c2.reset}. Restarting...
+    console.log(`  ${c2.bgreen}${c2.bold}\u2714  Updated to v${remoteVersion}${c2.reset}${c2.dim}  Restarting...${c2.reset}
 `);
     await new Promise((resolve) => {
       const child = spawn(process.execPath, [currentFile, "--no-update", ...process.argv.slice(2)], {
@@ -1161,23 +1296,32 @@ if (!args.noUpdate) {
   await checkAndUpdate(args.server);
 }
 if (args.publish && !args.project) {
-  console.error("error: --publish requires --project <id>");
+  process.stderr.write("\n  \x1B[91m\x1B[1m\u2716  Error\x1B[0m  --publish requires --project <id>\n\n");
   process.exit(1);
 }
 if (args.publish && !args.apiKey) {
-  console.error("error: --publish requires --api-key <gv_...>");
-  console.error("\nNext steps:");
-  console.error("  1) Sign in: https://gravio-platform.fly.dev/login");
-  console.error("  2) Create API key in dashboard");
-  console.error("  3) Re-run with: --api-key <your_key>\n");
+  process.stderr.write("\n  \x1B[91m\x1B[1m\u2716  Error\x1B[0m  --publish requires --api-key <gv_...>\n\n");
+  process.stderr.write("  \x1B[2mSteps:\x1B[0m\n");
+  process.stderr.write("    1) Sign in  \u2192  \x1B[36mhttps://gravio.dev/login\x1B[0m\n");
+  process.stderr.write("    2) Get API key in your dashboard\n");
+  process.stderr.write("    3) Re-run with  \x1B[97m--api-key gv_...\x1B[0m\n\n");
   process.exit(1);
 }
 if (args.once) {
+  if (process.stdout.isTTY) {
+    console.log();
+    printScanStep(0);
+  }
   const { run, scan } = runScannerOnce({
     targetDir: args.target,
     outputFile: args.output,
     repoRoot: ROOT
   });
+  if (process.stdout.isTTY) {
+    const SCAN_TOTAL = 8;
+    printScanStep(SCAN_TOTAL);
+    process.stdout.write("\n");
+  }
   printScanReport({ run, scan, version: readVersion() });
   if (args.publish) {
     const publishUrl = new URL("/api/publish", args.server).toString();
@@ -1221,16 +1365,21 @@ var watcher = startScannerWatcher({
   logger: console,
   onScan: printWatchUpdate
 });
-console.log(`
-  \x1B[2mGravio scanner watching ${args.target}  (Ctrl+C to stop)\x1B[0m
-`);
+console.log(
+  `
+  \x1B[96m\x1B[1m  gravio  \x1B[0m\x1B[2m watch mode\x1B[0m
+
+  \x1B[2mWatching\x1B[0m  \x1B[36m${args.target}\x1B[0m
+  \x1B[2mDebounce  ${args.debounceMs}ms  \xB7  Ctrl+C to stop\x1B[0m
+`
+);
 process.on("SIGINT", () => {
   watcher.close();
-  console.log("gravio-scan: stopped");
+  console.log("\n  \x1B[2mgravio: stopped\x1B[0m\n");
   process.exit(0);
 });
 process.on("SIGTERM", () => {
   watcher.close();
-  console.log("gravio-scan: stopped");
+  console.log("\n  \x1B[2mgravio: stopped\x1B[0m\n");
   process.exit(0);
 });

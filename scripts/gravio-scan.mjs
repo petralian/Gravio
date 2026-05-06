@@ -20,7 +20,7 @@ import { readFileSync, writeFileSync, chmodSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
 import { runScannerOnce, startScannerWatcher } from "../src/core/scanner.mjs";
-import { printScanReport, printWatchUpdate, printPublishResult } from "../src/core/reporter.mjs";
+import { printScanReport, printWatchUpdate, printPublishResult, printScanStep } from "../src/core/reporter.mjs";
 
 /* Version injected by esbuild at bundle time. Falls back to "dev" when
  * running directly from source (scripts/gravio-scan.mjs). */
@@ -190,7 +190,10 @@ async function checkAndUpdate(serverBase) {
   const isBundled = !path.basename(process.argv[1]).includes("gravio-scan");
   if (!isBundled) return;
 
-  const c = { cyan: "\x1b[36m", green: "\x1b[32m", dim: "\x1b[2m", bold: "\x1b[1m", reset: "\x1b[0m" };
+  const c = {
+    cyan: "\x1b[36m", green: "\x1b[32m", dim: "\x1b[2m", bold: "\x1b[1m", reset: "\x1b[0m",
+    bgreen: "\x1b[92m", bcyan: "\x1b[96m", byellow: "\x1b[93m",
+  };
 
   try {
     const versionUrl = new URL("/api/cli/version", serverBase).toString();
@@ -201,13 +204,13 @@ async function checkAndUpdate(serverBase) {
     try { remoteVersion = JSON.parse(res.body).version; } catch { return; }
     if (!isNewer(remoteVersion, CLI_VERSION)) return;
 
-    console.log(`\n  ${c.cyan}[↑]${c.reset}  ${c.bold}Gravio CLI update available${c.reset}: ${c.dim}${CLI_VERSION}${c.reset} → ${c.bold}${c.green}${remoteVersion}${c.reset}`);
-    console.log(`  ${c.dim}Downloading...${c.reset}`);
+    console.log(`\n  ${c.byellow}${c.bold}↑  Update available${c.reset}  ${c.dim}${CLI_VERSION}${c.reset} ${c.dim}→${c.reset} ${c.bgreen}${c.bold}${remoteVersion}${c.reset}`);
+    console.log(`  ${c.dim}Downloading new version...${c.reset}`);
 
     const downloadUrl = new URL("/cli/gravio.mjs", serverBase).toString();
     const dlRes = await httpGet(downloadUrl);
     if (dlRes.status !== 200) {
-      console.log(`  ${c.dim}[!] Update download failed (HTTP ${dlRes.status}) — continuing with current version\n${c.reset}`);
+      console.log(`  ${c.dim}[!] Update download failed (HTTP ${dlRes.status}) — continuing with v${CLI_VERSION}\n${c.reset}`);
       return;
     }
 
@@ -215,7 +218,7 @@ async function checkAndUpdate(serverBase) {
     writeFileSync(currentFile, dlRes.body, "utf8");
     try { chmodSync(currentFile, 0o755); } catch { /* ignore on Windows */ }
 
-    console.log(`  ${c.green}[✓]${c.reset}  Updated to ${c.bold}${c.green}${remoteVersion}${c.reset}. Restarting...\n`);
+    console.log(`  ${c.bgreen}${c.bold}✔  Updated to v${remoteVersion}${c.reset}${c.dim}  Restarting...${c.reset}\n`);
 
     // Re-exec: spawn updated script with same args then exit this process.
     await new Promise((resolve) => {
@@ -239,25 +242,38 @@ if (!args.noUpdate) {
 
 // Validate publish prerequisites
 if (args.publish && !args.project) {
-  console.error("error: --publish requires --project <id>");
+  process.stderr.write("\n  \x1b[91m\x1b[1m✖  Error\x1b[0m  --publish requires --project <id>\n\n");
   process.exit(1);
 }
 
 if (args.publish && !args.apiKey) {
-  console.error("error: --publish requires --api-key <gv_...>");
-  console.error("\nNext steps:");
-  console.error("  1) Sign in: https://gravio-platform.fly.dev/login");
-  console.error("  2) Create API key in dashboard");
-  console.error("  3) Re-run with: --api-key <your_key>\n");
+  process.stderr.write("\n  \x1b[91m\x1b[1m✖  Error\x1b[0m  --publish requires --api-key <gv_...>\n\n");
+  process.stderr.write("  \x1b[2mSteps:\x1b[0m\n");
+  process.stderr.write("    1) Sign in  →  \x1b[36mhttps://gravio.dev/login\x1b[0m\n");
+  process.stderr.write("    2) Get API key in your dashboard\n");
+  process.stderr.write("    3) Re-run with  \x1b[97m--api-key gv_...\x1b[0m\n\n");
   process.exit(1);
 }
 
 if (args.once) {
+  // ── Progress: start ─────────────────────────────────────────────────────
+  if (process.stdout.isTTY) {
+    console.log();
+    printScanStep(0);
+  }
+
   const { run, scan } = runScannerOnce({
     targetDir: args.target,
     outputFile: args.output,
     repoRoot: ROOT,
   });
+
+  // ── Progress: done ──────────────────────────────────────────────────────
+  if (process.stdout.isTTY) {
+    const SCAN_TOTAL = 8;
+    printScanStep(SCAN_TOTAL);
+    process.stdout.write("\n");
+  }
 
   printScanReport({ run, scan, version: readVersion() });
 
@@ -303,16 +319,20 @@ const watcher = startScannerWatcher({
   onScan: printWatchUpdate,
 });
 
-console.log(`\n  \x1b[2mGravio scanner watching ${args.target}  (Ctrl+C to stop)\x1b[0m\n`);
+console.log(
+  `\n  \x1b[96m\x1b[1m  gravio  \x1b[0m\x1b[2m watch mode\x1b[0m\n` +
+  `\n  \x1b[2mWatching\x1b[0m  \x1b[36m${args.target}\x1b[0m` +
+  `\n  \x1b[2mDebounce  ${args.debounceMs}ms  ·  Ctrl+C to stop\x1b[0m\n`
+);
 
 process.on("SIGINT", () => {
   watcher.close();
-  console.log("gravio-scan: stopped");
+  console.log("\n  \x1b[2mgravio: stopped\x1b[0m\n");
   process.exit(0);
 });
 
 process.on("SIGTERM", () => {
   watcher.close();
-  console.log("gravio-scan: stopped");
+  console.log("\n  \x1b[2mgravio: stopped\x1b[0m\n");
   process.exit(0);
 });

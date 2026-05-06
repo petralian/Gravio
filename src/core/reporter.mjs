@@ -1,42 +1,90 @@
 /**
  * reporter.mjs
  * Gravio Scanner — CLI reporter.
- * Formats scan results as a rich, Lighthouse-style terminal report.
- * No external dependencies — plain ANSI escape codes only.
+ * Rich, colorful terminal output. No external dependencies — ANSI only.
  */
 
-// ─── ANSI helpers ────────────────────────────────────────────────────────────
+// ─── ANSI color palette ───────────────────────────────────────────────────────
 const c = {
-  reset:  "\x1b[0m",
-  bold:   "\x1b[1m",
-  dim:    "\x1b[2m",
-  cyan:   "\x1b[96m",
-  green:  "\x1b[32m",
-  red:    "\x1b[31m",
-  yellow: "\x1b[33m",
-  white:  "\x1b[97m",
-  gray:   "\x1b[90m",
+  reset:    "\x1b[0m",
+  bold:     "\x1b[1m",
+  dim:      "\x1b[2m",
+  italic:   "\x1b[3m",
+  under:    "\x1b[4m",
+
+  // Standard foreground
+  black:    "\x1b[30m",
+  red:      "\x1b[31m",
+  green:    "\x1b[32m",
+  yellow:   "\x1b[33m",
+  blue:     "\x1b[34m",
+  magenta:  "\x1b[35m",
+  cyan:     "\x1b[36m",
+  white:    "\x1b[97m",
+  gray:     "\x1b[90m",
+
+  // Bright foreground
+  bred:     "\x1b[91m",
+  bgreen:   "\x1b[92m",
+  byellow:  "\x1b[93m",
+  bblue:    "\x1b[94m",
+  bmagenta: "\x1b[95m",
+  bcyan:    "\x1b[96m",
+
+  // Background
+  bgBlack:  "\x1b[40m",
+  bgRed:    "\x1b[41m",
+  bgGreen:  "\x1b[42m",
+  bgBlue:   "\x1b[44m",
+  bgCyan:   "\x1b[46m",
+};
+
+// Dimension accent colors
+const DIM_COLOR = {
+  safety:        c.bred,
+  reliability:   c.bgreen,
+  evaluation:    c.bblue,
+  observability: c.bmagenta,
+  governance:    c.byellow,
 };
 
 function scoreColor(score) {
-  if (score >= 90) return c.green;
-  if (score >= 70) return c.cyan;
-  if (score >= 50) return c.yellow;
-  return c.red;
+  if (score >= 90) return c.bgreen;
+  if (score >= 70) return c.bcyan;
+  if (score >= 50) return c.byellow;
+  return c.bred;
 }
 
 function sevColor(sev) {
-  if (sev === "critical") return c.red;
-  if (sev === "high")     return c.yellow;
-  return c.dim;
+  if (sev === "critical") return c.bred;
+  if (sev === "high")     return c.byellow;
+  if (sev === "medium")   return c.cyan;
+  return c.gray;
 }
 
-function bar(score, width = 20) {
+function sevBadge(sev) {
+  const col   = sevColor(sev);
+  const label = sev.toUpperCase().padEnd(8);
+  return `${col}${c.bold} ${label}${c.reset}`;
+}
+
+function gradeLabel(score) {
+  if (score >= 90) return `${c.bgreen}${c.bold}A${c.reset}`;
+  if (score >= 80) return `${c.bgreen}${c.bold}B${c.reset}`;
+  if (score >= 70) return `${c.byellow}${c.bold}C${c.reset}`;
+  if (score >= 60) return `${c.byellow}${c.bold}D${c.reset}`;
+  return `${c.bred}${c.bold}F${c.reset}`;
+}
+
+function bar(score, width = 22) {
   const filled = Math.max(0, Math.min(width, Math.round((score / 100) * width)));
-  return "█".repeat(filled) + "░".repeat(width - filled);
+  const col = scoreColor(score);
+  return `${col}${"█".repeat(filled)}${c.reset}${c.dim}${"░".repeat(width - filled)}${c.reset}`;
 }
 
-function hr(len = 72) { return `${c.dim}${"─".repeat(len)}${c.reset}`; }
+function hr(char = "─", len = 74, color = c.dim) {
+  return `${color}${char.repeat(len)}${c.reset}`;
+}
 
 function rpad(str, len) { return str + " ".repeat(Math.max(0, len - str.length)); }
 
@@ -58,19 +106,44 @@ function wrapText(text, maxLen) {
   return lines;
 }
 
-function today() {
+function timestamp() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+// ─── Spinner (sync-friendly, rewrites the same line) ─────────────────────────
+const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+let _spinnerIdx   = 0;
+let _spinnerTimer = null;
+let _spinnerLine  = "";
+
+function spinnerStart(msg) {
+  if (!process.stdout.isTTY) return;
+  _spinnerLine = msg;
+  _spinnerIdx  = 0;
+  _spinnerTimer = setInterval(() => {
+    const frame = SPINNER_FRAMES[_spinnerIdx++ % SPINNER_FRAMES.length];
+    process.stdout.write(`\r  ${c.cyan}${frame}${c.reset}  ${_spinnerLine}`);
+  }, 80);
+}
+
+function spinnerStop(icon, msg) {
+  if (_spinnerTimer) { clearInterval(_spinnerTimer); _spinnerTimer = null; }
+  if (process.stdout.isTTY) {
+    process.stdout.write(`\r  ${icon}  ${msg}${" ".repeat(Math.max(0, 60 - msg.length))}\n`);
+  } else {
+    console.log(`  ${icon}  ${msg}`);
+  }
+}
+
 // ─── Dimension config ─────────────────────────────────────────────────────────
-const DIM_ORDER  = ["safety", "reliability", "evaluation", "observability", "governance"];
-const DIM_LABELS = {
-  safety:        "Safety",
-  reliability:   "Reliability",
-  evaluation:    "Evaluation",
-  observability: "Observability",
-  governance:    "Governance",
+const DIM_ORDER = ["safety", "reliability", "evaluation", "observability", "governance"];
+const DIM_META  = {
+  safety:        { label: "Safety",        icon: "🛡 ", weight: "30%" },
+  reliability:   { label: "Reliability",   icon: "⚡ ", weight: "25%" },
+  evaluation:    { label: "Evaluation",    icon: "🧪 ", weight: "20%" },
+  observability: { label: "Observability", icon: "📡 ", weight: "10%" },
+  governance:    { label: "Governance",    icon: "📋 ", weight: "15%" },
 };
 
 // ─── Diagnostic Catalog ───────────────────────────────────────────────────────
@@ -274,96 +347,134 @@ function buildCatalog(scan) {
   ];
 }
 
-// ─── Check-line summary ───────────────────────────────────────────────────────
+// ─── Checks section ───────────────────────────────────────────────────────────
 const HEADER_CHECK_IDS = [
-  "secret-exposure",
-  "gitignore-env",
-  "test-signal",
-  "cicd-pipeline",
-  "eval-corpus",
-  "otel-tracing",
-  "changelog",
+  "secret-exposure", "gitignore-env",
+  "test-signal",     "cicd-pipeline",
+  "type-safety",     "eval-corpus",
+  "otel-tracing",    "changelog",
   "readme",
 ];
 
 function printCheckLines(catalog, scan) {
+  let passCount = 0;
+  let failCount = 0;
+
   for (const id of HEADER_CHECK_IDS) {
     const check = catalog.find((ch) => ch.id === id);
     if (!check) continue;
-    const icon   = check.pass ? `${c.green}[✓]${c.reset}` : `${c.red}[✗]${c.reset}`;
-    const label  = rpad(check.label, 22);
-    const detail = check.pass
-      ? `${c.gray}${check.brief}${c.reset}`
-      : `${c.yellow}${check.brief}${c.reset}`;
-    console.log(`  ${icon}  ${label}${detail}`);
+
+    if (check.pass) {
+      passCount++;
+      const icon  = `${c.bgreen}✔${c.reset}`;
+      const label = `${c.white}${rpad(check.label, 24)}${c.reset}`;
+      const brief = `${c.gray}${check.brief}${c.reset}`;
+      console.log(`  ${icon}  ${label}${brief}`);
+    } else {
+      failCount++;
+      const sevCol = sevColor(check.severity);
+      const icon   = `${sevCol}✖${c.reset}`;
+      const label  = `${c.bold}${rpad(check.label, 24)}${c.reset}`;
+      const brief  = `${sevCol}${check.brief}${c.reset}`;
+      const badge  = `  ${sevCol}${c.dim}[${check.severity}]${c.reset}`;
+      console.log(`  ${icon}  ${label}${brief}${badge}`);
+    }
   }
 
   // Git hygiene line
   const gitOk   = scan.trackedFileCount > 0;
-  const gitIcon = gitOk ? `${c.green}[✓]${c.reset}` : `${c.dim}[~]${c.reset}`;
-  const gitInfo = gitOk
+  const gitIcon = gitOk ? `${c.bgreen}✔${c.reset}` : `${c.dim}~${c.reset}`;
+  const gitLabel = `${c.white}${rpad("Git hygiene", 24)}${c.reset}`;
+  const gitInfo  = gitOk
     ? `${c.gray}${scan.trackedFileCount} files tracked${c.reset}`
     : `${c.dim}no git tracking detected${c.reset}`;
-  console.log(`  ${gitIcon}  ${rpad("Git hygiene", 22)}${gitInfo}`);
+  console.log(`  ${gitIcon}  ${gitLabel}${gitInfo}`);
+
+  return { passCount, failCount };
 }
 
 // ─── Dimension bars ───────────────────────────────────────────────────────────
 function printDimensionBars(scorecard) {
   console.log();
   for (const dim of DIM_ORDER) {
-    const score   = scorecard[dim] ?? 0;
-    const label   = rpad(DIM_LABELS[dim], 13);
-    const col     = scoreColor(score);
-    const filled  = bar(score);
+    const score    = scorecard[dim] ?? 0;
+    const meta     = DIM_META[dim];
+    const col      = DIM_COLOR[dim];
+    const barStr   = bar(score);
     const scoreStr = lpad(String(Math.round(score)), 3);
-    console.log(`  ${c.white}${label}${c.reset}  ${col}${filled}${c.reset}  ${col}${c.bold}${scoreStr}${c.reset}`);
+    const grade    = gradeLabel(score);
+    const label    = `${col}${rpad(meta.label, 14)}${c.reset}`;
+    const weight   = `${c.dim}${meta.weight}${c.reset}`;
+    console.log(`  ${meta.icon} ${label}  ${barStr}  ${scoreColor(score)}${c.bold}${scoreStr}${c.reset}  ${grade}  ${weight}`);
   }
   console.log();
 }
 
-// ─── Issue detail section ─────────────────────────────────────────────────────
+// ─── Issue cards ──────────────────────────────────────────────────────────────
 const SEV_ORDER = ["critical", "high", "medium", "low"];
 
 function printIssues(catalog) {
   const failing = catalog.filter((ch) => !ch.pass);
   if (failing.length === 0) {
-    console.log(`  ${c.green}✓${c.reset}  All checks passed — no issues to report.`);
+    console.log();
+    console.log(`  ${c.bgreen}${c.bold}✦  Perfect scan — all checks passed.${c.reset}`);
     return;
   }
 
-  // Group by dimension in DIM_ORDER, sort each group by severity
+  // ── Critical alert banner ──────────────────────────────────────────────────
+  const critCount = failing.filter((ch) => ch.severity === "critical").length;
+  if (critCount > 0) {
+    console.log();
+    console.log(`  ${c.bgRed}${c.white}${c.bold}  ⚠  CRITICAL — immediate action required  ${c.reset}`);
+  }
+
   for (const dim of DIM_ORDER) {
     const issues = failing
       .filter((ch) => ch.dim === dim)
       .sort((a, b) => SEV_ORDER.indexOf(a.severity) - SEV_ORDER.indexOf(b.severity));
     if (issues.length === 0) continue;
 
-    for (const issue of issues) {
-      const sevCol   = sevColor(issue.severity);
-      const sevLabel = issue.severity.toUpperCase();
-      const dimTitle = DIM_LABELS[dim].toUpperCase();
+    const meta   = DIM_META[dim];
+    const dimCol = DIM_COLOR[dim];
 
+    console.log();
+    console.log(`  ${dimCol}${c.bold}${meta.icon} ${meta.label.toUpperCase()}${c.reset}  ${c.dim}${"─".repeat(54)}${c.reset}`);
+
+    for (const issue of issues) {
       console.log();
-      console.log(
-        `  ${c.bold}${c.white}${dimTitle}${c.reset}  ` +
-        `${c.dim}${"─".repeat(Math.max(0, 44 - dimTitle.length))}${c.reset}  ` +
-        `${sevCol}[${sevLabel}]${c.reset}`
-      );
+
+      // Severity badge + title
+      console.log(`  ${sevBadge(issue.severity)} ${c.bold}${c.white}${issue.title}${c.reset}`);
+
+      // Why this matters
       console.log();
-      console.log(`  ${c.bold}${issue.title}${c.reset}`);
-      const wrapped = wrapText(issue.why, 68);
-      for (const line of wrapped) {
+      for (const line of wrapText(issue.why, 66)) {
         console.log(`  ${c.dim}${line}${c.reset}`);
       }
+
+      // Fix block
       console.log();
-      console.log(`  ${c.cyan}Fix ▸${c.reset}`);
+      console.log(`  ${c.cyan}${c.bold}How to fix${c.reset}  ${c.dim}${"·".repeat(54)}${c.reset}`);
       for (const line of issue.fix.split("\n")) {
-        console.log(`  ${c.gray}│${c.reset}  ${line}`);
+        if (line.startsWith("#")) {
+          console.log(`  ${c.dim}${line}${c.reset}`);
+        } else if (line.startsWith("⚠")) {
+          console.log(`  ${c.byellow}${c.bold}${line}${c.reset}`);
+        } else if (line === "") {
+          console.log();
+        } else {
+          console.log(`  ${c.bcyan}│${c.reset}  ${c.white}${line}${c.reset}`);
+        }
       }
+
+      // Docs link
       if (issue.docs) {
         console.log();
-        console.log(`  ${c.dim}Docs ▸ ${issue.docs}${c.reset}`);
+        console.log(`  ${c.dim}📖  ${issue.docs}${c.reset}`);
       }
+
+      console.log();
+      console.log(`  ${c.dim}${"·".repeat(72)}${c.reset}`);
     }
   }
 }
@@ -371,112 +482,180 @@ function printIssues(catalog) {
 // ─── Public API ───────────────────────────────────────────────────────────────
 
 /**
- * Print the full scan report to stdout.
+ * Print the full, colorful scan report.
  * @param {{ run: object, scan: object, version?: string }} opts
  */
 export function printScanReport({ run, scan, version = "?" }) {
-  const catalog  = buildCatalog(scan);
+  const catalog   = buildCatalog(scan);
   const scorecard = run.scorecard ?? {};
-  const overall  = run.summary?.overallScore ?? 0;
+  const overall   = run.summary?.overallScore ?? 0;
 
   const criticalFails = catalog.filter((ch) => !ch.pass && ch.severity === "critical").length;
+  const highFails     = catalog.filter((ch) => !ch.pass && ch.severity === "high").length;
   const totalIssues   = catalog.filter((ch) => !ch.pass).length;
-  // Use same gate as evaluate.mjs default threshold
+  const totalChecks   = HEADER_CHECK_IDS.length + 1; // +1 for git hygiene
   const overallPassed = overall >= 87 && criticalFails === 0;
 
-  // ── Header ─────────────────────────────────────────────────────────────────
+  // ── Header banner ───────────────────────────────────────────────────────────
   console.log();
-  console.log(hr());
+  console.log(hr("═"));
   console.log();
   console.log(
-    `  ${c.cyan}${c.bold}gravio${c.reset}` +
-    " ".repeat(38) +
-    `${c.dim}Gravio v${version}  ${today()}${c.reset}`
+    `  ${c.bcyan}${c.bold}  gravio  ${c.reset}` +
+    `${c.dim}AI Agent Quality Engine${c.reset}` +
+    " ".repeat(22) +
+    `${c.dim}v${version}  ${timestamp()}${c.reset}`
   );
   console.log();
-  console.log(`  Scanning  ${c.cyan}${scan.targetDir}${c.reset}`);
-  console.log(`  ${c.dim}${scan.totalFiles} files · ${scan.trackedFileCount} tracked${c.reset}`);
+  console.log(`  ${c.dim}Target   ${c.reset}${c.cyan}${scan.targetDir}${c.reset}`);
+  console.log(`  ${c.dim}Files    ${c.reset}${c.white}${scan.totalFiles}${c.reset}${c.dim} total · ${scan.trackedFileCount} git-tracked${c.reset}`);
   console.log();
+  console.log(hr("═"));
 
-  // ── Check lines ─────────────────────────────────────────────────────────────
-  printCheckLines(catalog, scan);
+  // ── Checks ──────────────────────────────────────────────────────────────────
+  console.log();
+  console.log(`  ${c.bold}${c.white}Checks${c.reset}  ${c.dim}Running ${totalChecks} quality gates${c.reset}`);
+  console.log();
+  const { passCount, failCount } = printCheckLines(catalog, scan);
 
-  // ── Dimension bars ──────────────────────────────────────────────────────────
+  // ── Pass/fail summary pill ──────────────────────────────────────────────────
+  console.log();
+  const passStr = `${c.bgreen}${c.bold}✔ ${passCount} passed${c.reset}`;
+  const failStr = failCount > 0 ? `  ${c.bred}${c.bold}✖ ${failCount} failed${c.reset}` : "";
+  console.log(`  ${passStr}${failStr}  ${c.dim}· ${scan.totalFiles} files scanned${c.reset}`);
+
+  // ── Dimension scores ─────────────────────────────────────────────────────────
   console.log();
   console.log(hr());
+  console.log();
+  console.log(`  ${c.bold}${c.white}Scores${c.reset}  ${c.dim}Five dimensions of agent quality${c.reset}`);
   printDimensionBars(scorecard);
 
-  // ── Score summary ───────────────────────────────────────────────────────────
+  // ── Overall score banner ─────────────────────────────────────────────────────
   console.log(hr());
   console.log();
 
+  const grade     = gradeLabel(overall);
   const passLabel = overallPassed
-    ? `${c.green}${c.bold} PASS ${c.reset}`
-    : `${c.red}${c.bold} FAIL ${c.reset}`;
-
-  const critStr = criticalFails > 0
-    ? `  ${c.red}·  ${criticalFails} critical risk${criticalFails !== 1 ? "s" : ""}${c.reset}`
-    : `  ${c.dim}·  0 critical risks${c.reset}`;
-
-  const issueStr = totalIssues > 0
-    ? `  ${c.dim}·  ${totalIssues} issue${totalIssues !== 1 ? "s" : ""}${c.reset}`
-    : "";
+    ? `${c.bgGreen}${c.black}${c.bold}  PASS  ${c.reset}`
+    : `${c.bgRed}${c.white}${c.bold}  FAIL  ${c.reset}`;
 
   console.log(
-    `  Score: ${c.cyan}${c.bold}${overall.toFixed(1)}${c.reset} / 100` +
-    `  ·  ${passLabel}${critStr}${issueStr}`
+    `  ${c.dim}Overall score${c.reset}   ` +
+    `${scoreColor(overall)}${c.bold}${overall.toFixed(1)}${c.reset}${c.dim} / 100${c.reset}` +
+    `   ${grade}   ${passLabel}`
   );
+  console.log();
+
+  // Stats row
+  const critStr  = criticalFails > 0
+    ? `${c.bred}${c.bold}⚠ ${criticalFails} critical${c.reset}`
+    : `${c.bgreen}✔ 0 critical${c.reset}`;
+  const highStr  = highFails > 0
+    ? `  ${c.byellow}⚠ ${highFails} high${c.reset}`
+    : `  ${c.dim}0 high${c.reset}`;
+  const issueStr = totalIssues > 0
+    ? `  ${c.dim}${totalIssues} issue${totalIssues !== 1 ? "s" : ""} total${c.reset}`
+    : `  ${c.dim}0 issues${c.reset}`;
+
+  console.log(`  ${critStr}${highStr}${issueStr}`);
   console.log();
   console.log(hr());
 
-  // ── Issues section ──────────────────────────────────────────────────────────
+  // ── Issues ──────────────────────────────────────────────────────────────────
   if (totalIssues > 0) {
     console.log();
-    console.log(
-      `  ${c.bold}${c.white}Issues  (${totalIssues})${c.reset}` +
-      `  ${c.dim}${"─".repeat(56)}${c.reset}`
-    );
+    console.log(`  ${c.bold}${c.white}Issues${c.reset}  ${c.dim}${totalIssues} thing${totalIssues !== 1 ? "s" : ""} to fix${c.reset}`);
     printIssues(catalog);
+    console.log(hr());
+  } else {
+    console.log();
+    console.log(`  ${c.bgreen}${c.bold}✦  Excellent — all checks passed. Your agent is production-grade.${c.reset}`);
     console.log();
     console.log(hr());
   }
 
+  // ── Next step hint ───────────────────────────────────────────────────────────
+  console.log();
+  console.log(`  ${c.dim}Next  ${c.reset}${c.cyan}gravio.dev/dashboard${c.reset}${c.dim}  →  view trends & history${c.reset}`);
   console.log();
 }
 
 /**
- * Print a compact one-line update for watch mode.
- * @param {{ run: object, scan: object }} opts
+ * Print a compact, colorful one-line update for watch mode.
  */
 export function printWatchUpdate({ run, scan }) {
   const scorecard = run.scorecard ?? {};
   const overall   = run.summary?.overallScore ?? 0;
-  const now       = new Date();
-  const time      = [now.getHours(), now.getMinutes(), now.getSeconds()]
-    .map((n) => String(n).padStart(2, "0")).join(":");
   const passed    = overall >= 87;
-  const passLabel = passed ? `${c.green}PASS${c.reset}` : `${c.red}FAIL${c.reset}`;
-  const dims      = DIM_ORDER
-    .map((d) => `${d.slice(0, 3)}: ${scoreColor(scorecard[d] ?? 0)}${Math.round(scorecard[d] ?? 0)}${c.reset}`)
+  const passLabel = passed
+    ? `${c.bgGreen}${c.black}${c.bold} PASS ${c.reset}`
+    : `${c.bgRed}${c.white}${c.bold} FAIL ${c.reset}`;
+
+  const dims = DIM_ORDER
+    .map((d) => {
+      const score = Math.round(scorecard[d] ?? 0);
+      const meta  = DIM_META[d];
+      return `${meta.icon}${DIM_COLOR[d]}${score}${c.reset}`;
+    })
     .join("  ");
 
+  const now  = new Date();
+  const time = [now.getHours(), now.getMinutes(), now.getSeconds()]
+    .map((n) => String(n).padStart(2, "0")).join(":");
+
   console.log(
-    `  ${c.dim}[${time}]${c.reset}  Score: ${c.cyan}${c.bold}${overall.toFixed(1)}${c.reset}/100` +
-    `  ${passLabel}  ${c.dim}${dims}${c.reset}`
+    `\n  ${c.dim}[${time}]${c.reset}  ` +
+    `${scoreColor(overall)}${c.bold}${overall.toFixed(1)}${c.reset}${c.dim}/100${c.reset}  ` +
+    `${passLabel}  ` +
+    `${dims}  ` +
+    `${c.dim}${scan.totalFiles} files${c.reset}`
   );
 }
 
 /**
- * Print the publish result line(s).
- * @param {{ server: string, project: string, success: boolean, error?: string }} opts
+ * Print a scan progress bar (reuses same line on TTY).
+ */
+export function printScanStep(step) {
+  const SCAN_STEPS = [
+    "Reading file tree",
+    "Checking git tracking",
+    "Analysing safety signals",
+    "Analysing reliability signals",
+    "Analysing evaluation signals",
+    "Analysing observability signals",
+    "Analysing governance signals",
+    "Computing scorecard",
+  ];
+  if (!process.stdout.isTTY) return;
+  const total  = SCAN_STEPS.length;
+  const cur    = Math.min(step, total);
+  const pct    = Math.round((cur / total) * 100);
+  const barW   = 28;
+  const filled = Math.round((cur / total) * barW);
+  const b      = `${c.cyan}${"█".repeat(filled)}${c.reset}${c.dim}${"░".repeat(barW - filled)}${c.reset}`;
+  const label  = step < total ? (SCAN_STEPS[step] ?? "") : "Complete";
+  process.stdout.write(
+    `\r  ${b}  ${c.dim}${lpad(String(pct), 3)}%${c.reset}  ${c.gray}${label}${" ".repeat(36)}${c.reset}`
+  );
+}
+
+/**
+ * Print the publish result.
  */
 export function printPublishResult({ server, project, success, error }) {
   console.log();
   if (success) {
-    const dashUrl = `${server}/dashboard?project=${encodeURIComponent(project)}`;
-    console.log(`  ${c.green}[✓]${c.reset}  Published to ${c.cyan}${dashUrl}${c.reset}`);
+    const dashUrl = `${server}/dashboard`;
+    console.log(`  ${c.bgreen}${c.bold}✔  Published${c.reset}  ${c.dim}→${c.reset}  ${c.cyan}${c.under}${dashUrl}${c.reset}`);
+    console.log(`  ${c.dim}Project${c.reset}  ${c.white}${project}${c.reset}`);
+    console.log();
+    console.log(`  ${c.dim}Open your dashboard to view trends, history, and issue details.${c.reset}`);
   } else {
-    console.log(`  ${c.red}[✗]${c.reset}  Publish failed: ${error ?? "unknown error"}`);
+    console.log(`  ${c.bred}${c.bold}✖  Publish failed${c.reset}  ${c.dim}${error ?? "unknown error"}${c.reset}`);
+    console.log();
+    console.log(`  ${c.dim}Check your --api-key and --server flags, then try again.${c.reset}`);
+    console.log(`  ${c.dim}Create an API key at ${c.reset}${c.cyan}gravio.dev/dashboard${c.reset}`);
   }
   console.log();
 }
