@@ -172,8 +172,18 @@ const server = http.createServer(async (req, res) => {
     }
     try {
       const body = await readBody(req);
-      const { label } = body ? JSON.parse(body) : {};
-      const key = generateApiKey(user.uid ?? user.id, label ?? "default");
+      const { label: rawLabel } = body ? JSON.parse(body) : {};
+      // Deduplicate label: if "default" exists, use "default 2", "default 3", …
+      const baseLabel = (typeof rawLabel === "string" && rawLabel.trim()) ? rawLabel.trim() : "default";
+      const existingKeys = stmts.listApiKeys.all(user.uid ?? user.id);
+      const usedLabels = new Set(existingKeys.map((k) => k.label));
+      let label = baseLabel;
+      if (usedLabels.has(label)) {
+        let n = 2;
+        while (usedLabels.has(`${baseLabel} ${n}`)) n++;
+        label = `${baseLabel} ${n}`;
+      }
+      const key = generateApiKey(user.uid ?? user.id, label);
       const keys = stmts.listApiKeys.all(user.uid ?? user.id);
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ ok: true, key, keys }));

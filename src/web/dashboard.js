@@ -83,7 +83,7 @@ function renderKeyList(keys) {
   list.innerHTML = keys.map((k) => `
     <li class="db-key-item">
       <span class="db-key-label">${esc(k.label)}</span>
-      <span class="db-key-created">${new Date(k.created_at).toLocaleDateString()}</span>
+      <span class="db-key-created">${new Date(k.created_at).toLocaleString([], { dateStyle: "short", timeStyle: "short" })}</span>
       <button class="adm-act-btn adm-act-danger" data-key-id="${k.id}" type="button">Revoke</button>
     </li>
   `).join("");
@@ -98,10 +98,25 @@ function renderKeyList(keys) {
 }
 
 $("db-gen-key").addEventListener("click", async () => {
-  const label = $("db-key-label").value.trim() || "default";
+  const raw = $("db-key-label").value.trim() || "default";
   const btn = $("db-gen-key");
   btn.disabled = true;
   try {
+    // Resolve existing labels so we can auto-increment duplicates client-side
+    // before sending, keeping the UX fast (server also deduplicates as fallback).
+    const existingRes = await fetch("/api/keys");
+    let existingLabels = new Set();
+    if (existingRes.ok) {
+      const { keys } = await existingRes.json();
+      existingLabels = new Set((keys ?? []).map((k) => k.label));
+    }
+    // Build a unique label: "default" → "default 2" → "default 3" …
+    let label = raw;
+    if (existingLabels.has(label)) {
+      let n = 2;
+      while (existingLabels.has(`${raw} ${n}`)) n++;
+      label = `${raw} ${n}`;
+    }
     const res = await fetch("/api/keys", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
