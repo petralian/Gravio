@@ -11,7 +11,7 @@ let currentUser = null;
 const elStartFree = document.getElementById("ob-start-free");
 const elAuthOk = document.getElementById("ob-auth-ok");
 const elProjectId = document.getElementById("ob-project-id");
-const elCmdPublish = document.getElementById("cmd-publish");
+const elCmdAuthorize = document.getElementById("cmd-authorize");
 const elDashboardLink = document.getElementById("ob-dashboard-link");
 
 const elModalWrap = document.getElementById("ob-auth-modal-wrap");
@@ -30,8 +30,8 @@ function getProjectId() {
 
 function updateProjectCommands() {
   const projectId = getProjectId();
-  if (elCmdPublish) {
-    elCmdPublish.textContent = `node gravio.mjs --once --target . --publish --project ${projectId} --server https://gravio.dev --api-key gv_your_api_key_here`;
+  if (elCmdAuthorize) {
+    elCmdAuthorize.textContent = `node gravio.mjs --authorize --target . --project ${projectId} --server https://gravio.dev --api-key gv_your_api_key_here`;
   }
   if (elDashboardLink) {
     elDashboardLink.href = `/dashboard?project=${encodeURIComponent(projectId)}`;

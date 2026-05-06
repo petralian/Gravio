@@ -106,6 +106,11 @@ npm run scorecard:scan         # One-time scanner run to generate latest.json
 npm run scorecard:scan:watch   # Watch target folder and regenerate latest.json on change
 npm run secret-scan            # Run secret scanner
 npm run verify                 # secret-scan + tests + gate (full CI check)
+
+# CLI authorize + encrypted publish flow
+node gravio.mjs --authorize --target . --project my-project --server https://gravio.dev --api-key gv_xxx
+node gravio.mjs --once --target .   # scan is blocked unless authorized; then writes encrypted latest.json and auto-publishes
+node gravio.mjs --logout --target . # remove local .gravio/auth.json
 ```
 
 ---
@@ -119,6 +124,16 @@ npm run verify                 # secret-scan + tests + gate (full CI check)
 **sessions** — `id, user_id, token_hash, expires_at`
 **api_keys** — `id, user_id, key_hash, label, created_at`
 **runs** — `id, project_id, user_id, ciphertext, published_at`
+
+---
+
+## Encrypted Run Envelope Contract
+
+- `POST /api/publish` accepts `run` as either legacy plaintext run JSON or encrypted envelope JSON.
+- Encrypted envelopes use `format: "gravio-run-v1"` and store only ciphertext plus key-derivation metadata.
+- New CLI behavior writes encrypted local artifact files (`agent-quality/runs/latest.json`) by default.
+- Dashboard decrypts envelope payload client-side (WebCrypto) using one of: API key mode, passphrase mode, or raw key mode.
+- Server continues blind storage only (`runs.ciphertext`), with no server-side decrypt path.
 
 ---
 

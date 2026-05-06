@@ -50,20 +50,20 @@
 
       <article class="ob-step-card">
         <p class="ob-step-num">Step 3</p>
-        <h2>Run your first local scan</h2>
-        <p>From the same folder where you downloaded <code>gravio.mjs</code>, run:</p>
-        <pre class="ob-code" id="cmd-local">node gravio.mjs --once --target .</pre>
-        <button class="m-btn m-btn-outline ob-copy" type="button" data-copy-id="cmd-local">Copy command</button>
-        <p class="ob-step-foot">Writes <code>agent-quality/runs/latest.json</code> next to the file. No data leaves your machine.</p>
+        <h2>Authorize this folder once</h2>
+        <p>Generate an API key on the <a href="/dashboard">dashboard</a>, then run:</p>
+        <pre class="ob-code" id="cmd-authorize">node gravio.mjs --authorize --target . --project my-first-project --server https://gravio.dev --api-key gv_your_api_key_here</pre>
+        <button class="m-btn m-btn-outline ob-copy" type="button" data-copy-id="cmd-authorize">Copy command</button>
+        <p class="ob-step-foot">Scanning is blocked until this is done. Authorization is saved locally for this folder.</p>
       </article>
 
       <article class="ob-step-card">
         <p class="ob-step-num">Step 4</p>
-        <h2>Publish encrypted results</h2>
-        <p>Free plan includes 3 cloud scans after registration. Generate an API key on the <a href="/dashboard">dashboard</a> first, then run:</p>
-        <pre class="ob-code" id="cmd-publish">node gravio.mjs --once --target . --publish --project my-first-project --server https://gravio.dev --api-key gv_your_api_key_here</pre>
-        <button class="m-btn m-btn-outline ob-copy" type="button" data-copy-id="cmd-publish">Copy command</button>
-        <p class="ob-step-foot">The CLI prints your encryption key on first run — copy and keep it. Without it, your scorecard cannot be decrypted on the dashboard.</p>
+        <h2>Run your first local scan</h2>
+        <p>From the same folder where you downloaded <code>gravio.mjs</code>, run:</p>
+        <pre class="ob-code" id="cmd-local">node gravio.mjs --once --target .</pre>
+        <button class="m-btn m-btn-outline ob-copy" type="button" data-copy-id="cmd-local">Copy command</button>
+        <p class="ob-step-foot">Writes an encrypted <code>agent-quality/runs/latest.json</code> envelope and auto-publishes securely.</p>
       </article>
 
       <article class="ob-step-card">
@@ -136,11 +136,11 @@
       </details>
       <details>
         <summary>What does the local scan actually look at?</summary>
-        <p>It walks the target folder for evidence of secret hygiene, test signal, changelog, session notes, and git status — and writes <code>agent-quality/runs/latest.json</code>. It never reads <code>.env</code> contents and never sends data anywhere unless you pass <code>--publish</code>.</p>
+        <p>It walks the target folder for evidence of secret hygiene, test signal, changelog, session notes, and git status — then writes an encrypted envelope to <code>agent-quality/runs/latest.json</code>. It never reads <code>.env</code> contents and never publishes unless you authorize this folder.</p>
       </details>
       <details>
-        <summary>I lost my encryption key. Can I still see my scorecard?</summary>
-        <p>No. Gravio is zero-knowledge — the server never sees your key. If you lose it, the encrypted run cannot be decrypted. Re-run the scan with <code>--publish</code> to generate a new key.</p>
+        <summary>How does decryption work on the dashboard?</summary>
+        <p>For runs published with authorization, enter the same API key on the dashboard to decrypt in-browser. The server stores ciphertext only.</p>
       </details>
       <details>
         <summary>Why was I getting logged out?</summary>

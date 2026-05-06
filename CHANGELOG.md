@@ -12,6 +12,9 @@ All notable changes to this project will be documented in this file.
 - Admin dashboard: new Plan column with inline `<select>` dropdown; free users show scan count as `used / 3`, paid users show bare count.
 - `/api/me` now returns `plan` field so frontends can gate features by tier.
 - Pro and Team plan users bypass the 3-project publish limit (only Free users are gated).
+- CLI local authorization state at `.gravio/auth.json` via `node gravio.mjs --authorize ...` and revocation via `node gravio.mjs --logout`.
+- Scanner now writes encrypted `agent-quality/runs/latest.json` envelopes (`format: gravio-run-v1`) instead of plaintext run JSON.
+- Dashboard decryption mode for API keys, with browser-side WebCrypto decrypt for encrypted run envelopes.
 
 ### Changed
 - Marketing copy now requires registration before cloud scoring and replaces misleading global `agentscored` install examples with real project commands.
@@ -26,6 +29,10 @@ All notable changes to this project will be documented in this file.
 - Onboarding flow is now register-first with in-page auth modal, project-first step ordering, and live command updates from the chosen project name.
 - Onboarding copy now clarifies that commands must be run in a real project directory (not random folders) to avoid npm/scan command confusion.
 - Canonical host redirects now keep browser sessions on `gravio.dev` (including redirect from `gravio-platform.fly.dev` and `www.gravio.dev`) to improve session continuity.
+- CLI `--once` now auto-publishes when a local folder is authorized, reducing repeated `--project/--api-key` flags.
+- CLI now blocks all scans until folder authorization exists (`--authorize`), and no longer requires a separate manual publish step.
+- `/api/publish` and `/api/runs/:projectId` now support encrypted run envelopes end-to-end while keeping legacy plaintext run compatibility.
+- Onboarding Step 4 now uses the authorize-once flow before scan/publish.
 
 ## [0.4.0] — 2026-05-05
 

@@ -292,7 +292,16 @@ describe("POST /api/publish + GET /api/runs/:projectId (authenticated)", () => {
   let cookie;
   let apiKey;
   const testRun = { runId: "test-run-001", summary: { overallScore: 75 }, scorecard: { safety: 80 } };
+  const encryptedRun = {
+    format: "gravio-run-v1",
+    encryptedAt: new Date().toISOString(),
+    cipher: "aes-256-gcm",
+    keyMode: "api-key",
+    kdf: { name: "pbkdf2-sha256", iterations: 210000, saltHex: "ab".repeat(32) },
+    ciphertext: "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=",
+  };
   const projectId = `test-proj-${Date.now()}`;
+  const encryptedProjectId = `test-proj-enc-${Date.now()}`;
 
   it("setup: register + create API key", async () => {
     cookie = await registerAndGetCookie(email, "password123");
@@ -318,6 +327,21 @@ describe("POST /api/publish + GET /api/runs/:projectId (authenticated)", () => {
     const data = JSON.parse(res.body);
     assert.strictEqual(data.run?.runId, testRun.runId);
     assert.ok(typeof data.publishedAt === "string");
+  });
+
+  it("stores and retrieves encrypted run envelopes", async () => {
+    const store = await httpPost(
+      `http://localhost:${TEST_PORT}/api/publish`,
+      { projectId: encryptedProjectId, run: encryptedRun },
+      { Authorization: `Bearer ${apiKey}` },
+    );
+    assert.strictEqual(store.status, 200);
+
+    const fetch = await httpGet(`http://localhost:${TEST_PORT}/api/runs/${encryptedProjectId}`, { Cookie: cookie });
+    assert.strictEqual(fetch.status, 200);
+    const data = JSON.parse(fetch.body);
+    assert.strictEqual(data.run?.format, "gravio-run-v1");
+    assert.strictEqual(data.run?.ciphertext, encryptedRun.ciphertext);
   });
 
   it("returns 401 for unauthenticated publish", async () => {

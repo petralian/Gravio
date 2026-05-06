@@ -12,3 +12,6 @@ data/
 # Build / temp
 *.log
 .DS_Store
+
+# Gravio local CLI auth/config
+.gravio/
