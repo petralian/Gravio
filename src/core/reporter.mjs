@@ -415,13 +415,94 @@ function buildCatalog(scan) {
 }
 
 // ─── Checks section ───────────────────────────────────────────────────────────
+// Critical + high severity checks shown in the header summary.
 const HEADER_CHECK_IDS = [
-  "secret-exposure", "gitignore-env",
-  "test-signal",     "cicd-pipeline",
-  "type-safety",     "eval-corpus",
-  "otel-tracing",    "changelog",
-  "readme",          "agent-instructions",
+  "secret-exposure",      "gitignore-env",
+  "cloud-credential-files","dep-vuln-check",
+  "test-signal",          "cicd-pipeline",
+  "type-safety",          "eval-corpus",
+  "adversarial-tests",    "otel-tracing",
+  "changelog",            "readme",
+  "agent-instructions",   "safety-rules",
 ];
+
+// ─── Recommendations section ─────────────────────────────────────────────────
+const DIFFICULTY_LABEL = {
+  "quick-win":     "QUICK WIN",
+  "medium":        "MEDIUM",
+  "deep-refactor": "DEEP REFACTOR",
+  "architectural": "ARCHITECTURAL",
+};
+const DIFFICULTY_COLOR = {
+  "quick-win":     (c) => c.bgreen,
+  "medium":        (c) => c.byellow,
+  "deep-refactor": (c) => c.bmagenta,
+  "architectural": (c) => c.bred,
+};
+
+function printRecommendations(catalog) {
+  const failing = catalog
+    .filter((ch) => !ch.pass)
+    .sort((a, b) => {
+      // Sort by: severity weight DESC, then impactScore DESC, then estimatedMinutes ASC
+      const sevWeight = { critical: 4, high: 3, medium: 2, low: 1 };
+      const sevDiff = (sevWeight[b.severity] ?? 0) - (sevWeight[a.severity] ?? 0);
+      if (sevDiff !== 0) return sevDiff;
+      const impDiff = (b.impactScore ?? 0) - (a.impactScore ?? 0);
+      if (impDiff !== 0) return impDiff;
+      return (a.estimatedMinutes ?? 999) - (b.estimatedMinutes ?? 999);
+    })
+    .slice(0, 5);
+
+  if (failing.length === 0) return;
+
+  console.log();
+  console.log(hr());
+  console.log();
+  console.log(`  ${c.bold}${c.white}Next Steps${c.reset}  ${c.dim}Top ${failing.length} recommendations ordered by ROI${c.reset}`);
+  console.log();
+
+  for (let i = 0; i < failing.length; i++) {
+    const ch = failing[i];
+    const diffColor = (DIFFICULTY_COLOR[ch.difficulty] ?? ((x) => x.gray))(c);
+    const diffLabel = DIFFICULTY_LABEL[ch.difficulty] ?? ch.difficulty;
+    const timeStr   = ch.estimatedMinutes >= 60
+      ? `${Math.round(ch.estimatedMinutes / 60)}h`
+      : `${ch.estimatedMinutes}min`;
+    const impStr    = `+${ch.impactScore ?? "?"}pts`;
+    const dimMeta   = DIM_META[ch.dim] ?? { icon: "?", label: ch.dim };
+    const subdimStr = ch.subdim ? `${c.dim}${ch.subdim}${c.reset}` : "";
+
+    console.log(
+      `  ${c.bold}${c.white}${i + 1}${c.reset}  ` +
+      `${diffColor}[${diffLabel}]${c.reset}  ` +
+      `${c.byellow}${timeStr}${c.reset}  ` +
+      `${c.bgreen}${impStr}${c.reset}  ` +
+      `${dimMeta.icon} ${c.dim}${ch.dim}${ch.subdim ? "/" + ch.subdim : ""}${c.reset}`
+    );
+    console.log(
+      `     ${c.bold}${c.white}${ch.label}${c.reset}  ` +
+      `${sevColor(ch.severity)}[${ch.severity}]${c.reset}`
+    );
+    if (ch.action) {
+      console.log(`     ${c.dim}→  ${c.reset}${c.gray}${ch.action}${c.reset}`);
+    }
+    if (i < failing.length - 1) console.log();
+  }
+
+  const quickWinCount = failing.filter((ch) => ch.difficulty === "quick-win").length;
+  const totalMins     = failing
+    .filter((ch) => ch.difficulty === "quick-win")
+    .reduce((s, ch) => s + (ch.estimatedMinutes ?? 0), 0);
+
+  if (quickWinCount > 0) {
+    console.log();
+    console.log(
+      `  ${c.dim}${quickWinCount} quick win${quickWinCount !== 1 ? "s" : ""} above — ` +
+      `estimated ${totalMins < 60 ? totalMins + " min" : Math.ceil(totalMins / 60) + "h"} total${c.reset}`
+    );
+  }
+}
 
 function printCheckLines(catalog, scan) {
   let passCount = 0;
@@ -559,6 +640,9 @@ export function printScanReport({ run, scan, version = "?" }) {
   console.log(`  ${critStr}${highStr}${issueStr}`);
   console.log();
   console.log(hr());
+
+  // ── Next Steps / Recommendations ───────────────────────────────────────────
+  printRecommendations(catalog);
 
   // ── Dashboard CTA — remediation detail lives server-side ───────────────────
   console.log();
