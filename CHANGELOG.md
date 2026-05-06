@@ -33,6 +33,7 @@ All notable changes to this project will be documented in this file.
 - Onboarding hero CTA now adapts to session state, hiding "Create account or sign in" for logged-in users and showing "Open dashboard" instead.
 - Marketing header now removes the separate onboarding menu item and routes "Start free" directly to guided onboarding.
 - Onboarding flow is now register-first with in-page auth modal, project-first step ordering, and live command updates from the chosen project name.
+- Onboarding steps remain visible to anonymous users, but exact copy-paste CLI commands are now hidden until users register or sign in.
 - Onboarding copy now clarifies that commands must be run in a real project directory (not random folders) to avoid npm/scan command confusion.
 - Canonical host redirects now keep browser sessions on `gravio.dev` (including redirect from `gravio-platform.fly.dev` and `www.gravio.dev`) to improve session continuity.
 - CLI `--once` now auto-publishes when a local folder is authorized, reducing repeated `--project/--api-key` flags.

@@ -7,6 +7,7 @@
  */
 
 let currentUser = null;
+let onboardingCliToken = null;
 
 const elStartFree = document.getElementById("ob-start-free");
 const elAuthOk = document.getElementById("ob-auth-ok");
@@ -30,11 +31,24 @@ function getProjectId() {
 
 function updateProjectCommands() {
   const projectId = getProjectId();
+  const tokenPart = onboardingCliToken ?? "gv_sign_in_to_auto_fill_token";
   if (elCmdAuthorize) {
-    elCmdAuthorize.textContent = `node gravio.mjs --authorize --target . --project ${projectId} --server https://gravio.dev --api-key gv_your_api_key_here`;
+    elCmdAuthorize.textContent = `node gravio.mjs --authorize --target . --project ${projectId} --server https://gravio.dev --api-key ${tokenPart}`;
   }
   if (elDashboardLink) {
     elDashboardLink.href = `/dashboard?project=${encodeURIComponent(projectId)}`;
+  }
+}
+
+async function fetchOnboardingCliToken() {
+  try {
+    const res = await fetch("/api/keys/onboarding", { method: "POST" });
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (!data?.key || typeof data.key !== "string") return null;
+    return data.key;
+  } catch {
+    return null;
   }
 }
 
@@ -58,19 +72,27 @@ function closeAuthModal() {
   elModalWrap?.setAttribute("hidden", "");
 }
 
-function applyAuthState(user) {
+async function applyAuthState(user) {
   currentUser = user;
   if (user) {
+    onboardingCliToken = await fetchOnboardingCliToken();
+    updateProjectCommands();
     if (elStartFree) elStartFree.textContent = "Account connected";
-    setAuthStatusMessage(`Signed in as ${user.email}. Continue with steps below.`);
+    if (onboardingCliToken) {
+      setAuthStatusMessage(`Signed in as ${user.email}. Your Step 3 command is auto-filled with a user-bound auth token.`);
+    } else {
+      setAuthStatusMessage(`Signed in as ${user.email}. Continue with steps below.`);
+    }
   } else {
+    onboardingCliToken = null;
+    updateProjectCommands();
     if (elStartFree) elStartFree.textContent = "Create account or sign in";
     clearAuthStatusMessage();
   }
 }
 
 document.addEventListener("site:auth", (e) => {
-  applyAuthState(e.detail?.user ?? null);
+  void applyAuthState(e.detail?.user ?? null);
 });
 
 function showError(id, msg) {
@@ -120,6 +142,16 @@ elStartFree?.addEventListener("click", () => {
   openAuthModal();
 });
 
+document.querySelectorAll(".ob-open-auth").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    if (currentUser) {
+      setAuthStatusMessage("You're signed in. Continue with steps 1-4 below.");
+      return;
+    }
+    openAuthModal();
+  });
+});
+
 elModalBackdrop?.addEventListener("click", closeAuthModal);
 elModalClose?.addEventListener("click", closeAuthModal);
 document.addEventListener("keydown", (e) => {
@@ -147,7 +179,7 @@ document.getElementById("ob-form-login")?.addEventListener("submit", async (e) =
     }
     closeAuthModal();
     if (window.siteChrome?.refresh) await window.siteChrome.refresh();
-    else applyAuthState({ email });
+    else await applyAuthState({ email });
   } catch {
     showError("ob-login-error", "Network error — please try again");
   } finally {
@@ -183,7 +215,7 @@ document.getElementById("ob-form-register")?.addEventListener("submit", async (e
     }
     closeAuthModal();
     if (window.siteChrome?.refresh) await window.siteChrome.refresh();
-    else applyAuthState({ email });
+    else await applyAuthState({ email });
   } catch {
     showError("ob-reg-error", "Network error — please try again");
   } finally {
@@ -200,6 +232,10 @@ function setCopied(btn, copied) {
 }
 
 async function copyFromPre(preId, btn) {
+  if (!currentUser) {
+    openAuthModal();
+    return;
+  }
   const pre = document.getElementById(preId);
   if (!pre) return;
   const text = pre.textContent.trim();

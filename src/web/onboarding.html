@@ -39,30 +39,51 @@
       <article class="ob-step-card">
         <p class="ob-step-num">Step 2</p>
         <h2>Download the Gravio CLI</h2>
-        <p>One file, no install. Drops <code>gravio.mjs</code> into your current folder. Requires Node.js 20 or newer.</p>
-        <p class="ob-os-label">macOS / Linux:</p>
-        <pre class="ob-code" id="cmd-download-unix">curl -fsSL https://gravio.dev/cli/gravio.mjs -o gravio.mjs</pre>
-        <button class="m-btn m-btn-outline ob-copy" type="button" data-copy-id="cmd-download-unix">Copy command</button>
-        <p class="ob-os-label">Windows (PowerShell):</p>
-        <pre class="ob-code" id="cmd-download-win">Invoke-WebRequest https://gravio.dev/cli/gravio.mjs -OutFile gravio.mjs</pre>
-        <button class="m-btn m-btn-outline ob-copy" type="button" data-copy-id="cmd-download-win">Copy command</button>
+        <p>One file, no install. Drops <code>gravio.mjs</code> into your current folder. Then run setup once to verify Node.js 20+ and install detected repo dependencies.</p>
+        <div data-auth-only hidden>
+          <p class="ob-os-label">macOS / Linux:</p>
+          <pre class="ob-code" id="cmd-download-unix">curl -fsSL https://gravio.dev/cli/gravio.mjs -o gravio.mjs</pre>
+          <button class="m-btn m-btn-outline ob-copy" type="button" data-copy-id="cmd-download-unix">Copy command</button>
+          <p class="ob-os-label">Windows (PowerShell):</p>
+          <pre class="ob-code" id="cmd-download-win">Invoke-WebRequest https://gravio.dev/cli/gravio.mjs -OutFile gravio.mjs</pre>
+          <button class="m-btn m-btn-outline ob-copy" type="button" data-copy-id="cmd-download-win">Copy command</button>
+          <p class="ob-os-label">Run setup once (all OS):</p>
+          <pre class="ob-code" id="cmd-setup">node gravio.mjs --setup --target .</pre>
+          <button class="m-btn m-btn-outline ob-copy" type="button" data-copy-id="cmd-setup">Copy command</button>
+        </div>
+        <div data-anon-only hidden>
+          <p class="ob-step-foot">Create an account or sign in to unlock exact download and setup commands for your environment.</p>
+          <button class="m-btn m-btn-outline ob-open-auth" type="button">Create account or sign in</button>
+        </div>
       </article>
 
       <article class="ob-step-card">
         <p class="ob-step-num">Step 3</p>
         <h2>Authorize this folder once</h2>
-        <p>Generate an API key on the <a href="/dashboard">dashboard</a>, then run:</p>
-        <pre class="ob-code" id="cmd-authorize">node gravio.mjs --authorize --target . --project my-first-project --server https://gravio.dev --api-key gv_your_api_key_here</pre>
-        <button class="m-btn m-btn-outline ob-copy" type="button" data-copy-id="cmd-authorize">Copy command</button>
-        <p class="ob-step-foot">Scanning is blocked until this is done. Authorization is saved locally for this folder.</p>
+        <p>After sign-in, we auto-generate a user-bound CLI auth token for this command:</p>
+        <div data-auth-only hidden>
+          <pre class="ob-code" id="cmd-authorize">node gravio.mjs --authorize --target . --project my-first-project --server https://gravio.dev --api-key gv_sign_in_to_auto_fill_token</pre>
+          <button class="m-btn m-btn-outline ob-copy" type="button" data-copy-id="cmd-authorize">Copy command</button>
+        </div>
+        <div data-anon-only hidden>
+          <p class="ob-step-foot">Sign in to unlock your exact authorize command with your chosen project name.</p>
+          <button class="m-btn m-btn-outline ob-open-auth" type="button">Create account or sign in</button>
+        </div>
+        <p class="ob-step-foot">Scanning is blocked until this is done. Authorization is saved locally for this folder. Reopening this page while signed in rotates the onboarding token.</p>
       </article>
 
       <article class="ob-step-card">
         <p class="ob-step-num">Step 4</p>
         <h2>Run your first local scan</h2>
         <p>From the same folder where you downloaded <code>gravio.mjs</code>, run:</p>
-        <pre class="ob-code" id="cmd-local">node gravio.mjs --once --target .</pre>
-        <button class="m-btn m-btn-outline ob-copy" type="button" data-copy-id="cmd-local">Copy command</button>
+        <div data-auth-only hidden>
+          <pre class="ob-code" id="cmd-local">node gravio.mjs --once --target .</pre>
+          <button class="m-btn m-btn-outline ob-copy" type="button" data-copy-id="cmd-local">Copy command</button>
+        </div>
+        <div data-anon-only hidden>
+          <p class="ob-step-foot">Sign in to unlock the first-scan command and copy it directly.</p>
+          <button class="m-btn m-btn-outline ob-open-auth" type="button">Create account or sign in</button>
+        </div>
         <p class="ob-step-foot">Cloud-only mode: scans are encrypted and auto-published securely. No local JSON scorecard is written.</p>
       </article>
 

@@ -4,6 +4,7 @@
  *
  * Gravio Scanner CLI — entry point.
  * Usage:
+ *   node scripts/gravio-scan.mjs --setup --target .
  *   node scripts/gravio-scan.mjs --authorize --project my-saas --api-key gv_xxx --server https://gravio.dev
  *   node scripts/gravio-scan.mjs --once
  *   node scripts/gravio-scan.mjs --target ../some-project --once
@@ -11,6 +12,8 @@
  * Optional encryption modes:
  *   node scripts/gravio-scan.mjs --once --key <64-char-hex>
  *   node scripts/gravio-scan.mjs --once --passphrase "my secret" --salt <hex>
+ *
+ * First run automatically performs setup unless --no-setup is provided.
  */
 import path from "node:path";
 import http from "node:http";
@@ -18,7 +21,7 @@ import https from "node:https";
 import { readFileSync, writeFileSync, chmodSync, existsSync, mkdirSync, unlinkSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { runScannerOnce, startScannerWatcher } from "../src/core/scanner.mjs";
 import { printScanReport, printWatchUpdate, printPublishResult, printScanStep } from "../src/core/reporter.mjs";
 import { deriveKey, encrypt, generateKey } from "../src/core/crypto-e2ee.mjs";
@@ -48,6 +51,8 @@ function parseArgs(argv) {
     noAutoPublish: false,
     debounceMs: 500,
     publish: false,
+    setup: false,
+    noSetup: false,
     project: null,
     server: null,
     apiKey: null,
@@ -97,6 +102,14 @@ function parseArgs(argv) {
       args.publish = true;
       continue;
     }
+    if (token === "--setup") {
+      args.setup = true;
+      continue;
+    }
+    if (token === "--no-setup") {
+      args.noSetup = true;
+      continue;
+    }
     if (token === "--project" && argv[i + 1]) {
       args.project = argv[i + 1];
       i += 1;
@@ -144,6 +157,10 @@ function authConfigPath(targetDir) {
   return path.join(path.resolve(targetDir), ".gravio", "auth.json");
 }
 
+function setupStatePath(targetDir) {
+  return path.join(path.resolve(targetDir), ".gravio", "setup.json");
+}
+
 function loadAuthConfig(targetDir) {
   try {
     const p = authConfigPath(targetDir);
@@ -178,6 +195,117 @@ function ensureGravioIgnored(targetDir) {
     ? `${body.trimEnd()}\n\n# Gravio local auth state\n.gravio/\n`
     : "# Gravio local auth state\n.gravio/\n";
   writeFileSync(gitignore, next, "utf8");
+}
+
+function loadSetupState(targetDir) {
+  try {
+    const p = setupStatePath(targetDir);
+    if (!existsSync(p)) return null;
+    const parsed = JSON.parse(readFileSync(p, "utf8"));
+    if (!parsed || typeof parsed !== "object") return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function saveSetupState(targetDir, payload) {
+  const p = setupStatePath(targetDir);
+  const dir = path.dirname(p);
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+  writeFileSync(p, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
+}
+
+function getNodeMajorVersion() {
+  const version = String(process.versions?.node ?? "");
+  const major = Number(version.split(".")[0]);
+  return Number.isFinite(major) ? major : 0;
+}
+
+function getNodeInstallHint() {
+  if (process.platform === "win32") {
+    return "Install Node.js LTS: winget install OpenJS.NodeJS.LTS";
+  }
+  if (process.platform === "darwin") {
+    return "Install Node.js LTS: brew install node@20 (or download from nodejs.org)";
+  }
+  return "Install Node.js LTS 20+: https://nodejs.org/en/download";
+}
+
+function assertNodeSupported() {
+  const major = getNodeMajorVersion();
+  if (major >= 20) return;
+  process.stderr.write("\n  \x1b[91m\x1b[1m✖  Error\x1b[0m  Node.js 20 or newer is required.\n");
+  process.stderr.write(`  Detected: ${process.version}\n`);
+  process.stderr.write(`  ${getNodeInstallHint()}\n\n`);
+  process.exit(1);
+}
+
+function dependencyInstallPlan(targetDir) {
+  const dir = path.resolve(targetDir);
+  const plan = [];
+  const has = (file) => existsSync(path.join(dir, file));
+
+  if (has("package.json")) {
+    if (has("pnpm-lock.yaml")) plan.push({ cmd: "pnpm", args: ["install", "--frozen-lockfile"] });
+    else if (has("yarn.lock")) plan.push({ cmd: "yarn", args: ["install", "--frozen-lockfile"] });
+    else if (has("package-lock.json")) plan.push({ cmd: "npm", args: ["ci"] });
+    else plan.push({ cmd: "npm", args: ["install"] });
+  }
+
+  if (has("requirements.txt")) {
+    if (process.platform === "win32") plan.push({ cmd: "py", args: ["-m", "pip", "install", "-r", "requirements.txt"] });
+    else plan.push({ cmd: "python3", args: ["-m", "pip", "install", "-r", "requirements.txt"] });
+  }
+
+  return plan;
+}
+
+function runInstallStep(targetDir, step) {
+  const pretty = `${step.cmd} ${step.args.join(" ")}`;
+  process.stdout.write(`  Running: ${pretty}\n`);
+  const res = spawnSync(step.cmd, step.args, {
+    cwd: path.resolve(targetDir),
+    stdio: "inherit",
+    shell: process.platform === "win32",
+  });
+  return res.status === 0;
+}
+
+function runSetup(targetDir, { silentNoWork = false } = {}) {
+  assertNodeSupported();
+  process.stdout.write("\n  \x1b[96m\x1b[1mGravio setup\x1b[0m\n");
+  process.stdout.write(`  Folder: ${path.resolve(targetDir)}\n`);
+
+  const plan = dependencyInstallPlan(targetDir);
+  if (!plan.length) {
+    if (!silentNoWork) {
+      process.stdout.write("  No package manager files detected. Skipping dependency install.\n");
+    }
+    saveSetupState(targetDir, {
+      version: 1,
+      completedAt: new Date().toISOString(),
+      installedSteps: [],
+    });
+    ensureGravioIgnored(targetDir);
+    return true;
+  }
+
+  for (const step of plan) {
+    if (!runInstallStep(targetDir, step)) {
+      process.stderr.write(`\n  \x1b[91m\x1b[1m✖  Setup failed\x1b[0m while running ${step.cmd}.\n\n`);
+      return false;
+    }
+  }
+
+  saveSetupState(targetDir, {
+    version: 1,
+    completedAt: new Date().toISOString(),
+    installedSteps: plan.map((s) => `${s.cmd} ${s.args.join(" ")}`),
+  });
+  ensureGravioIgnored(targetDir);
+  process.stdout.write("  \x1b[92m\x1b[1m✔  Setup complete\x1b[0m\n\n");
+  return true;
 }
 
 function resolvePublishContext(args, authCfg) {
@@ -405,6 +533,7 @@ async function checkAndUpdate(serverBase) {
 }
 
 const args = parseArgs(process.argv.slice(2));
+assertNodeSupported();
 
 const existingAuth = loadAuthConfig(args.target);
 const context = resolvePublishContext(args, existingAuth);
@@ -419,6 +548,20 @@ if (args.logout) {
   deleteAuthConfig(args.target);
   process.stdout.write("\n  Local Gravio authorization cleared (.gravio/auth.json removed).\n\n");
   process.exit(0);
+}
+
+if (args.setup) {
+  const ok = runSetup(args.target);
+  process.exit(ok ? 0 : 1);
+}
+
+if (!args.noSetup) {
+  const setupState = loadSetupState(args.target);
+  const setupDone = Boolean(setupState?.completedAt);
+  if (!setupDone) {
+    const ok = runSetup(args.target, { silentNoWork: true });
+    if (!ok) process.exit(1);
+  }
 }
 
 if (args.authorize) {
@@ -472,7 +615,7 @@ if (isScanCommand && !context.apiKey) {
   process.stderr.write("\n  \x1b[91m\x1b[1m✖  Error\x1b[0m  Scanning requires an API key first.\n\n");
   process.stderr.write("  \x1b[2mSteps:\x1b[0m\n");
   process.stderr.write("    1) Sign in  →  \x1b[36mhttps://gravio.dev/login\x1b[0m\n");
-  process.stderr.write("    2) Get API key in your dashboard\n");
+  process.stderr.write("    2) Open onboarding to auto-fill your user-bound token\n");
   process.stderr.write("    3) Run once: \x1b[97mnode gravio.mjs --authorize --project <id> --api-key gv_...\x1b[0m\n\n");
   process.exit(1);
 }

@@ -111,10 +111,13 @@ npm run secret-scan            # Run secret scanner
 npm run verify                 # secret-scan + tests + gate (full CI check)
 
 # CLI authorize + encrypted publish flow
+node gravio.mjs --setup --target .                                  # verifies Node >=20 + installs detected deps once
 node gravio.mjs --authorize --target . --project my-project --server https://gravio.dev --api-key gv_xxx
 node gravio.mjs --once --target .   # scan is blocked unless authorized; then writes encrypted latest.json and auto-publishes
 node gravio.mjs --logout --target . # remove local .gravio/auth.json
 ```
+
+Onboarding UX now auto-issues a user-bound token from the signed-in session using `POST /api/keys/onboarding` and injects it into Step 3, so users no longer need to manually create/paste a key from dashboard first. CLI now also supports `--setup` and performs one-time automatic setup on first run to verify Node version and install detected repo dependencies.
 
 ---
 
@@ -172,6 +175,7 @@ node gravio.mjs --logout --target . # remove local .gravio/auth.json
 - `/api/publish` accepts all scans; free users are auto-trimmed to latest 3 retained scans
 - `/api/publish` appends run history rows (no longer overwrites one row per project)
 - `/api/me` returns `plan` field so the frontend can gate features
+- `POST /api/keys/onboarding` requires session-cookie auth, rotates prior `onboarding-cli` token, and returns a fresh user-bound CLI bearer token for onboarding Step 3.
 
 ---
 

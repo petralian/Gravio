@@ -33,6 +33,12 @@ function getAuthUser(req) {
   return null;
 }
 
+function getSessionUser(req) {
+  const token = parseSessionCookie(req);
+  if (!token) return null;
+  return validateSession(token);
+}
+
 function isPaidOrAdmin(user) {
   return user?.role === "admin" || user?.plan === "pro" || user?.plan === "team";
 }
@@ -315,6 +321,29 @@ const server = http.createServer(async (req, res) => {
     const keys = stmts.listApiKeys.all(user.uid ?? user.id);
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ keys }));
+    return;
+  }
+
+  // ── POST /api/keys/onboarding — issue/rotate user-bound CLI token ──────
+  if (req.method === "POST" && req.url === "/api/keys/onboarding") {
+    const user = getSessionUser(req);
+    if (!user) {
+      res.writeHead(401, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Sign in required" }));
+      return;
+    }
+
+    const uid = user.uid ?? user.id;
+    const existingKeys = stmts.listApiKeys.all(uid);
+    for (const keyRow of existingKeys) {
+      if (keyRow.label === "onboarding-cli") {
+        stmts.deleteApiKey.run(keyRow.id, uid);
+      }
+    }
+
+    const key = generateApiKey(uid, "onboarding-cli");
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ ok: true, key }));
     return;
   }
 

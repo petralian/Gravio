@@ -257,6 +257,8 @@ describe("API keys", () => {
   const email = `apikey-${Date.now()}@gravio.test`;
   let cookie;
   let apiKey;
+  let onboardingKey1;
+  let onboardingKey2;
 
   it("setup: register user", async () => {
     cookie = await registerAndGetCookie(email, "password123");
@@ -284,6 +286,31 @@ describe("API keys", () => {
     assert.strictEqual(res.status, 200);
     const data = JSON.parse(res.body);
     assert.strictEqual(data.email, email.toLowerCase());
+  });
+
+  it("issues onboarding CLI token from session", async () => {
+    const res = await httpPost(`http://localhost:${TEST_PORT}/api/keys/onboarding`, {}, { Cookie: cookie });
+    assert.strictEqual(res.status, 200);
+    const data = JSON.parse(res.body);
+    assert.ok(data.key.startsWith("gv_"), "Onboarding key must start with gv_");
+    onboardingKey1 = data.key;
+  });
+
+  it("rotates onboarding CLI token on re-issue", async () => {
+    const res = await httpPost(`http://localhost:${TEST_PORT}/api/keys/onboarding`, {}, { Cookie: cookie });
+    assert.strictEqual(res.status, 200);
+    const data = JSON.parse(res.body);
+    onboardingKey2 = data.key;
+    assert.ok(onboardingKey2.startsWith("gv_"));
+    assert.notStrictEqual(onboardingKey2, onboardingKey1);
+  });
+
+  it("revoked onboarding token no longer authenticates", async () => {
+    const revoked = await httpGet(`http://localhost:${TEST_PORT}/api/me`, { Authorization: `Bearer ${onboardingKey1}` });
+    assert.strictEqual(revoked.status, 401);
+
+    const active = await httpGet(`http://localhost:${TEST_PORT}/api/me`, { Authorization: `Bearer ${onboardingKey2}` });
+    assert.strictEqual(active.status, 200);
   });
 });
 
