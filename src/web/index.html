@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Gravio — AI Quality Engine</title>
-  <meta name="description" content="Score your AI-assisted codebase for safety, reliability, and governance. Results are encrypted — the server never sees your code." />
-  <meta property="og:title" content="Gravio — AI Quality Engine" />
-  <meta property="og:description" content="One-file scanner. Score your AI-assisted codebase across six dimensions with encrypted result publishing." />
+  <title>Gravio — Codebase Quality Engine</title>
+  <meta name="description" content="Gravio scans your whole codebase and grades best practices for human and AI workflows across six dimensions." />
+  <meta property="og:title" content="Gravio — Codebase Quality Engine" />
+  <meta property="og:description" content="One-file scanner. Get a full codebase quality grade across six dimensions." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
@@ -21,23 +21,23 @@
     <!-- ─── HERO ─── -->
     <section class="m-hero m-container">
       <div class="m-hero-copy">
-        <p class="m-eyebrow">AI QUALITY ENGINE</p>
+        <p class="m-eyebrow">CODEBASE QUALITY ENGINE</p>
         <h1 class="m-hero-h1">
-          Your AI agent<br/>writes fast.
-          <br/><span class="m-gradient-text">Gravio makes sure</span>
-          <br/><span class="m-neon-text">it's safe.</span>
+          Your codebase<br/>ships fast.
+          <br/><span class="m-gradient-text">Gravio keeps it</span>
+          <br/><span class="m-neon-text">production-safe.</span>
         </h1>
         <p class="m-hero-lead">
-          One-file scanner. Runs locally. Scores your AI-assisted codebase across
-          safety, reliability, governance, and more — then publishes encrypted results
-          to your private dashboard. No source code ever leaves your machine.
+          Register first, then run unlimited cloud scans with a guided flow.
+          Gravio scores your full repository for human + AI best practices —
+          then publishes results to your secure dashboard.
         </p>
         <div class="m-cta-row">
           <a href="/onboarding" class="m-btn m-btn-neon m-btn-lg">Start free</a>
           <a href="/login" class="m-btn m-btn-outline m-btn-lg">Customer login</a>
           <a href="#how" class="m-btn m-btn-ghost m-btn-lg">See how it works →</a>
         </div>
-
+        <p class="m-hero-note">No source code ever leaves your machine. <span class="m-neon-subtle">Results secured by your account.</span></p>
       </div>
 
       <div class="m-terminal-card" role="img" aria-label="Terminal showing Gravio scan output">
@@ -117,7 +117,7 @@
           <p class="m-step-num">03</p>
           <div class="m-step-icon">🔐</div>
           <h3>Read your results</h3>
-          <p>Your encrypted dashboard shows dimension scores, trend history, and exact remediation steps. Free stores your last 3 results; Pro and Team unlock full history and CI gates.</p>
+          <p>Free shows generic cloud ratings while Pro/Team unlock detailed remediation guidance. Your dashboard is secured by your account.</p>
         </div>
       </div>
     </section>
@@ -189,7 +189,7 @@
           <div class="m-plan-price">
             <span class="m-plan-amount">$0</span>
           </div>
-          <p class="m-plan-desc">Perfect for solo developers. Full 14-check scan with dimension scores and secret exposure detection. Latest 3 results stored.</p>
+          <p class="m-plan-desc">Perfect for solo developers. Unlimited scans, cloud-only publishing, and generic quality ratings.</p>
           <ul class="m-plan-features">
             <li><span class="t-pass">✓</span> Gravio CLI (macOS / Win / Linux)</li>
             <li><span class="t-pass">✓</span> Cloud-only score publishing</li>
@@ -214,12 +214,12 @@
             <li><span class="t-pass">✓</span> Score trend history &amp; regressions</li>
             <li><span class="t-pass">✓</span> Explainability reports</li>
             <li><span class="t-pass">✓</span> Detailed fix guidance</li>
-            <li><span class="t-pass">✓</span> End-to-end encrypted results (you hold the key)</li>
+            <li><span class="t-pass">✓</span> Optional end-to-end encryption (E2EE)</li>
             <li><span class="t-pass">✓</span> 10 projects</li>
             <li><span class="t-pass">✓</span> Email support</li>
             <li><span class="t-pass">✓</span> Prompt packs (fix this for me)</li>
           </ul>
-          <a href="/upgrade/pro" class="m-btn m-btn-neon m-btn-full lemonsqueezy-button">Get early access</a>
+          <a href="https://gravio.lemonsqueezy.com/checkout/buy/67a0964e-0d16-4d0e-859e-c23ab81bfdfa?embed=1" class="m-btn m-btn-neon m-btn-full lemonsqueezy-button">Buy Gravio Pro</a>
         </div>
 
         <div class="m-plan-card">
@@ -233,20 +233,25 @@
               <span class="m-seats-val"><span id="team-seats-count">2</span> seats</span>
             </div>
             <input type="range" min="2" max="10" value="2" id="team-seats-slider" class="m-seats-slider" aria-label="Number of team seats">
-            <p class="m-seats-hint">2 seats included &nbsp;·&nbsp; $19 each additional &nbsp;·&nbsp; 10 seat max</p>
+            <p class="m-seats-hint">
+              2 seats included · $19 each additional · 10 seat max
+              <br>
+              Additional seat add-ons needed: <strong id="team-addon-count">0</strong>
+            </p>
           </div>
-          <p class="m-plan-desc">Shared dashboards, CI quality gates, and audit exports for teams shipping with multiple AI agents.</p>
+          <p class="m-plan-desc">Policy enforcement and audit exports for teams shipping with multiple AI agents.</p>
           <ul class="m-plan-features">
             <li><span class="t-pass">✓</span> Everything in Pro</li>
-            <li><span class="t-pass">✓</span> Shared team dashboards</li>
-            <li><span class="t-pass">✓</span> E2EE encrypted results (team-shared key)</li>
+            <li><span class="t-pass">✓</span> Optional E2EE (server-side key escrow available)</li>
             <li><span class="t-pass">✓</span> Unlimited projects</li>
-            <li><span class="t-pass">✓</span> CI quality gate integration</li>
             <li><span class="t-pass">✓</span> Custom policy packs</li>
+            <li><span class="t-pass">✓</span> SSO</li>
             <li><span class="t-pass">✓</span> Audit export (CSV / JSON)</li>
             <li><span class="t-pass">✓</span> Priority support + SLA</li>
+            <li><span class="t-pass">✓</span> Peer percentile benchmarking</li>
           </ul>
-          <a href="/upgrade/team" class="m-btn m-btn-outline m-btn-full lemonsqueezy-button">Contact sales</a>
+          <a href="https://gravio.lemonsqueezy.com/checkout/buy/41b8f6fd-1ff0-4cfb-b993-d035a50b3b8b?embed=1" class="m-btn m-btn-outline m-btn-full lemonsqueezy-button">Buy Gravio Team (2 seats)</a>
+          <a href="https://gravio.lemonsqueezy.com/checkout/buy/50fc22c1-0f60-4015-a21a-b45e4473c1c3?embed=1" class="m-btn m-btn-ghost m-btn-full lemonsqueezy-button" id="team-addon-link">Buy Team +1 seat add-on</a>
         </div>
 
       </div>
@@ -294,11 +299,11 @@
       <div class="m-security-inner">
         <p class="m-eyebrow">PRIVACY &amp; SECURITY</p>
         <h2 class="m-security-h2">Your code never leaves<br/><span class="m-neon-text">your machine.</span></h2>
-        <p>The scanner reads only file structure and git metadata — never source file content. On Pro and Team, results are encrypted with your key before leaving your machine — the server stores ciphertext it cannot read, decrypt, or share. Zero-knowledge by design.</p>
+        <p>The scanner reads only file structure and git metadata — never source file content. Published results are access-controlled by your account and API key. Upgrade to Pro or Team for optional end-to-end encryption, where the server stores only ciphertext it cannot read.</p>
         <div class="m-security-pills">
           <span class="m-pill">No source code uploaded</span>
           <span class="m-pill">Auth-gated result access</span>
-          <span class="m-pill">E2EE on Pro &amp; Team</span>
+          <span class="m-pill">Optional E2EE (Pro &amp; Team)</span>
           <span class="m-pill">Open-source scanner</span>
           <span class="m-pill">Signed binaries</span>
         </div>
@@ -321,7 +326,7 @@
 
   <div data-site-footer></div>
 
-  <script src="https://app.lemonsqueezy.com/js/lemon.js" defer></script>
+  <script src="https://assets.lemonsqueezy.com/lemon.js" defer></script>
   <script src="site-chrome.js"></script>
   <script>
     (function () {
@@ -329,10 +334,17 @@
       if (!slider) return;
       var countEl = document.getElementById('team-seats-count');
       var priceEl = document.getElementById('team-price');
+      var addonCountEl = document.getElementById('team-addon-count');
+      var addonLinkEl = document.getElementById('team-addon-link');
+      var addonBaseLabel = 'Buy Team +1 seat add-on';
+
       slider.addEventListener('input', function () {
         var seats = parseInt(this.value, 10);
+        var addons = Math.max(0, seats - 2);
         countEl.textContent = seats;
-        priceEl.textContent = '$' + (59 + (seats - 2) * 19);
+        priceEl.textContent = '$' + (59 + addons * 19);
+        addonCountEl.textContent = addons;
+        addonLinkEl.textContent = addons > 0 ? (addonBaseLabel + ' ×' + addons) : addonBaseLabel;
       });
     })();
   </script>
