@@ -618,10 +618,6 @@ body.marketing {
   color: var(--text-3);
 }
 
-#team-addon-link {
-  margin-top: 10px;
-}
-
 /* ── INSTALL ── */
 .m-install-inner {
   display: grid;

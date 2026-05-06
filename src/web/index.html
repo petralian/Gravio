@@ -235,8 +235,6 @@
             <input type="range" min="2" max="10" value="2" id="team-seats-slider" class="m-seats-slider" aria-label="Number of team seats">
             <p class="m-seats-hint">
               2 seats included · $19 each additional · 10 seat max
-              <br>
-              Additional seat add-ons needed: <strong id="team-addon-count">0</strong>
             </p>
           </div>
           <p class="m-plan-desc">Policy enforcement and audit exports for teams shipping with multiple AI agents.</p>
@@ -250,8 +248,7 @@
             <li><span class="t-pass">✓</span> Priority support + SLA</li>
             <li><span class="t-pass">✓</span> Peer percentile benchmarking</li>
           </ul>
-          <a href="https://gravio.lemonsqueezy.com/checkout/buy/41b8f6fd-1ff0-4cfb-b993-d035a50b3b8b?embed=1" class="m-btn m-btn-outline m-btn-full lemonsqueezy-button">Buy Gravio Team (2 seats)</a>
-          <a href="https://gravio.lemonsqueezy.com/checkout/buy/50fc22c1-0f60-4015-a21a-b45e4473c1c3?embed=1" class="m-btn m-btn-ghost m-btn-full lemonsqueezy-button" id="team-addon-link">Buy Team +1 seat add-on</a>
+          <a href="https://gravio.lemonsqueezy.com/checkout/buy/41b8f6fd-1ff0-4cfb-b993-d035a50b3b8b?embed=1" class="m-btn m-btn-outline m-btn-full lemonsqueezy-button" id="team-checkout-link">Buy Gravio Team</a>
         </div>
 
       </div>
@@ -334,18 +331,47 @@
       if (!slider) return;
       var countEl = document.getElementById('team-seats-count');
       var priceEl = document.getElementById('team-price');
-      var addonCountEl = document.getElementById('team-addon-count');
-      var addonLinkEl = document.getElementById('team-addon-link');
-      var addonBaseLabel = 'Buy Team +1 seat add-on';
+      var teamButtonEl = document.getElementById('team-checkout-link');
 
       slider.addEventListener('input', function () {
         var seats = parseInt(this.value, 10);
         var addons = Math.max(0, seats - 2);
         countEl.textContent = seats;
         priceEl.textContent = '$' + (59 + addons * 19);
-        addonCountEl.textContent = addons;
-        addonLinkEl.textContent = addons > 0 ? (addonBaseLabel + ' ×' + addons) : addonBaseLabel;
+        if (teamButtonEl) {
+          teamButtonEl.textContent = 'Buy Gravio Team (' + seats + ' seats)';
+        }
       });
+
+      if (teamButtonEl) {
+        teamButtonEl.addEventListener('click', async function (event) {
+          event.preventDefault();
+          var fallbackUrl = teamButtonEl.getAttribute('href');
+          var originalLabel = teamButtonEl.textContent;
+          teamButtonEl.textContent = 'Preparing checkout...';
+          teamButtonEl.setAttribute('aria-disabled', 'true');
+          try {
+            var seats = parseInt(slider.value, 10);
+            var response = await fetch('/api/billing/team-checkout', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ seats: seats })
+            });
+            var data = await response.json();
+            if (!response.ok || !data.checkoutUrl) {
+              throw new Error(data.error || 'Unable to prepare checkout');
+            }
+            window.location.href = data.checkoutUrl;
+          } catch (err) {
+            window.location.href = fallbackUrl;
+          }
+        });
+      });
+
+      var initialSeats = parseInt(slider.value, 10);
+      if (teamButtonEl) {
+        teamButtonEl.textContent = 'Buy Gravio Team (' + initialSeats + ' seats)';
+      }
     })();
   </script>
 </body>

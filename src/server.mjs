@@ -33,12 +33,6 @@ function getAuthUser(req) {
   return null;
 }
 
-function getSessionUser(req) {
-  const token = parseSessionCookie(req);
-  if (!token) return null;
-  return validateSession(token);
-}
-
 function isPaidOrAdmin(user) {
   return user?.role === "admin" || user?.plan === "pro" || user?.plan === "team";
 }
@@ -152,6 +146,10 @@ function summarizeScans(scans) {
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const WEB_DIR = path.join(__dirname, "web");
 const PORT = process.env.PORT ?? 3000;
+const TEAM_BASE_PRICE_CENTS = 5900;
+const TEAM_INCLUDED_SEATS = 2;
+const TEAM_ADDITIONAL_SEAT_CENTS = 1900;
+const TEAM_MAX_SEATS = 10;
 
 /** Current platform version, served to CLI for auto-update checks. */
 const APP_VERSION = (() => {
@@ -321,29 +319,6 @@ const server = http.createServer(async (req, res) => {
     const keys = stmts.listApiKeys.all(user.uid ?? user.id);
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ keys }));
-    return;
-  }
-
-  // ── POST /api/keys/onboarding — issue/rotate user-bound CLI token ──────
-  if (req.method === "POST" && req.url === "/api/keys/onboarding") {
-    const user = getSessionUser(req);
-    if (!user) {
-      res.writeHead(401, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ error: "Sign in required" }));
-      return;
-    }
-
-    const uid = user.uid ?? user.id;
-    const existingKeys = stmts.listApiKeys.all(uid);
-    for (const keyRow of existingKeys) {
-      if (keyRow.label === "onboarding-cli") {
-        stmts.deleteApiKey.run(keyRow.id, uid);
-      }
-    }
-
-    const key = generateApiKey(uid, "onboarding-cli");
-    res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ ok: true, key }));
     return;
   }
 
@@ -656,48 +631,107 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // ── Upgrade redirects — configurable via LEMON_PRO_URL / LEMON_TEAM_URL env vars ─
-  if (req.method === "GET" && (urlPath === "/upgrade/pro" || urlPath === "/upgrade/team")) {
-    const key = urlPath === "/upgrade/pro" ? "LEMON_PRO_URL" : "LEMON_TEAM_URL";
-    const dest = process.env[key] || "mailto:hello@gravio.dev";
-    res.writeHead(302, { Location: dest });
-    res.end();
-    return;
-  }
+  // ── API: POST /api/billing/team-checkout — custom Lemon checkout by seats ─
+  if (req.method === "POST" && req.url === "/api/billing/team-checkout") {
+    const apiKey = process.env.LEMON_API_KEY;
+    const storeId = process.env.LEMON_STORE_ID;
+    const variantId = process.env.LEMON_TEAM_VARIANT_ID;
 
-  // ── POST /api/webhooks/lemonsqueezy — signature-verified event receiver ──
-  if (req.method === "POST" && urlPath === "/api/webhooks/lemonsqueezy") {
-    const secret = process.env.LEMON_WEBHOOK_SECRET;
-    if (!secret) {
-      res.writeHead(501, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ error: "webhook not configured" }));
+    if (!apiKey || !storeId || !variantId) {
+      res.writeHead(503, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({
+        error: "Billing is not configured. Missing LEMON_API_KEY, LEMON_STORE_ID, or LEMON_TEAM_VARIANT_ID.",
+      }));
       return;
     }
-    let body = "";
-    req.on("data", (chunk) => { body += chunk; });
-    req.on("end", async () => {
-      // Verify HMAC-SHA256 signature
-      const sig = req.headers["x-signature"];
-      const { createHmac } = await import("node:crypto");
-      const expected = createHmac("sha256", secret).update(body).digest("hex");
-      if (sig !== expected) {
-        res.writeHead(401, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ error: "invalid signature" }));
+
+    let payload;
+    try {
+      payload = JSON.parse(await readBody(req));
+    } catch {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Invalid JSON" }));
+      return;
+    }
+
+    const seats = Number(payload?.seats);
+    if (!Number.isInteger(seats) || seats < TEAM_INCLUDED_SEATS || seats > TEAM_MAX_SEATS) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({
+        error: `seats must be an integer between ${TEAM_INCLUDED_SEATS} and ${TEAM_MAX_SEATS}`,
+      }));
+      return;
+    }
+
+    const customPrice = TEAM_BASE_PRICE_CENTS + (seats - TEAM_INCLUDED_SEATS) * TEAM_ADDITIONAL_SEAT_CENTS;
+
+    try {
+      const lsResponse = await fetch("https://api.lemonsqueezy.com/v1/checkouts", {
+        method: "POST",
+        headers: {
+          Accept: "application/vnd.api+json",
+          "Content-Type": "application/vnd.api+json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          data: {
+            type: "checkouts",
+            attributes: {
+              custom_price: customPrice,
+              checkout_options: {
+                embed: true,
+              },
+              checkout_data: {
+                custom: {
+                  plan: "team",
+                  seats,
+                },
+              },
+            },
+            relationships: {
+              store: {
+                data: { type: "stores", id: String(storeId) },
+              },
+              variant: {
+                data: { type: "variants", id: String(variantId) },
+              },
+            },
+          },
+        }),
+      });
+
+      const raw = await lsResponse.text();
+      let parsed;
+      try { parsed = JSON.parse(raw); } catch { parsed = null; }
+
+      if (!lsResponse.ok) {
+        res.writeHead(502, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({
+          error: "Unable to create checkout",
+          lemonStatus: lsResponse.status,
+          lemonBody: parsed ?? raw,
+        }));
         return;
       }
-      let event;
-      try { event = JSON.parse(body); } catch {
-        res.writeHead(400, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ error: "invalid json" }));
+
+      const checkoutUrl = parsed?.data?.attributes?.url;
+      if (!checkoutUrl) {
+        res.writeHead(502, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Checkout URL missing from Lemon response" }));
         return;
       }
-      const eventName = event?.meta?.event_name ?? "unknown";
-      // TODO: handle order_created / subscription_created / subscription_cancelled
-      // to update user plan in db (stmts.setUserPlan)
-      console.log("[lemonsqueezy webhook]", eventName, event?.data?.id ?? "");
+
       res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ received: true }));
-    });
+      res.end(JSON.stringify({
+        ok: true,
+        seats,
+        totalCents: customPrice,
+        checkoutUrl,
+      }));
+    } catch (err) {
+      res.writeHead(502, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: err.message }));
+    }
     return;
   }
 
@@ -710,7 +744,6 @@ const server = http.createServer(async (req, res) => {
 
   // ── Page routes (strip query string before matching) ────────────────────
   const urlPath = req.url.split("?")[0].replace(/\/+$/, "") || "/";
-
 
   if (req.method === "GET" && urlPath === "/login") {
     serveStatic(res, path.join(WEB_DIR, "login.html"));
