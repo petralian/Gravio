@@ -12,25 +12,7 @@
 </head>
 <body class="dashboard">
 
-  <!-- ─── NAV ─── -->
-  <header class="m-nav">
-    <div class="m-container m-nav-inner">
-      <a href="/" class="m-brand" aria-label="Gravio home">
-        <svg class="m-brand-icon" width="26" height="26" viewBox="0 0 26 26" fill="none" aria-hidden="true">
-          <rect width="26" height="26" rx="6" fill="rgba(0,229,255,0.1)"/>
-          <path d="M7 13a6 6 0 1 1 6 6H7v-2.5h6a3.5 3.5 0 1 0-3.5-3.5H7V13z" fill="#00e5ff"/>
-        </svg>
-        <span class="m-brand-name">gravio</span>
-      </a>
-      <nav class="m-nav-links" aria-label="Primary navigation">
-        <a href="/">Home</a>
-        <a href="/tool">Scoring Tool</a>
-        <a href="/dashboard" aria-current="page" class="m-nav-active">Dashboard</a>
-        <span class="db-user-pill" id="db-user-pill" hidden></span>
-        <button class="m-btn m-btn-outline db-logout-btn" id="db-logout" type="button" hidden>Sign out</button>
-      </nav>
-    </div>
-  </header>
+  <div data-site-header></div>
 
   <main class="db-main m-container">
 
@@ -177,14 +159,9 @@
 
   </main>
 
-  <footer class="m-footer">
-    <div class="m-container m-footer-inner">
-      <a href="/" class="m-brand"><span class="m-brand-name">gravio</span></a>
-      <p class="m-footer-copy">© 2026 Gravio. Decryption is client-side only.</p>
-      <a class="m-footer-link" href="mailto:hello@gravio.dev">hello@gravio.dev</a>
-    </div>
-  </footer>
+  <div data-site-footer></div>
 
+  <script src="site-chrome.js"></script>
   <script src="dashboard.js"></script>
 </body>
 </html>

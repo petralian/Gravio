@@ -1,0 +1,889 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "git-status-check",
+			"type": "shell",
+			"command": "git",
+			"args": [
+				"status",
+				"--short"
+			]
+		},
+		{
+			"label": "run-tests",
+			"type": "shell",
+			"command": "node",
+			"args": [
+				"--test",
+				"tests/evaluate.test.mjs",
+				"tests/scanner-daemon.test.mjs",
+				"tests/crypto-e2ee.test.mjs",
+				"tests/server.test.mjs"
+			]
+		},
+		{
+			"label": "commit-dp-fix",
+			"type": "shell",
+			"command": "git",
+			"args": [
+				"add",
+				"src/server.mjs",
+				"src/web/admin.js",
+				"src/web/login.js",
+				"tests/server.test.mjs"
+			]
+		},
+		{
+			"label": "commit-message-dp-fix",
+			"type": "shell",
+			"command": "git",
+			"args": [
+				"commit",
+				"-m",
+				"fix(auth): support login query params and move admin route to /dp"
+			]
+		},
+		{
+			"label": "push-master",
+			"type": "shell",
+			"command": "git",
+			"args": [
+				"push",
+				"origin",
+				"master"
+			]
+		},
+		{
+			"label": "deploy-fly",
+			"type": "shell",
+			"command": "flyctl",
+			"args": [
+				"deploy",
+				"--app",
+				"gravio-platform",
+				"--strategy",
+				"immediate"
+			]
+		},
+		{
+			"label": "verify-live-dp",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-NoProfile",
+				"-Command",
+				"$r1 = Invoke-WebRequest -Uri 'https://gravio-platform.fly.dev/login?next=/dp' -MaximumRedirection 0 -ErrorAction SilentlyContinue; if($r1){'LOGIN_STATUS=' + [int]$r1.StatusCode}else{'LOGIN_STATUS=unknown'}; $r2 = Invoke-WebRequest -Uri 'https://gravio-platform.fly.dev/dp' -MaximumRedirection 0 -ErrorAction SilentlyContinue; if($r2){'DP_STATUS=' + [int]$r2.StatusCode}else{'DP_STATUS=unknown'}; try { Invoke-WebRequest -Uri 'https://gravio-platform.fly.dev/admin' -MaximumRedirection 0 -ErrorAction Stop | Out-Null; 'ADMIN_STATUS=200' } catch { if($_.Exception.Response){'ADMIN_STATUS=' + [int]$_.Exception.Response.StatusCode.value__} else {'ADMIN_STATUS=unknown'} }"
+			]
+		},
+		{
+			"label": "verify-live-headers",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"for %u in (\"https://gravio-platform.fly.dev/login?next=/dp\" \"https://gravio-platform.fly.dev/dp\" \"https://gravio-platform.fly.dev/admin\") do @echo URL=%u & curl.exe -s -o NUL -w \"HTTP_STATUS=%{http_code}\\n\" %u"
+			]
+		},
+		{
+			"label": "verify-login-url",
+			"type": "shell",
+			"command": "curl.exe",
+			"args": [
+				"-s",
+				"-o",
+				"NUL",
+				"-w",
+				"HTTP_STATUS=%{http_code}\\n",
+				"https://gravio-platform.fly.dev/login?next=/dp"
+			]
+		},
+		{
+			"label": "verify-login-url-cmd",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"curl -s -o NUL -w \"HTTP_STATUS=%{http_code}\\n\" \"https://gravio-platform.fly.dev/login?next=/dp\""
+			]
+		},
+		{
+			"label": "test-onboarding-changes",
+			"type": "shell",
+			"command": "node",
+			"args": [
+				"--test",
+				"tests/evaluate.test.mjs",
+				"tests/scanner-daemon.test.mjs",
+				"tests/crypto-e2ee.test.mjs",
+				"tests/server.test.mjs"
+			]
+		},
+		{
+			"label": "status-after-onboarding",
+			"type": "shell",
+			"command": "git",
+			"args": [
+				"status",
+				"--short"
+			]
+		},
+		{
+			"label": "commit-onboarding-files",
+			"type": "shell",
+			"command": "git",
+			"args": [
+				"add",
+				"src/server.mjs",
+				"src/web/dashboard.html",
+				"src/web/index.html",
+				"src/web/login.html",
+				"src/web/styles.css",
+				"src/web/onboarding.html",
+				"src/web/onboarding.js",
+				"tests/server.test.mjs"
+			]
+		},
+		{
+			"label": "commit-onboarding",
+			"type": "shell",
+			"command": "git",
+			"args": [
+				"commit",
+				"-m",
+				"feat(web): add customer login entry and guided onboarding flow"
+			]
+		},
+		{
+			"label": "push-onboarding",
+			"type": "shell",
+			"command": "git",
+			"args": [
+				"push",
+				"origin",
+				"master"
+			]
+		},
+		{
+			"label": "deploy-onboarding",
+			"type": "shell",
+			"command": "flyctl",
+			"args": [
+				"deploy",
+				"--app",
+				"gravio-platform",
+				"--strategy",
+				"immediate"
+			]
+		},
+		{
+			"label": "verify-live-onboarding-login",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"for %u in (\"https://gravio-platform.fly.dev/\" \"https://gravio-platform.fly.dev/login\" \"https://gravio-platform.fly.dev/onboarding\" \"https://gravio-platform.fly.dev/login?next=/dp\" \"https://gravio-platform.fly.dev/dp\") do @echo URL=%u & curl -s -o NUL -w \"HTTP_STATUS=%{http_code}\\n\" %u"
+			]
+		},
+		{
+			"label": "verify-login-next-dp",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"curl -s -o NUL -w \"HTTP_STATUS=%{http_code}\\n\" \"https://gravio-platform.fly.dev/login?next=/dp\""
+			]
+		},
+		{
+			"label": "post-deploy-status",
+			"type": "shell",
+			"command": "git",
+			"args": [
+				"status",
+				"--short"
+			]
+		},
+		{
+			"label": "test-auth-gated-tool-and-copy",
+			"type": "shell",
+			"command": "node",
+			"args": [
+				"--test",
+				"tests/evaluate.test.mjs",
+				"tests/scanner-daemon.test.mjs",
+				"tests/crypto-e2ee.test.mjs",
+				"tests/server.test.mjs"
+			]
+		},
+		{
+			"label": "status-before-commit",
+			"type": "shell",
+			"command": "git",
+			"args": [
+				"status",
+				"--short"
+			]
+		},
+		{
+			"label": "commit-auth-copy-flow",
+			"type": "shell",
+			"command": "git",
+			"args": [
+				"add",
+				"scripts/scanner-daemon.mjs",
+				"src/server.mjs",
+				"src/web/dashboard.html",
+				"src/web/index.html",
+				"src/web/onboarding.html",
+				"tests/server.test.mjs",
+				"CHANGELOG.md"
+			]
+		},
+		{
+			"label": "commit-auth-copy-message",
+			"type": "shell",
+			"command": "git",
+			"args": [
+				"commit",
+				"-m",
+				"feat(product): require login for scoring tool and enforce 3 free cloud scans"
+			]
+		},
+		{
+			"label": "push-auth-copy-flow",
+			"type": "shell",
+			"command": "git",
+			"args": [
+				"push",
+				"origin",
+				"master"
+			]
+		},
+		{
+			"label": "deploy-auth-copy-flow",
+			"type": "shell",
+			"command": "flyctl",
+			"args": [
+				"deploy",
+				"--app",
+				"gravio-platform",
+				"--strategy",
+				"immediate"
+			]
+		},
+		{
+			"label": "retry-deploy-auth-copy-flow",
+			"type": "shell",
+			"command": "flyctl",
+			"args": [
+				"deploy",
+				"--app",
+				"gravio-platform",
+				"--strategy",
+				"immediate"
+			]
+		},
+		{
+			"label": "verify-live-auth-copy",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"curl -s https://gravio-platform.fly.dev/ | findstr /c:\"Start free (3 scans)\" && echo HOME_COPY_OK || echo HOME_COPY_NOT_LIVE & curl -s -o NUL -w \"TOOL_STATUS=%{http_code}\\n\" https://gravio-platform.fly.dev/tool"
+			]
+		},
+		{
+			"label": "deploy-local-only",
+			"type": "shell",
+			"command": "flyctl",
+			"args": [
+				"deploy",
+				"--app",
+				"gravio-platform",
+				"--strategy",
+				"immediate",
+				"--local-only"
+			]
+		},
+		{
+			"label": "check-fly-release",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"flyctl releases -a gravio-platform"
+			]
+		},
+		{
+			"label": "verify-live-final",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"curl -s https://gravio-platform.fly.dev/ | find \"Start free (3 scans)\" >NUL && echo HOME_COPY_OK || echo HOME_COPY_NOT_LIVE & curl -s -o NUL -w \"TOOL_STATUS=%{http_code}\\n\" https://gravio-platform.fly.dev/tool & curl -s -o NUL -w \"EVALUATE_UNAUTH=%{http_code}\\n\" -H \"Content-Type: application/json\" -d \"{\\\"run\\\":{}}\" https://gravio-platform.fly.dev/api/evaluate"
+			]
+		},
+		{
+			"label": "inspect-fly-machines",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"flyctl status -a gravio-platform & flyctl machine list -a gravio-platform"
+			]
+		},
+		{
+			"label": "force-new-deploy-now",
+			"type": "shell",
+			"command": "flyctl",
+			"args": [
+				"deploy",
+				"--app",
+				"gravio-platform",
+				"--strategy",
+				"immediate"
+			]
+		},
+		{
+			"label": "deploy-with-org-personal",
+			"type": "shell",
+			"command": "flyctl",
+			"args": [
+				"deploy",
+				"--app",
+				"gravio-platform",
+				"--org",
+				"personal",
+				"--strategy",
+				"immediate"
+			]
+		},
+		{
+			"label": "deploy-without-depot",
+			"type": "shell",
+			"command": "flyctl",
+			"args": [
+				"deploy",
+				"--app",
+				"gravio-platform",
+				"--strategy",
+				"immediate",
+				"--depot=false"
+			]
+		},
+		{
+			"label": "deploy-depot-scope-app",
+			"type": "shell",
+			"command": "flyctl",
+			"args": [
+				"deploy",
+				"--app",
+				"gravio-platform",
+				"--strategy",
+				"immediate",
+				"--depot-scope",
+				"app"
+			]
+		},
+		{
+			"label": "deploy-buildkit-remote",
+			"type": "shell",
+			"command": "flyctl",
+			"args": [
+				"deploy",
+				"--app",
+				"gravio-platform",
+				"--strategy",
+				"immediate",
+				"--buildkit",
+				"--remote-only"
+			]
+		},
+		{
+			"label": "git-status-final",
+			"type": "shell",
+			"command": "git",
+			"args": [
+				"status",
+				"--short"
+			]
+		},
+		{
+			"label": "git-head-final",
+			"type": "shell",
+			"command": "git",
+			"args": [
+				"rev-parse",
+				"--short",
+				"HEAD"
+			]
+		},
+		{
+			"label": "final-deploy-attempt",
+			"type": "shell",
+			"command": "flyctl",
+			"args": [
+				"deploy",
+				"--app",
+				"gravio-platform",
+				"--strategy",
+				"immediate",
+				"--depot=true"
+			]
+		},
+		{
+			"label": "verify-evaluate-auth-live",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"curl -s -o NUL -w \"HTTP_STATUS=%{http_code}\\n\" -H \"Content-Type: application/json\" -d \"{}\" https://gravio-platform.fly.dev/api/evaluate"
+			]
+		},
+		{
+			"label": "verify-release-state",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-NoProfile",
+				"-Command",
+				"git status --short --branch; git log --oneline -n 5; git rev-parse HEAD; git remote -v"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "verify-release-state-no-pager",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-NoProfile",
+				"-Command",
+				"git -c core.pager=cat status --short --branch; git -c core.pager=cat log --oneline -n 5; git rev-parse HEAD; git remote -v"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "test-before-release",
+			"type": "shell",
+			"command": "node",
+			"args": [
+				"--test",
+				"tests/evaluate.test.mjs",
+				"tests/scanner-daemon.test.mjs",
+				"tests/crypto-e2ee.test.mjs",
+				"tests/server.test.mjs"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "commit-and-push-ux-fixes",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"git add src/web/dashboard.html src/web/onboarding.html src/web/onboarding.js src/web/styles.css CHANGELOG.md && git commit -m \"fix(ux): unify onboarding header and fix dashboard section layout\" && git push origin master"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "commit-ux-fixes",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-NoProfile",
+				"-Command",
+				"git add src/web/dashboard.html src/web/onboarding.html src/web/onboarding.js src/web/styles.css CHANGELOG.md; git commit -m 'fix(ux): unify onboarding header and fix dashboard section layout'"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "commit-ux-fixes-safe",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-NoProfile",
+				"-Command",
+				"git add src/web/dashboard.html src/web/onboarding.html src/web/onboarding.js src/web/styles.css CHANGELOG.md; git commit -m fix-ux-header-dashboard-layout"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "push-master-after-ux-fix",
+			"type": "shell",
+			"command": "git",
+			"args": [
+				"push",
+				"origin",
+				"master"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "deploy-fly-ux-fix",
+			"type": "shell",
+			"command": "flyctl",
+			"args": [
+				"deploy",
+				"--app",
+				"gravio-platform",
+				"--strategy",
+				"immediate",
+				"--depot=true"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "verify-live-copy-post-deploy",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-NoProfile",
+				"-Command",
+				"$on = Invoke-WebRequest -UseBasicParsing https://gravio-platform.fly.dev/onboarding; if($on.Content -match 'ob-signup-cta'){ 'ONBOARDING_HAS_NEW_ID=YES' } else { 'ONBOARDING_HAS_NEW_ID=NO' }; if($on.Content -match 'id=\"ob-dashboard-cta\"'){ 'ONBOARDING_HAS_DASHBOARD_CTA_ID=YES' } else { 'ONBOARDING_HAS_DASHBOARD_CTA_ID=NO' }; $db = Invoke-WebRequest -UseBasicParsing https://gravio-platform.fly.dev/dashboard; if($db.Content -match 'id=\"db-projects-section\"'){ 'DASHBOARD_PROJECTS_SECTION=YES' } else { 'DASHBOARD_PROJECTS_SECTION=NO' }; if($db.Content -match 'id=\"db-apikeys-section\"'){ 'DASHBOARD_APIKEYS_SECTION=YES' } else { 'DASHBOARD_APIKEYS_SECTION=NO' };"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "verify-live-onboarding-markers",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"curl -s https://gravio-platform.fly.dev/onboarding | findstr /C:\"ob-signup-cta\" /C:\"ob-dashboard-cta\" /C:\"ob-user-pill\""
+			],
+			"isBackground": false
+		},
+		{
+			"label": "verify-live-dashboard-markers",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"curl -s https://gravio-platform.fly.dev/dashboard | findstr /C:\"db-projects-section\" /C:\"db-apikeys-section\""
+			],
+			"isBackground": false
+		},
+		{
+			"label": "verify-post-release-state",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-NoProfile",
+				"-Command",
+				"git -c core.pager=cat status --short --branch; flyctl releases -a gravio-platform | Select-Object -First 8"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "audit-git-head",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-NoProfile",
+				"-Command",
+				"git -c core.pager=cat status --short --branch; git -c core.pager=cat log --oneline -n 3; git rev-parse HEAD"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "audit-fly-releases",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-NoProfile",
+				"-Command",
+				"flyctl releases -a gravio-platform | Select-Object -First 8"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "audit-live-markers",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"curl -s https://gravio-platform.fly.dev/onboarding | findstr /C:\"ob-signup-cta\" /C:\"ob-dashboard-cta\" /C:\"ob-user-pill\" & curl -s https://gravio-platform.fly.dev/dashboard | findstr /C:\"db-projects-section\" /C:\"db-apikeys-section\""
+			],
+			"isBackground": false
+		},
+		{
+			"label": "dns-check-gravio",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"nslookup gravio.dev & nslookup www.gravio.dev"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "curl-check-domains",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"curl -I https://gravio.dev & curl -I https://www.gravio.dev & curl -I https://gravio-platform.fly.dev"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "fly-certs-status",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"flyctl certs list -a gravio-platform & flyctl status -a gravio-platform"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "fly-cert-details",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"flyctl certs show gravio.dev -a gravio-platform & flyctl certs show www.gravio.dev -a gravio-platform"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "add-fly-certs",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"flyctl certs add gravio.dev -a gravio-platform & flyctl certs add www.gravio.dev -a gravio-platform"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "check-fly-certs-and-https",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"flyctl certs check gravio.dev -a gravio-platform & flyctl certs check www.gravio.dev -a gravio-platform & curl -I https://gravio.dev & curl -I https://www.gravio.dev"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "verify-gravio-get",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"curl -s https://gravio.dev | findstr /C:\"gravio\" /C:\"Start free\""
+			],
+			"isBackground": false
+		},
+		{
+			"label": "verify-gravio-get-ps",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-NoProfile",
+				"-Command",
+				"$r = Invoke-WebRequest -UseBasicParsing https://gravio.dev; if($r.StatusCode -eq 200){'GRAVIO_DEV_GET=200'}; if($r.Content -match 'Start free'){ 'HAS_START_FREE=YES' } else { 'HAS_START_FREE=NO' }"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "verify-gravio-status-code",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"curl -s -o NUL -w \"GRAVIO_DEV_GET=%{http_code}\\n\" https://gravio.dev/ & curl -s -o NUL -w \"FLY_DEV_GET=%{http_code}\\n\" https://gravio-platform.fly.dev/"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "test-onboarding-flow-release",
+			"type": "shell",
+			"command": "node",
+			"args": [
+				"--test",
+				"tests/evaluate.test.mjs",
+				"tests/scanner-daemon.test.mjs",
+				"tests/crypto-e2ee.test.mjs",
+				"tests/server.test.mjs"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "status-before-deploy-flow",
+			"type": "shell",
+			"command": "git",
+			"args": [
+				"status",
+				"--short",
+				"--branch"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "commit-push-register-first-flow",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-NoProfile",
+				"-Command",
+				"git add CHANGELOG.md src/server.mjs src/web/dashboard.html src/web/index.html src/web/onboarding.html src/web/onboarding.js src/web/styles.css tests/server.test.mjs; git commit -m 'feat(onboarding): register-first guided flow and canonical host sessions'; git push origin master"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "commit-push-register-first-safe",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-NoProfile",
+				"-Command",
+				"git add CHANGELOG.md src/server.mjs src/web/dashboard.html src/web/index.html src/web/onboarding.html src/web/onboarding.js src/web/styles.css tests/server.test.mjs; git commit -m register-first-onboarding-flow; git push origin master"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "deploy-register-first-flow",
+			"type": "shell",
+			"command": "flyctl",
+			"args": [
+				"deploy",
+				"--app",
+				"gravio-platform",
+				"--strategy",
+				"immediate",
+				"--depot=true"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "verify-live-flow-markers",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"curl -s https://gravio.dev/ | findstr /C:\"Start free\" /C:\"Onboarding\" /C:\"Start free (3 scans)\" /C:\"#install\">nul & echo HOME_FETCH_OK & curl -s https://gravio.dev/ | findstr /C:\"href=\\\"/onboarding\\\" class=\\\"m-btn m-btn-neon m-btn-sm\\\">Start free</a>\" & curl -s https://gravio.dev/onboarding | findstr /C:\"id=\\\"ob-start-free\\\"\" /C:\"id=\\\"ob-project-id\\\"\" /C:\"cmd-publish\" /C:\"run in 30 seconds\" /C:\"npm ci\" & curl -s -o NUL -w \"GRAVIO_DEV_STATUS=%{http_code}\\n\" https://gravio.dev/"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "verify-home-startfree",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-NoProfile",
+				"-Command",
+				"$h = Invoke-WebRequest -UseBasicParsing https://gravio.dev/; if($h.Content -match 'Start free'){ 'HOME_HAS_START_FREE=YES' } else { 'HOME_HAS_START_FREE=NO' }; if($h.Content -match 'Start free \\(3 scans\\)'){ 'HOME_HAS_OLD_TEXT=YES' } else { 'HOME_HAS_OLD_TEXT=NO' }; if($h.Content -match 'href=\"/onboarding\" class=\"m-btn m-btn-neon m-btn-sm\">Start free</a>'){ 'HOME_STARTFREE_POINTS_ONBOARDING=YES' } else { 'HOME_STARTFREE_POINTS_ONBOARDING=NO' }"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "verify-onboarding-markers",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-NoProfile",
+				"-Command",
+				"$o = Invoke-WebRequest -UseBasicParsing https://gravio.dev/onboarding; if($o.Content -match 'id=\"ob-start-free\"'){ 'ONBOARDING_HAS_START_BUTTON=YES' } else { 'ONBOARDING_HAS_START_BUTTON=NO' }; if($o.Content -match 'id=\"ob-project-id\"'){ 'ONBOARDING_HAS_PROJECT_INPUT=YES' } else { 'ONBOARDING_HAS_PROJECT_INPUT=NO' }; if($o.Content -match 'run in 30 seconds'){ 'ONBOARDING_HAS_OLD_COPY=YES' } else { 'ONBOARDING_HAS_OLD_COPY=NO' }; if($o.Content -match 'npm ci'){ 'ONBOARDING_HAS_NPM_CI=YES' } else { 'ONBOARDING_HAS_NPM_CI=NO' }"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "verify-domain-status",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"curl -s -o NUL -w \"GRAVIO_DEV_STATUS=%{http_code}\\n\" https://gravio.dev/ & curl -s -o NUL -w \"ONBOARDING_STATUS=%{http_code}\\n\" https://gravio.dev/onboarding"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "check-home-startfree-line",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"curl -s https://gravio.dev/ | findstr /C:\"Start free\""
+			],
+			"isBackground": false
+		},
+		{
+			"label": "check-home-old-label",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"curl -s https://gravio.dev/ | findstr /C:\"Start free (3 scans)\""
+			],
+			"isBackground": false
+		},
+		{
+			"label": "check-onboarding-new-markers",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"curl -s https://gravio.dev/onboarding | findstr /C:\"ob-start-free\" /C:\"ob-project-id\" /C:\"Create your project name\""
+			],
+			"isBackground": false
+		},
+		{
+			"label": "verify-canonical-redirect-live",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"curl -s -o NUL -w \"FLY_ROOT_STATUS=%{http_code} REDIRECT=%{redirect_url}\\n\" https://gravio-platform.fly.dev/ & curl -s -o NUL -w \"WWW_ROOT_STATUS=%{http_code} REDIRECT=%{redirect_url}\\n\" https://www.gravio.dev/"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "quick-test-after-copy-tweak",
+			"type": "shell",
+			"command": "node",
+			"args": [
+				"--test",
+				"tests/server.test.mjs"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "commit-push-copy-cleanup",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-NoProfile",
+				"-Command",
+				"git add src/web/index.html; git commit -m remove-install-wording; git push origin master"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "deploy-copy-cleanup",
+			"type": "shell",
+			"command": "flyctl",
+			"args": [
+				"deploy",
+				"--app",
+				"gravio-platform",
+				"--strategy",
+				"immediate",
+				"--depot=true"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "final-status-and-release",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-NoProfile",
+				"-Command",
+				"git -c core.pager=cat status --short --branch; git rev-parse --short HEAD; flyctl releases -a gravio-platform | Select-Object -First 6"
+			],
+			"isBackground": false
+		}
+	]
+}

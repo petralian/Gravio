@@ -12,37 +12,58 @@
 </head>
 <body class="app-tool">
 
+  <div data-site-header></div>
+
   <div id="app">
     <header>
-      <div class="tool-topbar">
-        <a href="/" class="m-brand tool-brand" aria-label="Back to Gravio home">
-          <svg width="22" height="22" viewBox="0 0 26 26" fill="none" aria-hidden="true">
-            <rect width="26" height="26" rx="6" fill="rgba(0,229,255,0.1)"/>
-            <path d="M7 13a6 6 0 1 1 6 6H7v-2.5h6a3.5 3.5 0 1 0-3.5-3.5H7V13z" fill="#00e5ff"/>
-          </svg>
-          <span class="m-brand-name">gravio</span>
-        </a>
-        <span class="tool-tag">Scoring Tool</span>
-      </div>
       <h1>Agent Scorecard <span class="tool-beta">BETA</span></h1>
-      <p class="subtitle">Paste your run evidence JSON and evaluate your agent's quality score instantly.</p>
+      <p class="subtitle">Score an AI-agent run against safety, reliability, evaluation, observability, and governance gates. No data leaves your browser — evaluation runs locally.</p>
     </header>
 
     <main>
 
-      <!-- QUICKSTART -->
+      <!-- HOW TO GET THIS JSON -->
       <div class="card">
         <div class="section-head">
-          <h2>Quick start</h2>
+          <h2>How to get a run JSON</h2>
         </div>
-        <ul class="quickstart-list">
-          <li>Load a sample run below or import your own <code>latest.json</code></li>
-          <li>Optionally paste a previous run to enable regression detection</li>
-          <li>Click <strong>Evaluate</strong> to score against all gates and dimensions</li>
-        </ul>
-        <p class="schema-title">Required run shape</p>
-        <pre class="schema-block">{ runId, scorecard: { safety, reliability, evaluation, observability, governance },
+        <p class="subtitle" style="margin-bottom:16px">Three ways, easiest first. Pick one and the textarea below will fill in.</p>
+
+        <div class="tool-howto">
+
+          <div class="tool-howto-step">
+            <div class="tool-howto-num">1</div>
+            <div class="tool-howto-body">
+              <h3>Try a sample (fastest)</h3>
+              <p>Click <strong>Load realistic sample</strong> below to drop in a complete, valid run JSON you can score immediately. Use <strong>Load minimal sample</strong> for the bare-minimum shape.</p>
+            </div>
+          </div>
+
+          <div class="tool-howto-step">
+            <div class="tool-howto-num">2</div>
+            <div class="tool-howto-body">
+              <h3>Use the Quick builder</h3>
+              <p>Scroll down to the <strong>Quick builder</strong> card. Enter scores and pass/fail counts — it generates a valid run JSON for you. Best when you already know your numbers but don't want to write JSON by hand.</p>
+            </div>
+          </div>
+
+          <div class="tool-howto-step">
+            <div class="tool-howto-num">3</div>
+            <div class="tool-howto-body">
+              <h3>Generate one from your own project</h3>
+              <p>Run the Gravio scanner against your repository — it writes a fresh <code>latest.json</code> you can paste here.</p>
+              <code class="tool-howto-cmd">node scripts/scanner-daemon.mjs --once</code>
+              <p style="margin-top:8px">The result lands at <code>agent-quality/runs/latest.json</code>. Open it, copy the contents, paste into the textarea below — or use <strong>Import JSON file</strong>.</p>
+            </div>
+          </div>
+
+        </div>
+
+        <details style="margin-top:18px">
+          <summary style="cursor:pointer; color:var(--text-2); font-size:13px">Required JSON shape (advanced)</summary>
+          <pre class="schema-block" style="margin-top:10px">{ runId, scorecard: { safety, reliability, evaluation, observability, governance },
   workflowResults: [{ id, status }], adversarialResults: [{ id, status }] }</pre>
+        </details>
       </div>
 
       <!-- RUN JSON INPUT -->
@@ -174,6 +195,9 @@
     </main>
   </div>
 
+  <div data-site-footer></div>
+
+  <script src="site-chrome.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

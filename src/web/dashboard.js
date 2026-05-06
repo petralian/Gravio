@@ -40,16 +40,7 @@ let currentUser = null;
       return;
     }
     currentUser = await res.json();
-    // Show user pill + logout
-    const pill = $("db-user-pill");
-    pill.textContent = currentUser.email;
-    pill.removeAttribute("hidden");
-    const logoutBtn = $("db-logout");
-    logoutBtn.removeAttribute("hidden");
-    logoutBtn.addEventListener("click", async () => {
-      await fetch("/auth/logout", { method: "POST" });
-      location.href = "/login";
-    });
+    // Header user pill + logout are managed by site-chrome.js (shared header).
     // Load projects and API keys
     loadProjects();
     loadApiKeys();

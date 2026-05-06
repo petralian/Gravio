@@ -1,4 +1,10 @@
 "use strict";
+/**
+ * Onboarding page — modal + project-name controller.
+ * Header / sign-in / sign-out are owned by site-chrome.js.
+ * This script listens for the "site:auth" event from the chrome and
+ * updates the in-page CTA + status line accordingly.
+ */
 
 let currentUser = null;
 
@@ -38,37 +44,34 @@ function setAuthStatusMessage(msg) {
   elAuthOk.removeAttribute("hidden");
 }
 
+function clearAuthStatusMessage() {
+  if (!elAuthOk) return;
+  elAuthOk.textContent = "";
+  elAuthOk.setAttribute("hidden", "");
+}
+
 function openAuthModal() {
-  if (!elModalWrap) return;
-  elModalWrap.removeAttribute("hidden");
+  elModalWrap?.removeAttribute("hidden");
 }
 
 function closeAuthModal() {
-  if (!elModalWrap) return;
-  elModalWrap.setAttribute("hidden", "");
+  elModalWrap?.setAttribute("hidden", "");
 }
 
-function setAuthUi(user) {
-  const pill = document.getElementById("ob-user-pill");
-  const loginLink = document.getElementById("ob-login-link");
-  const logoutBtn = document.getElementById("ob-logout");
-
+function applyAuthState(user) {
+  currentUser = user;
   if (user) {
-    if (pill) {
-      pill.textContent = user.email;
-      pill.removeAttribute("hidden");
-    }
-    if (loginLink) loginLink.hidden = true;
-    if (logoutBtn) logoutBtn.removeAttribute("hidden");
     if (elStartFree) elStartFree.textContent = "Account connected";
     setAuthStatusMessage(`Signed in as ${user.email}. Continue with steps below.`);
   } else {
-    if (pill) pill.setAttribute("hidden", "");
-    if (loginLink) loginLink.hidden = false;
-    if (logoutBtn) logoutBtn.setAttribute("hidden", "");
     if (elStartFree) elStartFree.textContent = "Create account or sign in";
+    clearAuthStatusMessage();
   }
 }
+
+document.addEventListener("site:auth", (e) => {
+  applyAuthState(e.detail?.user ?? null);
+});
 
 function showError(id, msg) {
   const el = document.getElementById(id);
@@ -89,22 +92,6 @@ function setLoading(btnId, loading, defaultText) {
   if (!btn) return;
   btn.disabled = loading;
   btn.textContent = loading ? "Please wait…" : defaultText;
-}
-
-async function refreshAuthState() {
-  try {
-    const res = await fetch("/api/me");
-    if (!res.ok) {
-      currentUser = null;
-      setAuthUi(null);
-      return;
-    }
-    currentUser = await res.json();
-    setAuthUi(currentUser);
-  } catch {
-    currentUser = null;
-    setAuthUi(null);
-  }
 }
 
 tabLogin?.addEventListener("click", () => {
@@ -135,11 +122,8 @@ elStartFree?.addEventListener("click", () => {
 
 elModalBackdrop?.addEventListener("click", closeAuthModal);
 elModalClose?.addEventListener("click", closeAuthModal);
-
-document.getElementById("ob-logout")?.addEventListener("click", async () => {
-  await fetch("/auth/logout", { method: "POST" });
-  currentUser = null;
-  setAuthUi(null);
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") closeAuthModal();
 });
 
 document.getElementById("ob-form-login")?.addEventListener("submit", async (e) => {
@@ -161,8 +145,9 @@ document.getElementById("ob-form-login")?.addEventListener("submit", async (e) =
       showError("ob-login-error", data.error ?? "Login failed");
       return;
     }
-    await refreshAuthState();
     closeAuthModal();
+    if (window.siteChrome?.refresh) await window.siteChrome.refresh();
+    else applyAuthState({ email });
   } catch {
     showError("ob-login-error", "Network error — please try again");
   } finally {
@@ -196,8 +181,9 @@ document.getElementById("ob-form-register")?.addEventListener("submit", async (e
       showError("ob-reg-error", data.error ?? "Registration failed");
       return;
     }
-    await refreshAuthState();
     closeAuthModal();
+    if (window.siteChrome?.refresh) await window.siteChrome.refresh();
+    else applyAuthState({ email });
   } catch {
     showError("ob-reg-error", "Network error — please try again");
   } finally {
@@ -207,7 +193,6 @@ document.getElementById("ob-form-register")?.addEventListener("submit", async (e
 
 elProjectId?.addEventListener("input", updateProjectCommands);
 updateProjectCommands();
-refreshAuthState();
 
 function setCopied(btn, copied) {
   const label = copied ? "Copied" : "Copy command";

@@ -3,6 +3,9 @@
    Black · Grey · Blue · White · Neon (cyan · green · purple)
    ============================================================ */
 
+/* Global: HTML `hidden` attribute must always win over component display. */
+[hidden] { display: none !important; }
+
 /* ─── TOKENS ─── */
 :root {
   --black:          #000000;
@@ -937,7 +940,25 @@ body.admin-page { padding-top: 0; }
   border: 1px solid var(--border);
 }
 .db-logout-btn { font-size: 13px; padding: 6px 14px; }
-.db-projects-section, .db-apikeys-section { margin-bottom: 56px; }
+
+/* My projects + API keys: same surface treatment as the decrypt form-card */
+.db-projects-section,
+.db-apikeys-section {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 32px;
+  margin-bottom: 32px;
+}
+.db-projects-section .db-section-h2,
+.db-apikeys-section .db-section-h2 {
+  margin-top: 0;
+  margin-bottom: 8px;
+}
+@media (max-width: 720px) {
+  .db-projects-section,
+  .db-apikeys-section { padding: 20px; }
+}
 .db-projects-list { list-style: none; display: flex; flex-direction: column; gap: 8px; }
 .db-project-item { display: contents; }
 .db-project-btn {
@@ -1228,6 +1249,64 @@ body.onboarding-page {
 }
 .ob-logout-btn { font-size: 13px; padding: 6px 14px; }
 
+/* Shared site-chrome user pill (used in modular header on every page) */
+.sc-user-pill {
+  font-size: 12px;
+  color: var(--text-3);
+  font-family: var(--font-mono);
+  padding: 4px 10px;
+  background: rgba(255,255,255,0.05);
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
+
+/* Tool-page guidance block: numbered "How to get this JSON" card */
+.tool-howto { display: flex; flex-direction: column; gap: 18px; }
+.tool-howto-step {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+.tool-howto-num {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--neon-cyan-bg, rgba(0,229,255,0.1));
+  color: var(--neon-cyan, #00e5ff);
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  border: 1px solid var(--neon-cyan-border, rgba(0,229,255,0.3));
+}
+.tool-howto-body { flex: 1; min-width: 0; }
+.tool-howto-body h3 {
+  font-size: 15px;
+  margin: 0 0 4px 0;
+  font-weight: 600;
+  color: var(--text-1);
+}
+.tool-howto-body p {
+  margin: 0 0 8px 0;
+  color: var(--text-2);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.tool-howto-cmd {
+  display: block;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  color: var(--text-1);
+  white-space: pre-wrap;
+  word-break: break-all;
+  margin-top: 6px;
+}
+
 /* ═══════════════════════════════════════
    APP TOOL SURFACE  (body.app-tool)
 ═══════════════════════════════════════ */
@@ -1237,11 +1316,11 @@ body.app-tool {
     radial-gradient(900px 380px at 15% -10%, rgba(0, 229, 255, 0.06), transparent 70%),
     radial-gradient(700px 320px at 95% 0%, rgba(183, 126, 255, 0.05), transparent 70%),
     var(--bg);
-  padding: 32px 16px 64px;
+  padding: 0 0 64px;
 }
 
-body.app-tool #app    { max-width: 820px; margin: 0 auto; }
-body.app-tool header  { margin-bottom: 28px; }
+body.app-tool #app    { max-width: 820px; margin: 0 auto; padding: 32px 16px 0; }
+body.app-tool > #app > header  { margin-bottom: 28px; }
 
 .tool-topbar {
   display: flex;
@@ -1866,7 +1945,8 @@ button#evaluate-btn:hover {
   .m-cta-row { flex-direction: column; align-items: stretch; }
   .m-security-pills { gap: 7px; }
   .m-container, .m-section { padding-left: 18px; padding-right: 18px; }
-  body.app-tool { padding: 20px 14px 48px; }
+  body.app-tool { padding: 0 0 48px; }
+  body.app-tool #app { padding: 20px 14px 0; }
   .db-form-card { padding: 20px; }
   .db-score-value { font-size: 48px; }
   .db-metrics-row { grid-template-columns: 1fr; }
