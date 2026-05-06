@@ -63,7 +63,7 @@
         <p>From the same folder where you downloaded <code>gravio.mjs</code>, run:</p>
         <pre class="ob-code" id="cmd-local">node gravio.mjs --once --target .</pre>
         <button class="m-btn m-btn-outline ob-copy" type="button" data-copy-id="cmd-local">Copy command</button>
-        <p class="ob-step-foot">Writes an encrypted <code>agent-quality/runs/latest.json</code> envelope and auto-publishes securely.</p>
+        <p class="ob-step-foot">Cloud-only mode: scans are encrypted and auto-published securely. No local JSON scorecard is written.</p>
       </article>
 
       <article class="ob-step-card">
@@ -136,11 +136,11 @@
       </details>
       <details>
         <summary>What does the local scan actually look at?</summary>
-        <p>It walks the target folder for evidence of secret hygiene, test signal, changelog, session notes, and git status — then writes an encrypted envelope to <code>agent-quality/runs/latest.json</code>. It never reads <code>.env</code> contents and never publishes unless you authorize this folder.</p>
+        <p>It walks the target folder for evidence of secret hygiene, test signal, changelog, session notes, and git status — then encrypts and publishes to cloud. It never reads <code>.env</code> contents and requires folder authorization first.</p>
       </details>
       <details>
         <summary>How does decryption work on the dashboard?</summary>
-        <p>For runs published with authorization, enter the same API key on the dashboard to decrypt in-browser. The server stores ciphertext only.</p>
+        <p>Free tier shows generic rating only. Upgrade to Pro or Team to unlock detailed remediation guidance and full decryptable scorecard details.</p>
       </details>
       <details>
         <summary>Why was I getting logged out?</summary>

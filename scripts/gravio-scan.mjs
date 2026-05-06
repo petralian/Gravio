@@ -4,14 +4,13 @@
  *
  * Gravio Scanner CLI — entry point.
  * Usage:
+ *   node scripts/gravio-scan.mjs --authorize --project my-saas --api-key gv_xxx --server https://gravio.dev
  *   node scripts/gravio-scan.mjs --once
- *   node scripts/gravio-scan.mjs --target ../some-project --output agent-quality/runs/latest.json
+ *   node scripts/gravio-scan.mjs --target ../some-project --once
  *
- * Publish encrypted results:
- *   node scripts/gravio-scan.mjs --once --publish --project my-saas --api-key gv_xxx
- *   node scripts/gravio-scan.mjs --once --publish --project my-saas --api-key gv_xxx --passphrase "my secret"
- *   node scripts/gravio-scan.mjs --once --publish --project my-saas --api-key gv_xxx --key <64-char-hex>
- *   node scripts/gravio-scan.mjs --once --publish --project my-saas --api-key gv_xxx --passphrase "x" --salt <hex>
+ * Optional encryption modes:
+ *   node scripts/gravio-scan.mjs --once --key <64-char-hex>
+ *   node scripts/gravio-scan.mjs --once --passphrase "my secret" --salt <hex>
  */
 import path from "node:path";
 import http from "node:http";
@@ -191,6 +190,11 @@ function resolvePublishContext(args, authCfg) {
 
 function buildEncryptedRunEnvelope(run, options) {
   const now = new Date().toISOString();
+  const publicSummary = {
+    runId: run?.runId ?? "run",
+    createdAt: run?.createdAt ?? now,
+    overallScore: Number.isFinite(run?.summary?.overallScore) ? Number(run.summary.overallScore) : null,
+  };
 
   if (options.key) {
     const key = String(options.key).trim().toLowerCase();
@@ -201,6 +205,7 @@ function buildEncryptedRunEnvelope(run, options) {
       envelope: {
         format: "gravio-run-v1",
         encryptedAt: now,
+        publicSummary,
         cipher: "aes-256-gcm",
         keyMode: "raw-key",
         ciphertext: encrypt(key, JSON.stringify(run)),
@@ -218,6 +223,7 @@ function buildEncryptedRunEnvelope(run, options) {
       envelope: {
         format: "gravio-run-v1",
         encryptedAt: now,
+        publicSummary,
         cipher: "aes-256-gcm",
         keyMode: "passphrase",
         kdf: { name: "pbkdf2-sha256", iterations: 210000, saltHex },
@@ -234,6 +240,7 @@ function buildEncryptedRunEnvelope(run, options) {
       envelope: {
         format: "gravio-run-v1",
         encryptedAt: now,
+        publicSummary,
         cipher: "aes-256-gcm",
         keyMode: "api-key",
         kdf: { name: "pbkdf2-sha256", iterations: 210000, saltHex },
@@ -248,6 +255,7 @@ function buildEncryptedRunEnvelope(run, options) {
     envelope: {
       format: "gravio-run-v1",
       encryptedAt: now,
+      publicSummary,
       cipher: "aes-256-gcm",
       keyMode: "raw-key",
       ciphertext: encrypt(oneTimeKey, JSON.stringify(run)),
@@ -491,7 +499,6 @@ if (args.once) {
     passphrase: args.passphrase,
     salt: args.salt,
   });
-  writeFileSync(args.output, `${JSON.stringify(envelope, null, 2)}\n`, "utf8");
 
   // ── Progress: done ──────────────────────────────────────────────────────
   if (process.stdout.isTTY) {
@@ -501,7 +508,7 @@ if (args.once) {
   }
 
   printScanReport({ run, scan, version: readVersion() });
-  process.stdout.write(`\n  \x1b[2mEncrypted local artifact:\x1b[0m ${args.output}\n`);
+  process.stdout.write("\n  \x1b[2mCloud-only mode:\x1b[0m no local JSON artifact is written.\n");
   process.stdout.write(`  \x1b[2m${keyMessage}\x1b[0m\n`);
 
   {
@@ -545,6 +552,7 @@ const watcher = startScannerWatcher({
   logger: console,
   onScan: async ({ run, scan }) => {
     try {
+      try { unlinkSync(plainWatchOutput); } catch { /* ignore */ }
       const { envelope } = buildEncryptedRunEnvelope(run, {
         project: context.project,
         apiKey: context.apiKey,
@@ -552,7 +560,6 @@ const watcher = startScannerWatcher({
         passphrase: args.passphrase,
         salt: args.salt,
       });
-      writeFileSync(args.output, `${JSON.stringify(envelope, null, 2)}\n`, "utf8");
       await publishEnvelope({
         server: context.server,
         project: context.project,

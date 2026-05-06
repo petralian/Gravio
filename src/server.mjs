@@ -33,6 +33,36 @@ function getAuthUser(req) {
   return null;
 }
 
+function isPaidOrAdmin(user) {
+  return user?.role === "admin" || user?.plan === "pro" || user?.plan === "team";
+}
+
+function scoreBand(score) {
+  if (!Number.isFinite(score)) return "Unknown";
+  if (score >= 90) return "Excellent";
+  if (score >= 80) return "Strong";
+  if (score >= 70) return "Fair";
+  return "Needs work";
+}
+
+function toFreeTierGenericRun(runData) {
+  const fromPublic = runData?.publicSummary;
+  const fromSummary = runData?.summary;
+  const overall = Number(fromPublic?.overallScore ?? fromSummary?.overallScore ?? NaN);
+  const runId = fromPublic?.runId ?? runData?.runId ?? "run";
+  const createdAt = fromPublic?.createdAt ?? runData?.createdAt ?? null;
+  return {
+    runId,
+    createdAt,
+    summary: {
+      overallScore: Number.isFinite(overall) ? Number(overall.toFixed(2)) : null,
+      rating: scoreBand(overall),
+    },
+    limitedDetails: true,
+    upgradeMessage: "Upgrade to Pro or Team to view remediation details and fix guidance.",
+  };
+}
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const WEB_DIR = path.join(__dirname, "web");
 const PORT = process.env.PORT ?? 3000;
@@ -259,18 +289,11 @@ const server = http.createServer(async (req, res) => {
       }
 
       const uid = user.uid ?? user.id;
-      const existing = stmts.getRun.get(projectId, uid);
-      const runCount = stmts.listRunsForUser.all(uid).length;
-      const isPaidOrAdmin = user.role === "admin" || user.plan === "pro" || user.plan === "team";
-      if (!existing && !isPaidOrAdmin && runCount >= 3) {
-        res.writeHead(403, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({
-          error: "Free plan limit reached (3 projects). Upgrade to Pro or Team in your dashboard to publish more.",
-        }));
-        return;
-      }
-
       stmts.upsertRun.run(projectId, uid, JSON.stringify(run));
+      if (!isPaidOrAdmin(user)) {
+        // Free tier is cloud-only and keeps only the latest 3 cloud records.
+        stmts.trimRunsForFreeUser.run(uid, uid);
+      }
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ ok: true, projectId }));
     } catch (err) {
@@ -306,8 +329,9 @@ const server = http.createServer(async (req, res) => {
     }
     let runData;
     try { runData = JSON.parse(entry.ciphertext); } catch { runData = null; }
+    const outputRun = isPaidOrAdmin(user) ? runData : toFreeTierGenericRun(runData);
     res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ run: runData, publishedAt: entry.published_at }));
+    res.end(JSON.stringify({ run: outputRun, publishedAt: entry.published_at, limitedDetails: !isPaidOrAdmin(user) }));
     return;
   }
 

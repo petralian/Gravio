@@ -158,6 +158,16 @@ export const stmts = {
      FROM runs r JOIN users u ON r.user_id=u.id
      ORDER BY r.published_at DESC`,
   ),
+  trimRunsForFreeUser: db.prepare(
+    `DELETE FROM runs
+     WHERE user_id=?
+       AND id NOT IN (
+         SELECT id FROM runs
+         WHERE user_id=?
+         ORDER BY published_at DESC, id DESC
+         LIMIT 3
+       )`,
+  ),
   runCountPerUser: db.prepare(
     `SELECT user_id, COUNT(*) as run_count FROM runs GROUP BY user_id`,
   ),

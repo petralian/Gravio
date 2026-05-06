@@ -33,6 +33,9 @@ All notable changes to this project will be documented in this file.
 - CLI now blocks all scans until folder authorization exists (`--authorize`), and no longer requires a separate manual publish step.
 - `/api/publish` and `/api/runs/:projectId` now support encrypted run envelopes end-to-end while keeping legacy plaintext run compatibility.
 - Onboarding Step 4 now uses the authorize-once flow before scan/publish.
+- Free tier publish policy changed: scans are always accepted, but only the latest 3 cloud records are retained.
+- Free tier dashboard payloads now return generic rating summaries only; remediation details require Pro or Team.
+- Scanner CLI is now cloud-only for scan output (no local `agent-quality/runs/latest.json` artifact is written).
 
 ## [0.4.0] — 2026-05-05
 

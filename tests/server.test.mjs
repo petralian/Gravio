@@ -305,6 +305,10 @@ describe("POST /api/publish + GET /api/runs/:projectId (authenticated)", () => {
 
   it("setup: register + create API key", async () => {
     cookie = await registerAndGetCookie(email, "password123");
+    const me = await httpGet(`http://localhost:${TEST_PORT}/api/me`, { Cookie: cookie });
+    const uid = JSON.parse(me.body).id;
+    const { db } = await import(pathToFileURL(path.join(ROOT, "src", "core", "db.mjs")).href);
+    db.prepare("UPDATE users SET plan='pro' WHERE id=?").run(uid);
     const res = await httpPost(`http://localhost:${TEST_PORT}/api/keys`, { label: "ci" }, { Cookie: cookie });
     apiKey = JSON.parse(res.body).key;
     assert.ok(apiKey.startsWith("gv_"));
@@ -369,7 +373,7 @@ describe("POST /api/publish + GET /api/runs/:projectId (authenticated)", () => {
     assert.strictEqual(res.status, 400);
   });
 
-  it("enforces free plan limit at 3 cloud scans", async () => {
+  it("free tier keeps only latest 3 cloud records", async () => {
     const limitCookie = await registerAndGetCookie(`limit-${Date.now()}@gravio.test`, "password123");
     const keyRes = await httpPost(`http://localhost:${TEST_PORT}/api/keys`, { label: "limit" }, { Cookie: limitCookie });
     const limitKey = JSON.parse(keyRes.body).key;
@@ -383,12 +387,78 @@ describe("POST /api/publish + GET /api/runs/:projectId (authenticated)", () => {
       assert.strictEqual(okRes.status, 200);
     }
 
-    const blocked = await httpPost(
+    const fourth = await httpPost(
       `http://localhost:${TEST_PORT}/api/publish`,
       { projectId: "limit-proj-4", run: { runId: "limit-proj-4" } },
       { Authorization: `Bearer ${limitKey}` },
     );
-    assert.strictEqual(blocked.status, 403);
+    assert.strictEqual(fourth.status, 200);
+
+    const list = await httpGet(`http://localhost:${TEST_PORT}/api/runs/list`, { Cookie: limitCookie });
+    assert.strictEqual(list.status, 200);
+    const data = JSON.parse(list.body);
+    assert.strictEqual(data.runs.length, 3, "free tier should retain only latest 3 records");
+    assert.ok(data.runs.some((r) => r.project_id === "limit-proj-4"));
+  });
+
+  it("free tier receives generic rating only from /api/runs/:projectId", async () => {
+    const genericCookie = await registerAndGetCookie(`generic-${Date.now()}@gravio.test`, "password123");
+    const keyRes = await httpPost(`http://localhost:${TEST_PORT}/api/keys`, { label: "generic" }, { Cookie: genericCookie });
+    const genericKey = JSON.parse(keyRes.body).key;
+
+    const pid = `generic-proj-${Date.now()}`;
+    const save = await httpPost(
+      `http://localhost:${TEST_PORT}/api/publish`,
+      {
+        projectId: pid,
+        run: {
+          runId: "g-1",
+          summary: { overallScore: 81.25, workflowPassRate: 0.9 },
+          workflowResults: [{ id: "secret-scan", status: "pass" }],
+        },
+      },
+      { Authorization: `Bearer ${genericKey}` },
+    );
+    assert.strictEqual(save.status, 200);
+
+    const res = await httpGet(`http://localhost:${TEST_PORT}/api/runs/${pid}`, { Cookie: genericCookie });
+    assert.strictEqual(res.status, 200);
+    const body = JSON.parse(res.body);
+    assert.strictEqual(body.limitedDetails, true);
+    assert.strictEqual(body.run?.limitedDetails, true);
+    assert.strictEqual(typeof body.run?.summary?.overallScore, "number");
+    assert.ok(typeof body.run?.summary?.rating === "string");
+    assert.strictEqual(body.run?.workflowResults, undefined);
+  });
+
+  it("paid tier receives full details from /api/runs/:projectId", async () => {
+    const paidCookie = await registerAndGetCookie(`paid-${Date.now()}@gravio.test`, "password123");
+    const me = await httpGet(`http://localhost:${TEST_PORT}/api/me`, { Cookie: paidCookie });
+    const paidId = JSON.parse(me.body).id;
+    const { db } = await import(pathToFileURL(path.join(ROOT, "src", "core", "db.mjs")).href);
+    db.prepare("UPDATE users SET plan='pro' WHERE id=?").run(paidId);
+
+    const keyRes = await httpPost(`http://localhost:${TEST_PORT}/api/keys`, { label: "paid" }, { Cookie: paidCookie });
+    const paidKey = JSON.parse(keyRes.body).key;
+    const pid = `paid-proj-${Date.now()}`;
+    await httpPost(
+      `http://localhost:${TEST_PORT}/api/publish`,
+      {
+        projectId: pid,
+        run: {
+          runId: "p-1",
+          summary: { overallScore: 92.5, workflowPassRate: 1 },
+          workflowResults: [{ id: "secret-scan", status: "pass" }],
+        },
+      },
+      { Authorization: `Bearer ${paidKey}` },
+    );
+
+    const res = await httpGet(`http://localhost:${TEST_PORT}/api/runs/${pid}`, { Cookie: paidCookie });
+    assert.strictEqual(res.status, 200);
+    const body = JSON.parse(res.body);
+    assert.strictEqual(body.limitedDetails, false);
+    assert.ok(Array.isArray(body.run?.workflowResults));
   });
 });
 

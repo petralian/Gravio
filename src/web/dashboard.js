@@ -243,7 +243,7 @@ async function loadProjects() {
     const section = $("db-projects-section");
     const list = $("db-projects-list");
     if (!runs || runs.length === 0) {
-      list.innerHTML = `<li class="db-project-empty">No runs published yet. Run <code>node gravio.mjs --once --publish ...</code> to see your projects here.</li>`;
+      list.innerHTML = `<li class="db-project-empty">No cloud scans yet. Run <code>node gravio.mjs --once</code> to publish your next scan.</li>`;
     } else {
       list.innerHTML = runs.map((r) => `
         <li class="db-project-item">
@@ -408,6 +408,16 @@ function renderScorecard(run, publishedAt) {
   }
 
   elGates.innerHTML = "";
+  if (run?.limitedDetails) {
+    elGates.innerHTML = `<li class="gate-empty">Upgrade to Pro or Team to unlock detailed fix guidance and remediation checks.</li>`;
+    elDimensions.innerHTML = `<div class="dim-empty">Free tier shows a generic rating only.</div>`;
+    elRawJson.value = JSON.stringify({ summary: run.summary, runId: run.runId, limitedDetails: true }, null, 2);
+    elFormSection.style.display = "none";
+    elResults.removeAttribute("hidden");
+    elResults.scrollIntoView({ behavior: "smooth", block: "start" });
+    return;
+  }
+
   const checks = run?.workflowResults ?? [];
   if (checks.length > 0) {
     for (const check of checks) {

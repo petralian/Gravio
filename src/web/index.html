@@ -28,7 +28,7 @@
           <br/><span class="m-neon-text">production-safe.</span>
         </h1>
         <p class="m-hero-lead">
-          Register first, then run your first 3 cloud scans with a guided flow.
+          Register first, then run unlimited cloud scans with a guided flow.
           Gravio scores your agent on safety, reliability, and governance —
           then publishes results to your secure dashboard.
         </p>
@@ -117,7 +117,7 @@
           <p class="m-step-num">03</p>
           <div class="m-step-icon">🔐</div>
           <h3>Read your results</h3>
-          <p>Every account gets 3 free cloud scans. Your dashboard is secured by your account — only you can access your project results.</p>
+          <p>Free shows generic cloud ratings while Pro/Team unlock detailed remediation guidance. Your dashboard is secured by your account.</p>
         </div>
       </div>
     </section>
@@ -173,7 +173,7 @@
       <div class="m-section-header">
         <p class="m-eyebrow">PRICING</p>
         <h2 class="m-section-h2">Start free. Scale when you need it.</h2>
-        <p class="m-section-sub">Register once, run local scans anytime, and unlock 3 free cloud scans.</p>
+        <p class="m-section-sub">Register once and run unlimited cloud scans. Free stores your latest 3 cloud results.</p>
       </div>
       <div class="m-pricing-grid">
 
@@ -182,15 +182,15 @@
           <div class="m-plan-price">
             <span class="m-plan-amount">$0</span>
           </div>
-          <p class="m-plan-desc">Perfect for solo developers. Includes local scanning plus 3 cloud scans after registration.</p>
+          <p class="m-plan-desc">Perfect for solo developers. Unlimited scans, cloud-only publishing, and generic quality ratings.</p>
           <ul class="m-plan-features">
             <li><span class="t-pass">✓</span> Gravio CLI (macOS / Win / Linux)</li>
-            <li><span class="t-pass">✓</span> Local JSON scorecard output</li>
+            <li><span class="t-pass">✓</span> Cloud-only score publishing</li>
             <li><span class="t-pass">✓</span> 14 workflow checks</li>
             <li><span class="t-pass">✓</span> Secret exposure detection</li>
-            <li><span class="t-pass">✓</span> 3 cloud scans</li>
+            <li><span class="t-pass">✓</span> Unlimited scans (latest 3 saved)</li>
             <li><span class="t-pass">✓</span> Cloud dashboard</li>
-            <li class="m-plan-no"><span>—</span> Score trend history</li>
+            <li class="m-plan-no"><span>—</span> Detailed fix guidance</li>
           </ul>
           <a href="/login" class="m-btn m-btn-outline m-btn-full">Register free</a>
         </div>
@@ -206,6 +206,7 @@
             <li><span class="t-pass">✓</span> Everything in Free</li>
             <li><span class="t-pass">✓</span> Score trend history &amp; regressions</li>
             <li><span class="t-pass">✓</span> Explainability reports</li>
+            <li><span class="t-pass">✓</span> Detailed fix guidance</li>
             <li><span class="t-pass">✓</span> Optional end-to-end encryption (E2EE)</li>
             <li><span class="t-pass">✓</span> 10 projects</li>
             <li><span class="t-pass">✓</span> Email support</li>
@@ -263,12 +264,11 @@
 <pre class="m-terminal-pre"><span class="t-comment"># Register first</span>
 <span class="t-comment"># Visit: https://gravio.dev/onboarding</span>
 
-<span class="t-comment"># Pick project id in onboarding (example: my-first-project)</span>
-<span class="t-comment"># Then run your first scan from your project root</span>
-<span class="t-prompt">$</span> <span class="t-cmd">node gravio.mjs --once --target .</span>
+<span class="t-comment"># Authorize this folder once</span>
+<span class="t-prompt">$</span> <span class="t-cmd">node gravio.mjs --authorize --project my-first-project --api-key gv_xxx --server https://gravio.dev</span>
 
-<span class="t-comment"># Publish results to your dashboard</span>
-<span class="t-prompt">$</span> <span class="t-cmd">node gravio.mjs --once --publish --project my-first-project --api-key gv_xxx --server https://gravio.dev</span><span class="t-cursor">█</span></pre>
+<span class="t-comment"># Run scans anytime (cloud-only, auto-publish)</span>
+<span class="t-prompt">$</span> <span class="t-cmd">node gravio.mjs --once --target .</span><span class="t-cursor">█</span></pre>
           </div>
         </div>
       </div>
@@ -294,7 +294,7 @@
     <section class="m-cta-final m-container">
       <p class="m-eyebrow">EARLY ACCESS</p>
       <h2 class="m-cta-h2">Ready to see your agent quality score?</h2>
-      <p>Register now and get 3 free cloud scans.</p>
+      <p>Register now and run unlimited cloud scans.</p>
       <div class="m-cta-row">
         <a href="/onboarding" class="m-btn m-btn-neon m-btn-lg">Start free</a>
         <a href="/login" class="m-btn m-btn-outline m-btn-lg">Customer login</a>

@@ -131,9 +131,17 @@ node gravio.mjs --logout --target . # remove local .gravio/auth.json
 
 - `POST /api/publish` accepts `run` as either legacy plaintext run JSON or encrypted envelope JSON.
 - Encrypted envelopes use `format: "gravio-run-v1"` and store only ciphertext plus key-derivation metadata.
-- New CLI behavior writes encrypted local artifact files (`agent-quality/runs/latest.json`) by default.
+- New CLI behavior publishes encrypted envelopes to cloud by default without writing local run artifacts.
 - Dashboard decrypts envelope payload client-side (WebCrypto) using one of: API key mode, passphrase mode, or raw key mode.
 - Server continues blind storage only (`runs.ciphertext`), with no server-side decrypt path.
+
+## Free Tier Runtime Policy
+
+- Free scans are always accepted and published to cloud.
+- Cloud retention for free users is capped to latest 3 records (older records auto-pruned).
+- `/api/runs/:projectId` returns generic rating-only payloads for free users (no detailed remediation/check data).
+- Pro/Team/admin users receive full run detail payloads.
+- CLI scan flow is cloud-only (no local run JSON artifact persisted).
 
 ---
 
