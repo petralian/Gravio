@@ -19,7 +19,7 @@ import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { spawn, spawnSync } from "node:child_process";
 import { scanTargetProject } from "../src/core/scan-signals.mjs";
-import { printScanReport, printPublishResult, printScanStep, buildCatalog } from "../src/core/reporter.mjs";
+import { printScanReport, printPublishResult, printScanStep, buildCatalog, buildExportReport } from "../src/core/reporter.mjs";
 import { deriveKey, encrypt, generateKey } from "../src/core/crypto-e2ee.mjs";
 
 // eslint-disable-next-line no-undef
@@ -53,6 +53,8 @@ function parseArgs(argv) {
     noUpdate: false,
     setupVerbose: false,
     help: false,
+    export: null,   // --export [file] — write MoSCoW markdown report
+    dim: null,      // --dim <dimension> — filter export to one dimension
   };
 
   if (argv[0] && !argv[0].startsWith("-")) {
@@ -113,6 +115,23 @@ function parseArgs(argv) {
     }
     if (token === "--setup-verbose") {
       args.setupVerbose = true;
+      continue;
+    }
+    if (token === "--export") {
+      // --export           → use default filename
+      // --export FILE.md   → use specified filename
+      const next = argv[i + 1];
+      if (next && !next.startsWith("-")) {
+        args.export = next;
+        i += 1;
+      } else {
+        args.export = "gravio-report.md";
+      }
+      continue;
+    }
+    if (token === "--dim" && argv[i + 1]) {
+      args.dim = argv[i + 1].toLowerCase();
+      i += 1;
       continue;
     }
     if (token === "--help" || token === "-h") {
@@ -830,6 +849,21 @@ async function handleRun(args) {
   }
 
   printScanReport({ run, scan, version: readVersion() });
+
+  // MoSCoW export if --export flag was set
+  if (args.export) {
+    try {
+      const { writeFileSync } = await import("node:fs");
+      const catalog = buildCatalog(scan);
+      const reportText = buildExportReport({ catalog, run, scan, dimFilter: args.dim ?? undefined });
+      const outFile = path.resolve(args.target, args.export);
+      writeFileSync(outFile, reportText, "utf8");
+      process.stdout.write(`\n  \x1b[32m\u2714  Report exported\x1b[0m  \u2192  ${outFile}\n`);
+    } catch (err) {
+      process.stderr.write(`\n  \x1b[31m\u26a0  Export failed: ${err.message}\x1b[0m\n`);
+    }
+  }
+
   process.stdout.write("\n  \x1b[2mCloud-only mode:\x1b[0m no local JSON artifact is written.\n");
   process.stdout.write(`  \x1b[2m${keyMessage}\x1b[0m\n`);
 

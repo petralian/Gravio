@@ -151,7 +151,13 @@ export function buildCatalog(scan) {
     hasCodeOwners,
     hasSafetyRulesInInstructions, hasModelPinned, hasPromptVersioning, hasToolWhitelist,
     hasLockFile, hasLintConfig, hasPreCommitHooks, hasEvalConfig,
+    // AI/agentic detection
+    isAgenticProject,
   } = scan;
+
+  // Agentic-dimension checks are N/A (neither pass nor fail) for non-AI projects.
+  // AI-specific eval checks are also N/A for non-agentic projects.
+  const notAgentic = !isAgenticProject;
 
   return [
     // ── SAFETY — Secrets & Exposure ─────────────────────────────────────────
@@ -259,6 +265,7 @@ export function buildCatalog(scan) {
     // ── EVALUATION — Corpus Depth ────────────────────────────────────────────
     { dim: "evaluation", subdim: "eval-corpus", id: "eval-corpus", severity: "high",
       difficulty: "medium", estimatedMinutes: 120, impactScore: 5,
+      na: notAgentic,
       pass: evalCorpusExists,
       label: "Eval corpus",
       brief: evalCorpusExists
@@ -267,6 +274,7 @@ export function buildCatalog(scan) {
       action: "Create evals/ with at least 10 test cases mirroring real user workflows." },
     { dim: "evaluation", subdim: "eval-corpus", id: "adversarial-tests", severity: "high",
       difficulty: "medium", estimatedMinutes: 90, impactScore: 2,
+      na: notAgentic,
       pass: hasAdversarialTests,
       label: "Adversarial tests",
       brief: hasAdversarialTests ? "adversarial test cases found" : "no adversarial/injection tests",
@@ -279,6 +287,7 @@ export function buildCatalog(scan) {
       action: "Create fixtures/ or a golden.json with expected outputs for regression testing." },
     { dim: "evaluation", subdim: "baseline-hygiene", id: "baseline-tracking", severity: "medium",
       difficulty: "quick-win", estimatedMinutes: 20, impactScore: 2,
+      na: notAgentic,
       pass: hasBaseline,
       label: "Baseline tracking",
       brief: hasBaseline ? "baseline.json found" : "no baseline.json",
@@ -375,38 +384,45 @@ export function buildCatalog(scan) {
       action: "Add commitlint.config.js with conventional commits to make history readable." },
 
     // ── AGENTIC — Agent Governance ───────────────────────────────────────────
+    // All agentic checks are N/A for projects with no detected AI/LLM tooling.
     { dim: "agentic", subdim: "agent-governance", id: "agent-instructions", severity: "medium",
       difficulty: "quick-win", estimatedMinutes: 30, impactScore: 3,
+      na: notAgentic,
       pass: hasAiDocs,
       label: "Agent instructions",
       brief: hasAiDocs ? "agent rules detected" : "no agent instruction files",
       action: "Create .github/copilot-instructions.md or AGENTS.md with operating rules." },
     { dim: "agentic", subdim: "agent-governance", id: "safety-rules", severity: "high",
       difficulty: "quick-win", estimatedMinutes: 20, impactScore: 2,
+      na: notAgentic,
       pass: hasSafetyRulesInInstructions,
       label: "Safety guardrails",
       brief: hasSafetyRulesInInstructions ? "safety rules detected" : "no explicit safety rules in instructions",
       action: "Add at least 3 `never do X` rules to your agent instructions file." },
     { dim: "agentic", subdim: "agent-governance", id: "model-pinned", severity: "low",
       difficulty: "quick-win", estimatedMinutes: 10, impactScore: 1,
+      na: notAgentic,
       pass: hasModelPinned,
       label: "Model version pinned",
       brief: hasModelPinned ? "model version found in config" : "no model version pinned",
       action: "Specify the exact model (e.g. claude-sonnet-4 or gpt-4o) in your instructions." },
     { dim: "agentic", subdim: "prompt-engineering", id: "agent-skill-catalog", severity: "low",
       difficulty: "medium", estimatedMinutes: 60, impactScore: 2,
+      na: notAgentic,
       pass: hasAgentSkillCatalog || hasPromptAssets,
       label: "Skills / prompts",
       brief: (hasAgentSkillCatalog || hasPromptAssets) ? "skill or prompt assets found" : "no reusable skills/prompts",
       action: "Create .github/prompts/ or skills/ with reusable prompt templates." },
     { dim: "agentic", subdim: "prompt-engineering", id: "prompt-versioning", severity: "low",
       difficulty: "quick-win", estimatedMinutes: 10, impactScore: 1,
+      na: notAgentic,
       pass: hasPromptVersioning,
       label: "Prompt versioning",
       brief: hasPromptVersioning ? "prompts tracked in git" : "prompt assets not git-tracked",
       action: "Ensure prompts/ or skills/ files are committed to git for version history." },
     { dim: "agentic", subdim: "prompt-engineering", id: "tool-whitelist", severity: "medium",
       difficulty: "quick-win", estimatedMinutes: 20, impactScore: 1,
+      na: notAgentic,
       pass: hasToolWhitelist,
       label: "Tool whitelist",
       brief: hasToolWhitelist ? "tool permissions defined" : "no tool/function allowlist",
@@ -442,7 +458,7 @@ const DIFFICULTY_COLOR = {
 
 function printRecommendations(catalog) {
   const failing = catalog
-    .filter((ch) => !ch.pass)
+    .filter((ch) => !ch.pass && !ch.na)   // exclude N/A checks entirely
     .sort((a, b) => {
       // Sort by: severity weight DESC, then impactScore DESC, then estimatedMinutes ASC
       const sevWeight = { critical: 4, high: 3, medium: 2, low: 1 };
@@ -507,12 +523,19 @@ function printRecommendations(catalog) {
 function printCheckLines(catalog, scan) {
   let passCount = 0;
   let failCount = 0;
+  let naCount = 0;
 
   for (const id of HEADER_CHECK_IDS) {
     const check = catalog.find((ch) => ch.id === id);
     if (!check) continue;
 
-    if (check.pass) {
+    if (check.na) {
+      naCount++;
+      const icon  = `${c.dim}~${c.reset}`;
+      const label = `${c.dim}${rpad(check.label, 24)}${c.reset}`;
+      const brief = `${c.dim}n/a — not applicable for this project${c.reset}`;
+      console.log(`  ${icon}  ${label}${brief}`);
+    } else if (check.pass) {
       passCount++;
       const icon  = `${c.bgreen}✔${c.reset}`;
       const label = `${c.white}${rpad(check.label, 24)}${c.reset}`;
@@ -545,9 +568,14 @@ function printCheckLines(catalog, scan) {
 function printDimensionBars(scorecard) {
   console.log();
   for (const dim of DIM_ORDER) {
-    const score    = scorecard[dim] ?? 0;
+    const score    = scorecard[dim];
     const meta     = DIM_META[dim];
     const col      = DIM_COLOR[dim];
+    if (score === null || score === undefined) {
+      const label = `${c.dim}${rpad(meta.label, 14)}${c.reset}`;
+      console.log(`  ${meta.icon} ${label}  ${c.dim}${"░".repeat(22)}${c.reset}  ${c.dim} n/a  \u2014  not applicable${c.reset}`);
+      continue;
+    }
     const barStr   = bar(score);
     const scoreStr = lpad(String(Math.round(score)), 3);
     const grade    = gradeLabel(score);
@@ -569,9 +597,9 @@ export function printScanReport({ run, scan, version = "?" }) {
   const scorecard = run.scorecard ?? {};
   const overall   = run.summary?.overallScore ?? 0;
 
-  const criticalFails = catalog.filter((ch) => !ch.pass && ch.severity === "critical").length;
-  const highFails     = catalog.filter((ch) => !ch.pass && ch.severity === "high").length;
-  const totalIssues   = catalog.filter((ch) => !ch.pass).length;
+  const criticalFails = catalog.filter((ch) => !ch.pass && !ch.na && ch.severity === "critical").length;
+  const highFails     = catalog.filter((ch) => !ch.pass && !ch.na && ch.severity === "high").length;
+  const totalIssues   = catalog.filter((ch) => !ch.pass && !ch.na).length;
   const totalChecks   = HEADER_CHECK_IDS.length + 1; // +1 for git hygiene
   const overallPassed = overall >= 87 && criticalFails === 0;
 
@@ -731,8 +759,186 @@ export function printScanStep(step) {
 /**
  * Print the publish result.
  */
-export function printPublishResult({ server, project, success, error, streak }) {
-  console.log();
+// ─── MoSCoW Export ───────────────────────────────────────────────────────────
+
+const MOSCOW_TIERS = [
+  { key: "must",   label: "🔴 Must Have (Critical — fix before ship)",    filter: (ch) => ch.severity === "critical" },
+  { key: "should", label: "🟠 Should Have (High — fix this sprint)",       filter: (ch) => ch.severity === "high" },
+  { key: "could",  label: "🟡 Could Have (Medium — schedule next)",        filter: (ch) => ch.severity === "medium" },
+  { key: "wont",   label: "⚪ Won't Fix Now (Low — backlog)",              filter: (ch) => ch.severity === "low" },
+];
+
+/**
+ * Build a human/AI-readable MoSCoW-ranked Markdown report.
+ * @param {{ catalog: object[], run: object, scan: object, dimFilter?: string }} opts
+ * @returns {string} Markdown text
+ */
+export function buildExportReport({ catalog, run, scan, dimFilter }) {
+  const scorecard = run.scorecard ?? {};
+  const overall   = run.summary?.overallScore ?? 0;
+  const ts        = new Date(scan.scannedAt ?? Date.now()).toISOString().slice(0, 10);
+  const grade     = overall >= 90 ? "A" : overall >= 80 ? "B" : overall >= 70 ? "C" : overall >= 60 ? "D" : "F";
+
+  const activeCatalog = dimFilter
+    ? catalog.filter((ch) => ch.dim === dimFilter)
+    : catalog;
+
+  const lines = [];
+
+  // ── Header ─────────────────────────────────────────────────────────────────
+  lines.push(`# Gravio Quality Report — ${ts}`);
+  lines.push("");
+  lines.push(`| | |`);
+  lines.push(`|---|---|`);
+  lines.push(`| **Target** | \`${scan.targetDir}\` |`);
+  lines.push(`| **Overall Score** | **${overall.toFixed(1)} / 100** (Grade ${grade}) |`);
+  lines.push(`| **Files Scanned** | ${scan.totalFiles} (${scan.trackedFileCount} git-tracked) |`);
+  lines.push(`| **Scanned At** | ${scan.scannedAt} |`);
+  if (dimFilter) lines.push(`| **Filter** | Dimension: \`${dimFilter}\` |`);
+  lines.push("");
+
+  // ── Dimension Scores table ─────────────────────────────────────────────────
+  lines.push(`## Dimension Scores`);
+  lines.push("");
+  lines.push(`| Dimension | Score | Grade | Weight |`);
+  lines.push(`|-----------|------:|-------|--------|`);
+  for (const dim of DIM_ORDER) {
+    if (dimFilter && dim !== dimFilter) continue;
+    const score = scorecard[dim];
+    const meta  = DIM_META[dim];
+    if (score === null || score === undefined) {
+      lines.push(`| ${meta.label} | n/a | — | ${meta.weight} |`);
+    } else {
+      const g = score >= 90 ? "A" : score >= 80 ? "B" : score >= 70 ? "C" : score >= 60 ? "D" : "F";
+      const bar = "█".repeat(Math.round(score / 10)) + "░".repeat(10 - Math.round(score / 10));
+      lines.push(`| ${meta.label} | \`${bar}\` ${Math.round(score)} | ${g} | ${meta.weight} |`);
+    }
+  }
+  lines.push("");
+
+  // ── Table of Contents ──────────────────────────────────────────────────────
+  lines.push(`## Contents`);
+  lines.push("");
+  lines.push(`1. [MoSCoW Priority Rankings](#moscow-priority-rankings)`);
+  lines.push(`2. [By Dimension](#by-dimension)`);
+  lines.push(`   - ${DIM_ORDER.filter((d) => !dimFilter || d === dimFilter).map((d) => `[${DIM_META[d].label}](#${d})`).join(" · ")}`);
+  lines.push(`3. [Passing Checks](#passing-checks)`);
+  lines.push(`4. [Not Applicable](#not-applicable)`);
+  lines.push("");
+
+  // ── MoSCoW section ─────────────────────────────────────────────────────────
+  lines.push(`## MoSCoW Priority Rankings`);
+  lines.push("");
+  lines.push(`> Use this section to plan your remediation backlog.`);
+  lines.push(`> **Must** = blocking issues, **Should** = high value, **Could** = nice to have, **Won't** = low priority.`);
+  lines.push("");
+
+  for (const tier of MOSCOW_TIERS) {
+    const items = activeCatalog.filter((ch) => !ch.pass && !ch.na && tier.filter(ch));
+    lines.push(`### ${tier.label}`);
+    lines.push("");
+    if (items.length === 0) {
+      lines.push(`> ✅ No issues in this tier.`);
+    } else {
+      for (const ch of items) {
+        const dimMeta = DIM_META[ch.dim] ?? { label: ch.dim, icon: "" };
+        lines.push(`#### ${ch.label}`);
+        lines.push(`- **Dimension:** ${dimMeta.label} › ${ch.subdim ?? ""}`);
+        lines.push(`- **Check ID:** \`${ch.id}\``);
+        lines.push(`- **Current state:** ${ch.brief}`);
+        lines.push(`- **Effort:** ${ch.difficulty} (~${ch.estimatedMinutes} min)  |  **Score impact:** +${ch.impactScore ?? "?"} pts`);
+        lines.push(`- **Action:** ${ch.action}`);
+        lines.push("");
+      }
+    }
+    lines.push("");
+  }
+
+  // ── By Dimension section ───────────────────────────────────────────────────
+  lines.push(`## By Dimension`);
+  lines.push("");
+
+  const dimsToShow = dimFilter ? [dimFilter] : DIM_ORDER;
+  for (const dim of dimsToShow) {
+    const meta  = DIM_META[dim] ?? { label: dim, icon: "", weight: "" };
+    const score = scorecard[dim];
+    const dimChecks = activeCatalog.filter((ch) => ch.dim === dim);
+    const failing = dimChecks.filter((ch) => !ch.pass && !ch.na);
+    const passing = dimChecks.filter((ch) => ch.pass && !ch.na);
+    const na      = dimChecks.filter((ch) => ch.na);
+
+    lines.push(`### ${meta.icon} ${meta.label} {#${dim}}`);
+    lines.push("");
+    if (score === null || score === undefined) {
+      lines.push(`> **Score:** n/a — not applicable for this project type`);
+    } else {
+      lines.push(`> **Score:** ${Math.round(score)} / 100  |  **Weight:** ${meta.weight}  |  **Issues:** ${failing.length} failing, ${passing.length} passing, ${na.length} n/a`);
+    }
+    lines.push("");
+
+    if (failing.length > 0) {
+      lines.push(`**Failing checks:**`);
+      lines.push("");
+      for (const ch of failing.sort((a, b) => {
+        const w = { critical: 4, high: 3, medium: 2, low: 1 };
+        return (w[b.severity] ?? 0) - (w[a.severity] ?? 0);
+      })) {
+        const sev = ch.severity.toUpperCase();
+        lines.push(`- ❌ **[${sev}] ${ch.label}** — ${ch.brief}`);
+        lines.push(`  - *${ch.action}*`);
+      }
+      lines.push("");
+    }
+
+    if (passing.length > 0) {
+      lines.push(`**Passing checks:**`);
+      lines.push("");
+      for (const ch of passing) {
+        lines.push(`- ✅ **${ch.label}** — ${ch.brief}`);
+      }
+      lines.push("");
+    }
+
+    if (na.length > 0) {
+      lines.push(`**Not applicable:** ${na.map((ch) => `\`${ch.id}\``).join(", ")}`);
+      lines.push("");
+    }
+  }
+
+  // ── Passing checks summary ─────────────────────────────────────────────────
+  lines.push(`## Passing Checks`);
+  lines.push("");
+  const allPassing = activeCatalog.filter((ch) => ch.pass && !ch.na);
+  if (allPassing.length === 0) {
+    lines.push(`> No checks passing yet.`);
+  } else {
+    for (const ch of allPassing) {
+      const dimMeta = DIM_META[ch.dim] ?? { label: ch.dim };
+      lines.push(`- ✅ **${ch.label}** (${dimMeta.label}) — ${ch.brief}`);
+    }
+  }
+  lines.push("");
+
+  // ── Not applicable ─────────────────────────────────────────────────────────
+  lines.push(`## Not Applicable`);
+  lines.push("");
+  const allNa = activeCatalog.filter((ch) => ch.na);
+  if (allNa.length === 0) {
+    lines.push(`> All checks are applicable for this project.`);
+  } else {
+    lines.push(`The following checks were skipped because they don't apply to this project type:`);
+    lines.push("");
+    for (const ch of allNa) {
+      const dimMeta = DIM_META[ch.dim] ?? { label: ch.dim };
+      lines.push(`- \`${ch.id}\` (${dimMeta.label}) — ${ch.label}`);
+    }
+  }
+  lines.push("");
+
+  return lines.join("\n");
+}
+
+export function printPublishResult({ server, project, success, error, streak }) {  console.log();
   if (success) {
     const dashUrl = `${server}/dashboard`;
     console.log(`  ${c.bgreen}${c.bold}✔  Published${c.reset}  ${c.dim}→${c.reset}  ${c.cyan}${c.under}${dashUrl}${c.reset}`);

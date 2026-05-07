@@ -445,9 +445,12 @@ function computeRichScorecard(scan) {
 }
 
 function summarize(scorecard, workflowResults, weights) {
-  const overall = Object.entries(weights).reduce((sum, [dim, weight]) => {
-    return sum + (scorecard[dim] ?? 0) * weight;
-  }, 0);
+  // Exclude N/A (null) dimensions — redistribute their weight proportionally among active dims
+  const activeDims = Object.entries(weights).filter(([dim]) => scorecard[dim] !== null && scorecard[dim] !== undefined);
+  const activeWeight = activeDims.reduce((s, [, w]) => s + w, 0);
+  const overall = activeWeight > 0
+    ? activeDims.reduce((sum, [dim, w]) => sum + (scorecard[dim] ?? 0) * (w / activeWeight), 0)
+    : 0;
 
   const passed = workflowResults.filter((w) => w.status === "pass").length;
   const rate = workflowResults.length > 0 ? passed / workflowResults.length : 0;

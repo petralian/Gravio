@@ -174,6 +174,53 @@ export function scanTargetProject(targetDir) {
       ));
     })();
 
+  // ━━━ AI / AGENTIC ECOSYSTEM DETECTION ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // Detects whether this project actively uses AI/LLM tools — used to determine if
+  // agentic-dimension checks apply. We cast a wide net: SDK deps, env keys, source imports.
+
+  const hasAiSdkDependency =
+    depsText.includes("@anthropic-ai") ||
+    depsText.includes("anthropic") ||
+    depsText.includes("openai") ||
+    depsText.includes("langchain") ||
+    depsText.includes("@langchain/") ||
+    depsText.includes("llamaindex") ||
+    depsText.includes("llama-index") ||
+    depsText.includes("@google/generativeai") ||
+    depsText.includes("google-generativeai") ||
+    depsText.includes("@google-ai/") ||
+    depsText.includes("@huggingface/inference") ||
+    depsText.includes("huggingface_hub") ||
+    depsText.includes("@ai-sdk/") ||
+    depsText.includes("groq-sdk") ||
+    depsText.includes("mistralai") ||
+    depsText.includes("cohere-ai") ||
+    depsText.includes("litellm") ||
+    depsText.includes("tiktoken") ||
+    depsText.includes("sentence-transformers") ||
+    depsText.includes("@aws-sdk/client-bedrock") ||
+    depsText.includes("amazon-bedrock");
+
+  // Detect AI API keys in .env.example / .env.sample / .env.template
+  const hasAiEnvVars = (() => {
+    const AI_KEY_RE = /ANTHROPIC_API_KEY|OPENAI_API_KEY|GEMINI_API_KEY|GROQ_API_KEY|TOGETHER_API_KEY|COHERE_API_KEY|HF_TOKEN|HUGGINGFACE_TOKEN|MISTRAL_API_KEY|GOOGLE_AI_KEY/i;
+    const envSampleFiles = allFiles.filter((f) => /\.env\.(example|sample|template)$/i.test(path.basename(f)));
+    for (const f of envSampleFiles) {
+      if (AI_KEY_RE.test(safeReadText(path.join(resolvedTarget, f)))) return true;
+    }
+    return false;
+  })();
+
+  // Detect AI imports in source files even when no manifest exists (e.g. Python scripts)
+  const hasAiSourceImports = (() => {
+    const AI_IMPORT_RE = /from\s+(anthropic|openai|langchain|llamaindex)|import\s+(anthropic|openai|langchain)|require\(['"](?:anthropic|openai|@anthropic-ai|@openai)['"]\)/i;
+    const sourceFiles = allFiles.filter((f) => /\.(py|ts|js|mjs|go|rb|java|cs)$/.test(f)).slice(0, 30);
+    for (const f of sourceFiles) {
+      if (AI_IMPORT_RE.test(safeReadText(path.join(resolvedTarget, f)))) return true;
+    }
+    return false;
+  })();
+
   const packageJson = safeReadJson(path.join(resolvedTarget, "package.json"), null);
   const hasNodeEvalScript = Object.keys(packageJson?.scripts ?? {}).some(
     (s) => s === "eval" || s === "evals" || s === "bench" || s === "benchmark" || s.includes("eval")
@@ -231,6 +278,19 @@ export function scanTargetProject(targetDir) {
 
   const hasAgentOrchestration =
     hasGlob(".github/agents/") || has("AGENTS.md") || has(".continue/config.json") || has(".aider.conf.yml");
+
+  // A project is "agentic" if it demonstrably uses AI tools — SDK deps, API keys, source imports,
+  // or agent instruction/config files. Non-agentic projects skip the agentic dimension entirely.
+  const isAgenticProject =
+    hasAiSdkDependency ||
+    hasAiSourceImports ||
+    hasAiEnvVars ||
+    hasAgentInstructions ||
+    hasPromptAssets ||
+    hasAgentSkillCatalog ||
+    hasAgentOrchestration ||
+    hasGlob(".claude/") ||
+    hasGlob(".cursor/");
 
   // ━━━ RELIABILITY ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -565,6 +625,7 @@ export function scanTargetProject(targetDir) {
     readmeExists, licenseExists, hasChangelog, hasVersion,
     hasAiDocs, hasDecisionLog, hasContributing, hasCodeOwners,
     // agentic
+    isAgenticProject, hasAiSdkDependency, hasAiSourceImports, hasAiEnvVars,
     hasAgentSkillCatalog, hasPromptAssets, hasAgentOrchestration,
     // back-compat fields
     hasNotes, hasNextSession,
