@@ -985,9 +985,12 @@ function renderWorkspaceRecs(scans) {
                 <div class="db-rec-action-head">
                   <span class="db-priority-chip ${priorityClass(item.priority)}">${esc(item.priority ?? "medium")}</span>
                   <span class="db-rec-dim-chip">${esc(item.dimension ?? "general")}</span>
+                  ${item.effort ? `<span class="db-effort-chip db-effort-${esc(item.effort)}">effort: ${esc(item.effort)}</span>` : ""}
+                  ${item.impact ? `<span class="db-impact-chip db-impact-${esc(item.impact)}">impact: ${esc(item.impact)}</span>` : ""}
                 </div>
                 <p class="db-rec-action-title">${esc(item.title ?? "Recommended action")}</p>
                 <p class="db-rec-action-why">${esc(item.why ?? "")}</p>
+                ${item.how ? `<p class="db-rec-action-how">${esc(item.how)}</p>` : ""}
                 ${Array.isArray(item.actions) && item.actions.length ? `
                   <ul class="db-rec-bullets">
                     ${item.actions.map((step) => `<li>${esc(step)}</li>`).join("")}
