@@ -7,6 +7,7 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- Google SSO support with OAuth2 + PKCE routes: `GET /auth/sso/providers`, `GET /auth/sso/google/start`, and `GET /auth/sso/google/callback`.
 - New conversion-focused sales page at `/why-gravio.html` explaining AI coding oversight risks, Gravio value props, external trust references, and FAQ schema for improved GEO/AIO discoverability.
 - Interactive proof-metrics module on `/why-gravio.html` using Chart.js (open source) with source-linked risk, adoption, and business-impact datasets.
 - `POST /api/keys/onboarding` — authenticated endpoint that mints a fresh user-bound CLI key (label "onboarding"), deleting any prior key with that label, so the onboarding page always has a real token to auto-fill.
@@ -17,8 +18,11 @@ All notable changes to this project will be documented in this file.
 - `GET /api/billing/status` authenticated endpoint for current plan, status, seats, renewal timestamp, and portal URL.
 - Settings page billing card showing live Lemon-synced subscription details and a manage billing action.
 - Ship-ready CLI gate mode: `npm run scorecard:ship-ready` enforces required billing env vars (`LEMON_API_KEY`, `LEMON_STORE_ID`, `LEMON_TEAM_VARIANT_ID`, `LEMON_WEBHOOK_SECRET`).
+- Billing action APIs: `POST /api/billing/cancel`, `POST /api/billing/resume`, and `POST /api/billing/seats` (authenticated, ownership-verified against Lemon subscription).
+- Webhook idempotency persistence via new `webhook_events` table (`provider + event_key` unique) to prevent duplicate webhook side-effects.
 
 ### Changed
+- Registration now enforces a stronger password policy (minimum 12 chars with upper/lowercase, number, and symbol) with matching validation hints in login/onboarding forms.
 - Shared header and homepage hero now link directly to `/why-gravio.html` as an educational conversion path for new prospects.
 - Dashboard Recommendations now returns and renders a structured remediation playbook (priority actions, per-dimension target gaps, and ready-to-ship checklist) instead of short flat recommendation strings.
 - Onboarding is now a true 3-step flow: (1) download CLI, (2) run one smart command, (3) open dashboard.
@@ -66,6 +70,7 @@ All notable changes to this project will be documented in this file.
 - Free tier dashboard payloads now return generic rating summaries only; remediation details require Pro or Team.
 - Scanner CLI is now cloud-only for scan output (no local `agent-quality/runs/latest.json` artifact is written).
 - Lemon webhook handling now persists subscription lifecycle state to the `users` table (status, seats, renewal, cancellation flag, Lemon IDs, portal URL) and processes lifecycle events (`subscription_updated`, `subscription_cancelled`, `subscription_expired`, payment fail/recover, plan changed).
+- Lemon webhook processing now uses idempotency keys (header or payload hash fallback) and returns `{ duplicate: true }` for re-deliveries.
 
 ## [0.4.0] — 2026-05-05
 

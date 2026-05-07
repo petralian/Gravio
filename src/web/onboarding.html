@@ -98,6 +98,7 @@
             </div>
             <p class="auth-error" id="ob-login-error" hidden></p>
             <button class="m-btn m-btn-neon auth-submit" type="submit" id="ob-login-submit">Sign in →</button>
+            <a href="/auth/sso/google/start?next=/onboarding" class="m-btn m-btn-outline auth-submit" id="ob-login-sso-google" hidden>Continue with Google</a>
           </form>
         </div>
 
@@ -109,7 +110,8 @@
             </div>
             <div class="auth-field">
               <label for="ob-reg-password">Password</label>
-              <input type="password" id="ob-reg-password" name="password" autocomplete="new-password" placeholder="Min. 8 characters" required />
+              <input type="password" id="ob-reg-password" name="password" autocomplete="new-password" placeholder="Min. 12 chars, mixed case, number, symbol" minlength="12" required />
+              <p class="auth-help">Use at least 12 characters with uppercase, lowercase, number, and symbol.</p>
             </div>
             <div class="auth-field">
               <label for="ob-reg-confirm">Confirm password</label>
@@ -117,6 +119,7 @@
             </div>
             <p class="auth-error" id="ob-reg-error" hidden></p>
             <button class="m-btn m-btn-neon auth-submit" type="submit" id="ob-reg-submit">Create account →</button>
+            <a href="/auth/sso/google/start?next=/onboarding" class="m-btn m-btn-outline auth-submit" id="ob-register-sso-google" hidden>Continue with Google</a>
           </form>
         </div>
       </div>

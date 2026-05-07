@@ -121,13 +121,16 @@ node gravio.mjs --logout --target . # remove local .gravio/auth.json
 
 ## SQLite Schema
 
-**users** — `id, email, password_hash, role ('user'|'admin'), plan ('free'|'pro'|'team'), is_active, created_at`
+**users** — `id, email, password_hash, auth_provider, auth_subject, role ('user'|'admin'), plan ('free'|'pro'|'team'), is_active, created_at`
 - `plan` column added via idempotent `ALTER TABLE` migration on startup (safe for existing DBs)
+- `auth_provider` + `auth_subject` map SSO identities to existing accounts and are unique as a pair when present.
 - `getSession` and `getApiKey` JOINs expose `u.plan` to all request handlers
 
 **sessions** — `id, user_id, token_hash, expires_at`
 **api_keys** — `id, user_id, key_hash, label, created_at`
 **runs** — `id, project_id, user_id, ciphertext, published_at`
+**webhook_events** — `id, provider, event_key, event_name, object_id, payload, processed_at`
+- Unique `(provider, event_key)` prevents duplicate webhook side-effects.
 
 ---
 
@@ -173,16 +176,32 @@ node gravio.mjs --logout --target . # remove local .gravio/auth.json
 | team | always publish, unlimited retention | yes |
 
 - `POST /api/admin/users/:id/plan` — admin-only endpoint to set any user's plan
+- `POST /api/scan-evaluate` — auth-gated; accepts `{ scan }` (raw signals from CLI), returns a full run artifact JSON (server evaluates using scoring weights/corpus). Used by CLI after local filesystem scan.
 - `/api/publish` accepts all scans; free users are auto-trimmed to latest 3 retained scans
 - `/api/publish` appends run history rows (no longer overwrites one row per project)
 - `/api/me` returns `plan` field so the frontend can gate features
+
+## Authentication Routes
+
+- `POST /auth/register` — email/password account creation with strong password policy enforcement.
+- `POST /auth/login` — email/password sign-in.
+- `POST /auth/logout` — session logout.
+- `GET /auth/sso/providers` — returns enabled SSO providers for UI capability detection.
+- `GET /auth/sso/google/start` — starts Google OAuth sign-in (PKCE + CSRF state cookie).
+- `GET /auth/sso/google/callback` — completes Google OAuth sign-in, links/creates user, sets session cookie.
 
 ## Billing Lifecycle (Lemon Squeezy)
 
 - Team checkout is created server-side via `POST /api/billing/team-checkout` using Lemon API custom pricing by seats.
 - Webhook endpoint: `POST /api/webhooks/lemonsqueezy` with HMAC verification using `LEMON_WEBHOOK_SECRET` and `X-Signature` header.
+- Webhook idempotency key uses `X-Event-Id` / `X-Webhook-Id` when present, else `event_name + object_id + sha256(rawBody)` and is persisted in `webhook_events`.
 - Lifecycle events now sync into `users` table billing fields: provider, customer/subscription IDs, status, seats, renews_at, cancelled flag, and portal URL.
 - `GET /api/billing/status` exposes the authenticated user's billing snapshot for Settings UI.
+- Authenticated mutation endpoints:
+  - `POST /api/billing/cancel`
+  - `POST /api/billing/resume`
+  - `POST /api/billing/seats`
+- Billing mutation routes enforce ownership by retrieving the Lemon subscription first and matching authenticated user email or stored Lemon customer ID before mutating.
 - Settings (`/settings`) now includes a Billing section that displays plan/status/seats/renewal and a manage-billing portal action.
 
 ---
@@ -230,3 +249,6 @@ For cloud deployment:
 | `LEMON_STORE_ID` | Lemon store ID used for checkout creation |
 | `LEMON_TEAM_VARIANT_ID` | Lemon Team variant ID used for dynamic seat pricing |
 | `LEMON_WEBHOOK_SECRET` | HMAC secret for validating Lemon webhook signatures |
+| `GOOGLE_OAUTH_CLIENT_ID` | Google OAuth client ID for SSO |
+| `GOOGLE_OAUTH_CLIENT_SECRET` | Google OAuth client secret for SSO token exchange |
+| `GOOGLE_OAUTH_REDIRECT_URI` | Redirect URI registered in Google console (callback endpoint) |

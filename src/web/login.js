@@ -1,5 +1,7 @@
 "use strict";
 
+const PASSWORD_POLICY_HINT = "Use at least 12 characters with uppercase, lowercase, number, and symbol.";
+
 /* ─── tab switching ─── */
 const tabLogin    = document.getElementById("tab-login");
 const tabRegister = document.getElementById("tab-register");
@@ -35,6 +37,57 @@ function setLoading(btnId, loading, defaultText) {
   const btn = document.getElementById(btnId);
   btn.disabled = loading;
   btn.textContent = loading ? "Please wait…" : defaultText;
+}
+
+function validateStrongPassword(email, password) {
+  if (!password || password.length < 12) return "Password must be at least 12 characters";
+  if (/\s/.test(password)) return "Password cannot contain spaces";
+  if (!/[a-z]/.test(password) || !/[A-Z]/.test(password) || !/\d/.test(password) || !/[^A-Za-z0-9]/.test(password)) {
+    return PASSWORD_POLICY_HINT;
+  }
+  const local = String(email ?? "").trim().toLowerCase().split("@")[0] ?? "";
+  if (local.length >= 3 && password.toLowerCase().includes(local)) {
+    return "Password cannot include your email name.";
+  }
+  return "";
+}
+
+async function setupSsoButtons() {
+  try {
+    const res = await fetch("/auth/sso/providers", { method: "GET" });
+    if (!res.ok) return;
+    const data = await res.json();
+    if (!data?.google) return;
+
+    const next = new URLSearchParams(location.search).get("next");
+    const href = next && next.startsWith("/")
+      ? `/auth/sso/google/start?next=${encodeURIComponent(next)}`
+      : "/auth/sso/google/start";
+    ["login-sso-google", "register-sso-google"].forEach((id) => {
+      const btn = document.getElementById(id);
+      if (!btn) return;
+      btn.setAttribute("href", href);
+      btn.removeAttribute("hidden");
+    });
+  } catch {
+    // Ignore provider detection failures and keep SSO buttons hidden.
+  }
+}
+
+function showSsoCallbackErrorIfPresent() {
+  const code = new URLSearchParams(location.search).get("authError");
+  if (!code) return;
+  const map = {
+    sso_not_configured: "Google SSO is not configured yet.",
+    sso_state_invalid: "Sign-in expired. Please try Google sign-in again.",
+    sso_token_exchange_failed: "Google sign-in failed during token exchange.",
+    sso_token_missing: "Google sign-in response was incomplete.",
+    sso_profile_failed: "Could not load your Google profile.",
+    sso_email_unverified: "Google account email must be verified.",
+    sso_signin_denied: "Sign-in was denied for this account.",
+    sso_unexpected_error: "Unexpected Google sign-in error. Please try again.",
+  };
+  showError("login-error", map[code] ?? "Google sign-in failed. Please try again.");
 }
 
 /* ─── redirect after auth ─── */
@@ -91,6 +144,12 @@ document.getElementById("form-register").addEventListener("submit", async (e) =>
     return;
   }
 
+  const passwordError = validateStrongPassword(email, password);
+  if (passwordError) {
+    showError("reg-error", passwordError);
+    return;
+  }
+
   setLoading("reg-submit", true, "Create account →");
 
   try {
@@ -111,3 +170,6 @@ document.getElementById("form-register").addEventListener("submit", async (e) =>
     setLoading("reg-submit", false, "Create account →");
   }
 });
+
+void setupSsoButtons();
+showSsoCallbackErrorIfPresent();

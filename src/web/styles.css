@@ -823,6 +823,11 @@ body.auth-page {
   border-color: var(--neon-cyan);
   box-shadow: 0 0 0 2px rgba(0,229,255,0.08);
 }
+.auth-help {
+  font-size: 12px;
+  color: var(--text-3);
+  margin: 0;
+}
 .auth-error {
   font-size: 13px;
   color: #ff4466;
@@ -2776,7 +2781,7 @@ button#evaluate-btn:hover {
 .db-runscans-details-summary {
   font-size: 13px;
   font-weight: 600;
-  color: var(--text-3);
+  color: var(--text-2);
   cursor: pointer;
   user-select: none;
   list-style: none;
@@ -2791,6 +2796,19 @@ button#evaluate-btn:hover {
   transition: transform 0.15s;
 }
 details[open] > .db-runscans-details-summary::before { transform: rotate(90deg); }
+.db-runscans-details-new-machine .db-runscans-details-summary {
+  color: var(--neon-cyan);
+  font-weight: 700;
+}
+.db-runscans-details-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: rgba(34, 211, 238, 0.08);
+  border: 1px solid rgba(34, 211, 238, 0.18);
+  border-radius: 6px;
+}
 .db-runscans-details > .db-runscans-steps {
   margin-top: 16px;
 }
@@ -2922,10 +2940,45 @@ details[open] > .db-runscans-details-summary::before { transform: rotate(90deg);
 .db-runscans-link:hover { text-decoration: underline; }
 
 /* Advanced command reference list */
-.db-cmd-ref {
+.db-cmd-ref-details {
   margin-top: 36px;
   padding-top: 28px;
   border-top: 1px solid var(--border);
+}
+.db-cmd-ref-summary {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-2);
+  cursor: pointer;
+  user-select: none;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+.db-cmd-ref-summary::-webkit-details-marker { display: none; }
+.db-cmd-ref-summary::before {
+  content: "▶";
+  font-size: 9px;
+  transition: transform 0.15s;
+}
+details[open] > .db-cmd-ref-summary::before { transform: rotate(90deg); }
+.db-cmd-ref-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: rgba(34, 211, 238, 0.08);
+  border: 1px solid rgba(34, 211, 238, 0.18);
+  border-radius: 6px;
+  color: var(--neon-cyan);
+  font-weight: 700;
+}
+.db-cmd-ref {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
 }
 .db-cmd-ref-heading {
   font-size: 11px;

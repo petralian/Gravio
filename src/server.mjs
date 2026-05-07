@@ -14,8 +14,69 @@ import {
   validateSession, destroySession,
   generateApiKey, validateApiKey,
   setSessionCookie, clearSessionCookie, parseSessionCookie,
+  loginOrCreateSsoUser,
 } from "./core/auth.mjs";
 import { stmts } from "./core/db.mjs";
+
+const GOOGLE_OAUTH_CLIENT_ID = String(process.env.GOOGLE_OAUTH_CLIENT_ID ?? "").trim();
+const GOOGLE_OAUTH_CLIENT_SECRET = String(process.env.GOOGLE_OAUTH_CLIENT_SECRET ?? "").trim();
+const GOOGLE_OAUTH_REDIRECT_URI = String(process.env.GOOGLE_OAUTH_REDIRECT_URI ?? "").trim();
+const SSO_STATE_COOKIE = "__sso_state";
+const IS_PROD = process.env.NODE_ENV === "production";
+
+function isGoogleSsoConfigured() {
+  return Boolean(GOOGLE_OAUTH_CLIENT_ID && GOOGLE_OAUTH_CLIENT_SECRET && GOOGLE_OAUTH_REDIRECT_URI);
+}
+
+function parseCookieByName(req, name) {
+  const header = req.headers["cookie"] ?? "";
+  for (const part of header.split(";")) {
+    const [cookieName, ...rest] = part.trim().split("=");
+    if (cookieName === name) return rest.join("=");
+  }
+  return null;
+}
+
+function buildCookie(name, value, maxAgeSeconds) {
+  return [
+    `${name}=${value}`,
+    "Path=/",
+    "HttpOnly",
+    "SameSite=Lax",
+    `Max-Age=${maxAgeSeconds}`,
+    IS_PROD ? "Secure" : null,
+  ].filter(Boolean).join("; ");
+}
+
+function addSetCookieHeader(res, cookie) {
+  const existing = res.getHeader("Set-Cookie");
+  if (!existing) {
+    res.setHeader("Set-Cookie", cookie);
+    return;
+  }
+  const next = Array.isArray(existing) ? [...existing, cookie] : [existing, cookie];
+  res.setHeader("Set-Cookie", next);
+}
+
+function sanitizeNextPath(value) {
+  const next = String(value ?? "").trim();
+  if (!next.startsWith("/")) return "/dashboard";
+  if (next.startsWith("//")) return "/dashboard";
+  return next;
+}
+
+function encodeSsoStatePayload(payload) {
+  return Buffer.from(JSON.stringify(payload), "utf8").toString("base64url");
+}
+
+function decodeSsoStatePayload(raw) {
+  if (!raw) return null;
+  try {
+    return JSON.parse(Buffer.from(raw, "base64url").toString("utf8"));
+  } catch {
+    return null;
+  }
+}
 
 /** Validate projectId: 1–64 chars, alphanumeric + hyphens + underscores only. */
 function isValidProjectId(id) {
@@ -723,6 +784,133 @@ const server = http.createServer(async (req, res) => {
     } catch (err) {
       res.writeHead(400, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ error: err.message }));
+    }
+    return;
+  }
+
+  // ── GET /auth/sso/providers ─────────────────────────────────────────────
+  if (req.method === "GET" && pathOnly === "/auth/sso/providers") {
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ google: isGoogleSsoConfigured() }));
+    return;
+  }
+
+  // ── GET /auth/sso/google/start ──────────────────────────────────────────
+  if (req.method === "GET" && pathOnly === "/auth/sso/google/start") {
+    if (!isGoogleSsoConfigured()) {
+      res.writeHead(503, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Google SSO is not configured" }));
+      return;
+    }
+
+    const requestUrl = new URL(req.url, "http://localhost");
+    const nextPath = sanitizeNextPath(requestUrl.searchParams.get("next"));
+    const state = crypto.randomBytes(24).toString("base64url");
+    const verifier = crypto.randomBytes(32).toString("base64url");
+    const challenge = crypto.createHash("sha256").update(verifier).digest("base64url");
+
+    const payload = encodeSsoStatePayload({ state, nextPath, verifier });
+    addSetCookieHeader(res, buildCookie(SSO_STATE_COOKIE, payload, 600));
+
+    const authUrl = new URL("https://accounts.google.com/o/oauth2/v2/auth");
+    authUrl.searchParams.set("client_id", GOOGLE_OAUTH_CLIENT_ID);
+    authUrl.searchParams.set("redirect_uri", GOOGLE_OAUTH_REDIRECT_URI);
+    authUrl.searchParams.set("response_type", "code");
+    authUrl.searchParams.set("scope", "openid email profile");
+    authUrl.searchParams.set("state", state);
+    authUrl.searchParams.set("code_challenge", challenge);
+    authUrl.searchParams.set("code_challenge_method", "S256");
+
+    res.writeHead(302, { Location: authUrl.toString() });
+    res.end();
+    return;
+  }
+
+  // ── GET /auth/sso/google/callback ───────────────────────────────────────
+  if (req.method === "GET" && pathOnly === "/auth/sso/google/callback") {
+    addSetCookieHeader(res, buildCookie(SSO_STATE_COOKIE, "", 0));
+
+    if (!isGoogleSsoConfigured()) {
+      res.writeHead(302, { Location: "/login?authError=sso_not_configured" });
+      res.end();
+      return;
+    }
+
+    const requestUrl = new URL(req.url, "http://localhost");
+    const code = String(requestUrl.searchParams.get("code") ?? "").trim();
+    const returnedState = String(requestUrl.searchParams.get("state") ?? "").trim();
+    const statePayload = decodeSsoStatePayload(parseCookieByName(req, SSO_STATE_COOKIE));
+
+    if (!code || !returnedState || !statePayload || statePayload.state !== returnedState) {
+      res.writeHead(302, { Location: "/login?authError=sso_state_invalid" });
+      res.end();
+      return;
+    }
+
+    try {
+      const tokenBody = new URLSearchParams({
+        code,
+        client_id: GOOGLE_OAUTH_CLIENT_ID,
+        client_secret: GOOGLE_OAUTH_CLIENT_SECRET,
+        redirect_uri: GOOGLE_OAUTH_REDIRECT_URI,
+        grant_type: "authorization_code",
+        code_verifier: String(statePayload.verifier ?? ""),
+      });
+
+      const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: tokenBody.toString(),
+      });
+      if (!tokenResponse.ok) {
+        res.writeHead(302, { Location: "/login?authError=sso_token_exchange_failed" });
+        res.end();
+        return;
+      }
+
+      const tokenData = await tokenResponse.json();
+      const accessToken = String(tokenData?.access_token ?? "").trim();
+      if (!accessToken) {
+        res.writeHead(302, { Location: "/login?authError=sso_token_missing" });
+        res.end();
+        return;
+      }
+
+      const profileResponse = await fetch("https://openidconnect.googleapis.com/v1/userinfo", {
+        method: "GET",
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      if (!profileResponse.ok) {
+        res.writeHead(302, { Location: "/login?authError=sso_profile_failed" });
+        res.end();
+        return;
+      }
+
+      const profile = await profileResponse.json();
+      const email = String(profile?.email ?? "").trim().toLowerCase();
+      const subject = String(profile?.sub ?? "").trim();
+      const emailVerified = Boolean(profile?.email_verified);
+
+      if (!email || !subject || !emailVerified) {
+        res.writeHead(302, { Location: "/login?authError=sso_email_unverified" });
+        res.end();
+        return;
+      }
+
+      const authResult = await loginOrCreateSsoUser({ provider: "google", subject, email });
+      if (!authResult.ok) {
+        res.writeHead(302, { Location: "/login?authError=sso_signin_denied" });
+        res.end();
+        return;
+      }
+
+      setSessionCookie(res, authResult.token);
+      addSetCookieHeader(res, buildCookie(SSO_STATE_COOKIE, "", 0));
+      res.writeHead(302, { Location: sanitizeNextPath(statePayload.nextPath) });
+      res.end();
+    } catch {
+      res.writeHead(302, { Location: "/login?authError=sso_unexpected_error" });
+      res.end();
     }
     return;
   }

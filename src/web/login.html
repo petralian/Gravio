@@ -42,6 +42,7 @@
           </div>
           <p class="auth-error" id="login-error" hidden></p>
           <button class="m-btn m-btn-neon auth-submit" type="submit" id="login-submit">Sign in →</button>
+          <a href="/auth/sso/google/start" class="m-btn m-btn-outline auth-submit" id="login-sso-google" hidden>Continue with Google</a>
         </form>
       </div>
 
@@ -54,7 +55,8 @@
           </div>
           <div class="auth-field">
             <label for="reg-password">Password</label>
-            <input type="password" id="reg-password" name="password" autocomplete="new-password" placeholder="Min. 8 characters" required />
+            <input type="password" id="reg-password" name="password" autocomplete="new-password" placeholder="Min. 12 chars, mixed case, number, symbol" minlength="12" required />
+            <p class="auth-help">Use at least 12 characters with uppercase, lowercase, number, and symbol.</p>
           </div>
           <div class="auth-field">
             <label for="reg-confirm">Confirm password</label>
@@ -62,6 +64,7 @@
           </div>
           <p class="auth-error" id="reg-error" hidden></p>
           <button class="m-btn m-btn-neon auth-submit" type="submit" id="reg-submit">Create account →</button>
+          <a href="/auth/sso/google/start" class="m-btn m-btn-outline auth-submit" id="register-sso-google" hidden>Continue with Google</a>
         </form>
       </div>
 

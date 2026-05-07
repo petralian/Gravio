@@ -41,6 +41,8 @@ db.exec(`
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     email       TEXT    NOT NULL UNIQUE COLLATE NOCASE,
     password_hash TEXT  NOT NULL,
+    auth_provider TEXT,
+    auth_subject TEXT,
     role        TEXT    NOT NULL DEFAULT 'user' CHECK (role IN ('user','admin')),
     plan        TEXT    NOT NULL DEFAULT 'free' CHECK (plan IN ('free','pro','team')),
     billing_provider TEXT,
@@ -78,6 +80,17 @@ db.exec(`
     ciphertext  TEXT    NOT NULL,
     published_at TEXT   NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
   );
+
+  CREATE TABLE IF NOT EXISTS webhook_events (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    provider    TEXT    NOT NULL,
+    event_key   TEXT    NOT NULL,
+    event_name  TEXT,
+    object_id   TEXT,
+    payload     TEXT,
+    processed_at TEXT   NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
+    UNIQUE(provider, event_key)
+  );
 `);
 
 // ─── Migrations (idempotent — run on every start) ───────────────────────────
@@ -87,6 +100,28 @@ try {
   db.exec(`ALTER TABLE users ADD COLUMN plan TEXT NOT NULL DEFAULT 'free' CHECK (plan IN ('free','pro','team'))`);
 } catch {
   // Column already exists — ignore
+}
+
+try {
+  db.exec(`ALTER TABLE users ADD COLUMN auth_provider TEXT`);
+} catch {
+  // Column already exists — ignore
+}
+
+try {
+  db.exec(`ALTER TABLE users ADD COLUMN auth_subject TEXT`);
+} catch {
+  // Column already exists — ignore
+}
+
+try {
+  db.exec(`
+    CREATE UNIQUE INDEX IF NOT EXISTS users_auth_provider_subject_uq
+      ON users(auth_provider, auth_subject)
+      WHERE auth_provider IS NOT NULL AND auth_subject IS NOT NULL
+  `);
+} catch {
+  // Index already exists — ignore
 }
 
 try {
@@ -128,6 +163,22 @@ try {
   db.exec(`ALTER TABLE users ADD COLUMN billing_portal_url TEXT`);
 } catch {
   // Column already exists — ignore
+}
+try {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS webhook_events (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      provider    TEXT    NOT NULL,
+      event_key   TEXT    NOT NULL,
+      event_name  TEXT,
+      object_id   TEXT,
+      payload     TEXT,
+      processed_at TEXT   NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
+      UNIQUE(provider, event_key)
+    )
+  `);
+} catch {
+  // Table already exists — ignore
 }
 
 // Migration: older schema enforced one run per (project_id, user_id) via UNIQUE.
@@ -177,7 +228,13 @@ export const stmts = {
     `INSERT INTO users (email, password_hash, role) VALUES (?, ?, ?)`,
   ),
   getUserByEmail: db.prepare(`SELECT * FROM users WHERE email=? COLLATE NOCASE`),
+  getUserByProviderSubject: db.prepare(
+    `SELECT * FROM users WHERE auth_provider=? AND auth_subject=?`,
+  ),
   getUserById: db.prepare(`SELECT * FROM users WHERE id=?`),
+  linkUserAuthProvider: db.prepare(
+    `UPDATE users SET auth_provider=?, auth_subject=? WHERE id=?`,
+  ),
   listUsers: db.prepare(`SELECT id, email, role, plan, is_active, created_at FROM users ORDER BY id ASC`),
   setUserPlan: db.prepare(`UPDATE users SET plan=? WHERE id=?`),
   getBillingForUser: db.prepare(
@@ -287,6 +344,12 @@ export const stmts = {
   ),
   runCountPerUser: db.prepare(
     `SELECT user_id, COUNT(*) as run_count FROM runs GROUP BY user_id`,
+  ),
+
+  // webhook idempotency
+  insertWebhookEvent: db.prepare(
+    `INSERT OR IGNORE INTO webhook_events (provider, event_key, event_name, object_id, payload)
+     VALUES (?, ?, ?, ?, ?)`,
   ),
 };
 

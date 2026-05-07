@@ -646,7 +646,7 @@ async function ensureAuth(targetDir, server, maybeToken) {
   const meUrl = new URL("/api/me", server).toString();
   const me = await httpGet(meUrl, { Authorization: `Bearer ${apiKey}` });
   if (me.status !== 200) {
-    throw new Error("API key validation failed. Refresh token from onboarding.");
+    throw new Error("API key validation failed. Go to your project's Commands tab to get a fresh command with your token integrated.");
   }
 
   saveAuthConfig(targetDir, {

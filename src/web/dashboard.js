@@ -77,10 +77,23 @@ function getRequestedProjectFromUrl() {
   return String(id).trim();
 }
 
-function setProjectInUrl(projectId) {
+function getRequestedTabFromUrl() {
+  const tab = new URLSearchParams(window.location.search).get("tab");
+  const valid = ["overview", "scans", "recommendations", "runscans"];
+  return valid.includes(tab) ? tab : null;
+}
+
+function setProjectInUrl(projectId, tabName = null) {
   const params = new URLSearchParams(window.location.search);
   params.set("project", projectId);
+  if (tabName) params.set("tab", tabName);
   window.history.pushState(null, "", `${window.location.pathname}?${params.toString()}`);
+}
+
+function setTabInUrl(tabName) {
+  const params = new URLSearchParams(window.location.search);
+  params.set("tab", tabName);
+  window.history.replaceState(null, "", `${window.location.pathname}?${params.toString()}`);
 }
 
 function clearProjectFromUrl() {
@@ -218,7 +231,7 @@ function renderProjectsGrid(projects) {
 }
 
 // ─── Workspace tabs ───
-function switchTab(tabName) {
+function switchTab(tabName, updateUrl = true) {
   state.currentTab = tabName;
   document.querySelectorAll(".db-tab").forEach((btn) => {
     const active = btn.dataset.tab === tabName;
@@ -232,6 +245,9 @@ function switchTab(tabName) {
       panel.setAttribute("hidden", "");
     }
   });
+  if (updateUrl) {
+    setTabInUrl(tabName);
+  }
 }
 
 // ─── Workspace rendering ───
@@ -304,7 +320,12 @@ function renderWorkspace(projectId, payload) {
   renderWorkspaceScans(scans);
   renderWorkspaceRecs(scans);
   renderWorkspaceRunScans(projectId, scans.length > 0);
-  switchTab("overview");
+  
+  // Check for requested tab from URL
+  const requestedTab = getRequestedTabFromUrl();
+  const initialTab = requestedTab || "overview";
+  switchTab(initialTab, false);
+  
   showView("workspace");
 }
 
@@ -354,8 +375,8 @@ function renderWorkspaceRunScans(projectId, hasScans) {
          </div>
        </div>
 
-       <details class="db-runscans-details">
-         <summary class="db-runscans-details-summary">New machine or folder?</summary>
+       <details class="db-runscans-details db-runscans-details-new-machine">
+         <summary class="db-runscans-details-summary"><span class="db-runscans-details-badge">New machine or folder?</span></summary>
          <div class="db-runscans-steps">
            <div class="db-runscans-step">
              <div class="db-runscans-step-num">1</div>
@@ -429,11 +450,11 @@ function renderWorkspaceRunScans(projectId, hasScans) {
       ${primarySection}
 
       <!-- ─ Advanced commands ─ -->
-      <div class="db-cmd-ref">
-        <p class="db-cmd-ref-heading">Advanced commands</p>
-        <p class="db-runscans-p" style="margin-bottom:14px">Run these from the folder containing <code>gravio.mjs</code>. Use <code>node gravio.mjs --help</code> to see this list in your terminal.</p>
-
-        <div class="db-cmd-ref-list">
+      <details class="db-cmd-ref-details">
+        <summary class="db-cmd-ref-summary"><span class="db-cmd-ref-badge">Advanced commands</span></summary>
+        <div class="db-cmd-ref">
+          <p class="db-runscans-p" style="margin-bottom:14px">Run these from the folder containing <code>gravio.mjs</code>. Use <code>node gravio.mjs --help</code> to see this list in your terminal.</p>
+          <div class="db-cmd-ref-list">
 
           <div class="db-cmd-ref-item">
             <div class="db-cmd-ref-meta">
@@ -490,8 +511,9 @@ function renderWorkspaceRunScans(projectId, hasScans) {
             </div>
           </div>
 
+          </div>
         </div>
-      </div>
+      </details>
 
       <!-- ─ Project management ─ -->
       <div class="db-cmd-ref" style="margin-top:32px">
@@ -862,6 +884,11 @@ function bindEvents() {
     const projectId = getRequestedProjectFromUrl();
     if (projectId) {
       openProject(projectId);
+      // After project loads, check for requested tab
+      const requestedTab = getRequestedTabFromUrl();
+      if (requestedTab) {
+        setTimeout(() => switchTab(requestedTab, false), 0);
+      }
     } else {
       showView("projects");
     }
@@ -886,6 +913,11 @@ async function init() {
       const hasProject = state.projects.some((p) => p.project_id === requestedProject);
       if (hasProject) {
         await openProject(requestedProject);
+        // After project loads, check for requested tab
+        const requestedTab = getRequestedTabFromUrl();
+        if (requestedTab) {
+          switchTab(requestedTab, false);
+        }
       } else {
         showError(elPhError, `Project not found: ${requestedProject}`);
       }

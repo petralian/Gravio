@@ -8,6 +8,7 @@
 
 let currentUser = null;
 let onboardingCliToken = null;
+const PASSWORD_POLICY_HINT = "Use at least 12 characters with uppercase, lowercase, number, and symbol.";
 
 const elStartFree = document.getElementById("ob-start-free");
 const elAuthOk = document.getElementById("ob-auth-ok");
@@ -104,6 +105,35 @@ function setLoading(btnId, loading, defaultText) {
   btn.textContent = loading ? "Please wait…" : defaultText;
 }
 
+function validateStrongPassword(email, password) {
+  if (!password || password.length < 12) return "Password must be at least 12 characters";
+  if (/\s/.test(password)) return "Password cannot contain spaces";
+  if (!/[a-z]/.test(password) || !/[A-Z]/.test(password) || !/\d/.test(password) || !/[^A-Za-z0-9]/.test(password)) {
+    return PASSWORD_POLICY_HINT;
+  }
+  const local = String(email ?? "").trim().toLowerCase().split("@")[0] ?? "";
+  if (local.length >= 3 && password.toLowerCase().includes(local)) {
+    return "Password cannot include your email name.";
+  }
+  return "";
+}
+
+async function setupSsoButtons() {
+  try {
+    const res = await fetch("/auth/sso/providers", { method: "GET" });
+    if (!res.ok) return;
+    const data = await res.json();
+    if (!data?.google) return;
+    ["ob-login-sso-google", "ob-register-sso-google"].forEach((id) => {
+      const btn = document.getElementById(id);
+      if (!btn) return;
+      btn.removeAttribute("hidden");
+    });
+  } catch {
+    // Keep SSO buttons hidden if provider discovery fails.
+  }
+}
+
 tabLogin?.addEventListener("click", () => {
   tabLogin.classList.add("auth-tab-active");
   tabLogin.setAttribute("aria-selected", "true");
@@ -193,6 +223,13 @@ document.getElementById("ob-form-register")?.addEventListener("submit", async (e
     return;
   }
 
+  const passwordError = validateStrongPassword(email, password);
+  if (passwordError) {
+    showError("ob-reg-error", passwordError);
+    setLoading("ob-reg-submit", false, "Create account →");
+    return;
+  }
+
   try {
     const res = await fetch("/auth/register", {
       method: "POST",
@@ -245,3 +282,5 @@ document.querySelectorAll("[data-copy-id]").forEach((btn) => {
     copyFromPre(preId, btn);
   });
 });
+
+void setupSsoButtons();

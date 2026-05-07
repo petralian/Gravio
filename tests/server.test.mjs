@@ -120,6 +120,14 @@ describe("GET /styles.css", () => {
 });
 
 describe("GET /login", () => {
+  describe("GET /auth/sso/providers", () => {
+    it("returns provider config flags", async () => {
+      const res = await httpGet(`http://localhost:${TEST_PORT}/auth/sso/providers`);
+      assert.strictEqual(res.status, 200);
+      const data = JSON.parse(res.body);
+      assert.strictEqual(typeof data.google, "boolean");
+    });
+  });
   it("returns 200 with login HTML", async () => {
     const res = await httpGet(`http://localhost:${TEST_PORT}/login`);
     assert.strictEqual(res.status, 200);
@@ -182,7 +190,7 @@ describe("POST /api/evaluate", () => {
   let cookie;
 
   it("setup: authenticate user", async () => {
-    cookie = await registerAndGetCookie(`eval-${Date.now()}@gravio.test`, "password123");
+    cookie = await registerAndGetCookie(`eval-${Date.now()}@gravio.test`, "Str0ng!Alpha99");
     assert.ok(cookie);
   });
 
@@ -220,8 +228,18 @@ describe("POST /api/evaluate", () => {
 
 describe("Auth — register / login / logout / me", () => {
   const email = `test-${Date.now()}@gravio.test`;
-  const password = "hunter2-test";
+  const password = "StrongerPass1!";
   let cookie;
+
+  it("rejects weak registration passwords", async () => {
+    const res = await httpPost(`http://localhost:${TEST_PORT}/auth/register`, {
+      email: `weak-${Date.now()}@gravio.test`,
+      password: "password123",
+    });
+    assert.strictEqual(res.status, 400);
+    const data = JSON.parse(res.body);
+    assert.ok(String(data.error ?? "").toLowerCase().includes("password"));
+  });
 
   it("registers a new user and returns a session cookie", async () => {
     cookie = await registerAndGetCookie(email, password);
@@ -275,7 +293,7 @@ describe("API keys", () => {
   let apiKey;
 
   it("setup: register user", async () => {
-    cookie = await registerAndGetCookie(email, "password123");
+    cookie = await registerAndGetCookie(email, "Str0ng!Alpha99");
     assert.ok(cookie);
   });
 
@@ -308,7 +326,7 @@ describe("POST /api/keys/onboarding", () => {
   let cookie;
 
   it("setup: register user", async () => {
-    cookie = await registerAndGetCookie(email, "password123");
+    cookie = await registerAndGetCookie(email, "Str0ng!Alpha99");
     assert.ok(cookie);
   });
 
@@ -356,7 +374,7 @@ describe("POST /api/publish + GET /api/runs/:projectId (authenticated)", () => {
   const encryptedProjectId = `test-proj-enc-${Date.now()}`;
 
   it("setup: register + create API key", async () => {
-    cookie = await registerAndGetCookie(email, "password123");
+    cookie = await registerAndGetCookie(email, "Str0ng!Alpha99");
     const me = await httpGet(`http://localhost:${TEST_PORT}/api/me`, { Cookie: cookie });
     const uid = JSON.parse(me.body).id;
     const { db } = await import(pathToFileURL(path.join(ROOT, "src", "core", "db.mjs")).href);
@@ -519,7 +537,7 @@ describe("POST /api/publish + GET /api/runs/:projectId (authenticated)", () => {
   });
 
   it("returns 404 for project belonging to another user", async () => {
-    const cookie2 = await registerAndGetCookie(`other-${Date.now()}@gravio.test`, "password123");
+    const cookie2 = await registerAndGetCookie(`other-${Date.now()}@gravio.test`, "Str0ng!Alpha99");
     const res = await httpGet(`http://localhost:${TEST_PORT}/api/runs/${projectId}`, { Cookie: cookie2 });
     assert.strictEqual(res.status, 404);
   });
@@ -534,7 +552,7 @@ describe("POST /api/publish + GET /api/runs/:projectId (authenticated)", () => {
   });
 
   it("free tier keeps only latest 3 cloud records", async () => {
-    const limitCookie = await registerAndGetCookie(`limit-${Date.now()}@gravio.test`, "password123");
+    const limitCookie = await registerAndGetCookie(`limit-${Date.now()}@gravio.test`, "Str0ng!Alpha99");
     const keyRes = await httpPost(`http://localhost:${TEST_PORT}/api/keys`, { label: "limit" }, { Cookie: limitCookie });
     const limitKey = JSON.parse(keyRes.body).key;
 
@@ -562,7 +580,7 @@ describe("POST /api/publish + GET /api/runs/:projectId (authenticated)", () => {
   });
 
   it("free tier receives generic rating only from /api/runs/:projectId", async () => {
-    const genericCookie = await registerAndGetCookie(`generic-${Date.now()}@gravio.test`, "password123");
+    const genericCookie = await registerAndGetCookie(`generic-${Date.now()}@gravio.test`, "Str0ng!Alpha99");
     const keyRes = await httpPost(`http://localhost:${TEST_PORT}/api/keys`, { label: "generic" }, { Cookie: genericCookie });
     const genericKey = JSON.parse(keyRes.body).key;
 
@@ -592,7 +610,7 @@ describe("POST /api/publish + GET /api/runs/:projectId (authenticated)", () => {
   });
 
   it("paid tier receives full details from /api/runs/:projectId", async () => {
-    const paidCookie = await registerAndGetCookie(`paid-${Date.now()}@gravio.test`, "password123");
+    const paidCookie = await registerAndGetCookie(`paid-${Date.now()}@gravio.test`, "Str0ng!Alpha99");
     const me = await httpGet(`http://localhost:${TEST_PORT}/api/me`, { Cookie: paidCookie });
     const paidId = JSON.parse(me.body).id;
     const { db } = await import(pathToFileURL(path.join(ROOT, "src", "core", "db.mjs")).href);
@@ -630,13 +648,13 @@ describe("Admin — user plan management", () => {
   before(async () => {
     // Register a user then directly promote them to admin via the shared DB instance
     const adminEmail = `plan-admin-${Date.now()}@gravio.test`;
-    adminCookie = await registerAndGetCookie(adminEmail, "password123");
+    adminCookie = await registerAndGetCookie(adminEmail, "Str0ng!Alpha99");
     const { db } = await import(pathToFileURL(path.join(ROOT, "src", "core", "db.mjs")).href);
     db.prepare("UPDATE users SET role='admin' WHERE email=?").run(adminEmail);
 
     // Register the target user whose plan we'll manage
     const targetEmail = `plan-target-${Date.now()}@gravio.test`;
-    targetCookie = await registerAndGetCookie(targetEmail, "password123");
+    targetCookie = await registerAndGetCookie(targetEmail, "Str0ng!Alpha99");
     const meRes = await httpGet(`http://localhost:${TEST_PORT}/api/me`, { Cookie: targetCookie });
     targetId = JSON.parse(meRes.body).id;
   });
@@ -768,7 +786,7 @@ describe("POST /api/webhooks/lemonsqueezy", () => {
   it("upgrades plan for order_created with valid signature and known user", async () => {
     // Register a user to upgrade
     const email = `webhook-user-${Date.now()}@gravio.test`;
-    const cookie = await registerAndGetCookie(email, "pass1234");
+    const cookie = await registerAndGetCookie(email, "Pass1234!ABcd");
     const meBefore = JSON.parse((await httpGet(`http://localhost:${TEST_PORT}/api/me`, { Cookie: cookie })).body);
     assert.strictEqual(meBefore.plan, "free", "user starts on free");
 
@@ -791,7 +809,7 @@ describe("POST /api/webhooks/lemonsqueezy", () => {
 
   it("upgrades plan for subscription_payment_success", async () => {
     const email = `webhook-sub-${Date.now()}@gravio.test`;
-    const cookie = await registerAndGetCookie(email, "pass1234");
+    const cookie = await registerAndGetCookie(email, "Pass1234!ABcd");
 
     const body = makeBody("subscription_payment_success", email, "team");
     const sig = sign(body, WEBHOOK_SECRET);
@@ -817,9 +835,28 @@ describe("POST /api/webhooks/lemonsqueezy", () => {
     assert.strictEqual(res.status, 200);
   });
 
+  it("is idempotent for duplicate webhook payloads", async () => {
+    const email = `webhook-dup-${Date.now()}@gravio.test`;
+    await registerAndGetCookie(email, "Pass1234!ABcd");
+
+    const body = makeBody("subscription_created", email, "pro", {
+      id: "sub-dup-1",
+      customer_id: "cus-dup-1",
+    });
+    const sig = sign(body, WEBHOOK_SECRET);
+
+    const first = await webhookPost(body, sig);
+    assert.strictEqual(first.status, 200);
+    assert.deepStrictEqual(JSON.parse(first.body), { ok: true });
+
+    const second = await webhookPost(body, sig);
+    assert.strictEqual(second.status, 200);
+    assert.deepStrictEqual(JSON.parse(second.body), { ok: true, duplicate: true });
+  });
+
   it("marks billing cancelled on subscription_cancelled", async () => {
     const email = `webhook-cancel-${Date.now()}@gravio.test`;
-    const cookie = await registerAndGetCookie(email, "pass1234");
+    const cookie = await registerAndGetCookie(email, "Pass1234!ABcd");
 
     const activateBody = makeBody("subscription_created", email, "team");
     const activateSig = sign(activateBody, WEBHOOK_SECRET);
@@ -840,7 +877,7 @@ describe("POST /api/webhooks/lemonsqueezy", () => {
 
   it("downgrades to free on subscription_expired", async () => {
     const email = `webhook-expired-${Date.now()}@gravio.test`;
-    const cookie = await registerAndGetCookie(email, "pass1234");
+    const cookie = await registerAndGetCookie(email, "Pass1234!ABcd");
 
     const activateBody = makeBody("subscription_created", email, "pro");
     const activateSig = sign(activateBody, WEBHOOK_SECRET);
@@ -853,5 +890,245 @@ describe("POST /api/webhooks/lemonsqueezy", () => {
 
     const meAfter = JSON.parse((await httpGet(`http://localhost:${TEST_PORT}/api/me`, { Cookie: cookie })).body);
     assert.strictEqual(meAfter.plan, "free");
+  });
+});
+
+describe("POST /api/billing actions", () => {
+  let originalFetch;
+  let subscriptionState;
+  let allowOwnerMatch = true;
+  let subscriptionOwnerEmail = "owner@gravio.test";
+
+  function jsonResponse(status, body) {
+    return {
+      ok: status >= 200 && status < 300,
+      status,
+      text: async () => JSON.stringify(body),
+    };
+  }
+
+  function makeSubscriptionPayload() {
+    return {
+      data: {
+        type: "subscriptions",
+        id: "sub_action_1",
+        attributes: {
+          user_email: allowOwnerMatch ? subscriptionOwnerEmail : "other-user@gravio.test",
+          customer_id: allowOwnerMatch ? "cus_action_1" : "cus_other",
+          status: subscriptionState.cancelled ? "cancelled" : "active",
+          cancelled: subscriptionState.cancelled,
+          renews_at: "2026-12-31T00:00:00Z",
+          first_subscription_item: {
+            id: "si_action_1",
+            quantity: subscriptionState.quantity,
+          },
+          urls: {
+            customer_portal: "https://app.lemonsqueezy.com/my-orders/test-action",
+          },
+        },
+      },
+    };
+  }
+
+  before(() => {
+    originalFetch = global.fetch;
+    process.env.LEMON_API_KEY = "lemon_test_key";
+    subscriptionState = { cancelled: false, quantity: 2 };
+    allowOwnerMatch = true;
+    global.fetch = async (url, options = {}) => {
+      const requestUrl = String(url);
+      const method = String(options.method ?? "GET").toUpperCase();
+
+      if (requestUrl.includes("/v1/subscriptions/sub_action_1") && method === "GET") {
+        return jsonResponse(200, makeSubscriptionPayload());
+      }
+
+      if (requestUrl.includes("/v1/subscriptions/sub_action_1") && method === "PATCH") {
+        const body = JSON.parse(String(options.body ?? "{}"));
+        subscriptionState.cancelled = Boolean(body?.data?.attributes?.cancelled);
+        return jsonResponse(200, makeSubscriptionPayload());
+      }
+
+      if (requestUrl.includes("/v1/subscription-items/si_action_1") && method === "PATCH") {
+        const body = JSON.parse(String(options.body ?? "{}"));
+        const nextQty = Number(body?.data?.attributes?.quantity);
+        if (!Number.isInteger(nextQty) || nextQty < 1) return jsonResponse(422, { error: "invalid quantity" });
+        subscriptionState.quantity = nextQty;
+        return jsonResponse(200, {
+          data: {
+            type: "subscription-items",
+            id: "si_action_1",
+            attributes: { quantity: subscriptionState.quantity },
+          },
+        });
+      }
+
+      return jsonResponse(404, { error: "unexpected fetch call", url: requestUrl, method });
+    };
+  });
+
+  after(() => {
+    global.fetch = originalFetch;
+    delete process.env.LEMON_API_KEY;
+  });
+
+  it("returns 401 for unauthenticated billing action", async () => {
+    const res = await httpPost(`http://localhost:${TEST_PORT}/api/billing/cancel`, {});
+    assert.strictEqual(res.status, 401);
+  });
+
+  it("cancels and resumes linked subscription", async () => {
+    const email = `billing-actions-${Date.now()}@gravio.test`;
+    const cookie = await registerAndGetCookie(email, "Pass1234!ABcd");
+    subscriptionOwnerEmail = email;
+
+    process.env.LEMON_WEBHOOK_SECRET = "billing-actions-secret";
+    const seedBody = JSON.stringify({
+      meta: { event_name: "subscription_created", custom_data: { plan: "team" } },
+      data: {
+        type: "subscriptions",
+        id: "sub_action_1",
+        attributes: {
+          user_email: email,
+          customer_id: "cus_action_1",
+          status: "active",
+          cancelled: false,
+          first_subscription_item: { id: "si_action_1", quantity: 2 },
+          renews_at: "2026-12-31T00:00:00Z",
+          urls: { customer_portal: "https://app.lemonsqueezy.com/my-orders/test-action" },
+        },
+      },
+    });
+    const seedSig = crypto.createHmac("sha256", process.env.LEMON_WEBHOOK_SECRET).update(seedBody).digest("hex");
+    const seed = await new Promise((resolve, reject) => {
+      const req = http.request(
+        {
+          hostname: "localhost",
+          port: TEST_PORT,
+          path: "/api/webhooks/lemonsqueezy",
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Content-Length": Buffer.byteLength(seedBody),
+            "X-Signature": seedSig,
+          },
+        },
+        (r) => { let d = ""; r.on("data", (c) => (d += c)); r.on("end", () => resolve({ status: r.statusCode, body: d })); }
+      );
+      req.on("error", reject);
+      req.write(seedBody);
+      req.end();
+    });
+    assert.strictEqual(seed.status, 200);
+
+    allowOwnerMatch = true;
+    let res = await httpPost(`http://localhost:${TEST_PORT}/api/billing/cancel`, {}, { Cookie: cookie });
+    assert.strictEqual(res.status, 200);
+    let data = JSON.parse(res.body);
+    assert.strictEqual(data.billing.cancelled, true);
+
+    res = await httpPost(`http://localhost:${TEST_PORT}/api/billing/resume`, {}, { Cookie: cookie });
+    assert.strictEqual(res.status, 200);
+    data = JSON.parse(res.body);
+    assert.strictEqual(data.billing.cancelled, false);
+
+    const statusRes = await httpGet(`http://localhost:${TEST_PORT}/api/billing/status`, { Cookie: cookie });
+    const status = JSON.parse(statusRes.body);
+    assert.strictEqual(status.cancelled, false);
+  });
+
+  it("updates seats for linked subscription item", async () => {
+    const email = `billing-seats-${Date.now()}@gravio.test`;
+    const cookie = await registerAndGetCookie(email, "Pass1234!ABcd");
+    subscriptionOwnerEmail = email;
+
+    process.env.LEMON_WEBHOOK_SECRET = "billing-seats-secret";
+    const seedBody = JSON.stringify({
+      meta: { event_name: "subscription_created", custom_data: { plan: "team" } },
+      data: {
+        type: "subscriptions",
+        id: "sub_action_1",
+        attributes: {
+          user_email: email,
+          customer_id: "cus_action_1",
+          status: "active",
+          cancelled: false,
+          first_subscription_item: { id: "si_action_1", quantity: 2 },
+          renews_at: "2026-12-31T00:00:00Z",
+        },
+      },
+    });
+    const seedSig = crypto.createHmac("sha256", process.env.LEMON_WEBHOOK_SECRET).update(seedBody).digest("hex");
+    await new Promise((resolve, reject) => {
+      const req = http.request(
+        {
+          hostname: "localhost",
+          port: TEST_PORT,
+          path: "/api/webhooks/lemonsqueezy",
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Content-Length": Buffer.byteLength(seedBody),
+            "X-Signature": seedSig,
+          },
+        },
+        () => resolve()
+      );
+      req.on("error", reject);
+      req.write(seedBody);
+      req.end();
+    });
+
+    allowOwnerMatch = true;
+    const res = await httpPost(`http://localhost:${TEST_PORT}/api/billing/seats`, { seats: 5 }, { Cookie: cookie });
+    assert.strictEqual(res.status, 200);
+    const data = JSON.parse(res.body);
+    assert.strictEqual(data.billing.seats, 5);
+  });
+
+  it("rejects billing action when ownership check fails", async () => {
+    const email = `billing-owner-${Date.now()}@gravio.test`;
+    const cookie = await registerAndGetCookie(email, "Pass1234!ABcd");
+    subscriptionOwnerEmail = email;
+
+    process.env.LEMON_WEBHOOK_SECRET = "billing-owner-secret";
+    const seedBody = JSON.stringify({
+      meta: { event_name: "subscription_created", custom_data: { plan: "team" } },
+      data: {
+        type: "subscriptions",
+        id: "sub_action_1",
+        attributes: {
+          user_email: email,
+          customer_id: "cus_action_1",
+          status: "active",
+          cancelled: false,
+          first_subscription_item: { id: "si_action_1", quantity: 2 },
+        },
+      },
+    });
+    const seedSig = crypto.createHmac("sha256", process.env.LEMON_WEBHOOK_SECRET).update(seedBody).digest("hex");
+    await new Promise((resolve, reject) => {
+      const req = http.request(
+        {
+          hostname: "localhost",
+          port: TEST_PORT,
+          path: "/api/webhooks/lemonsqueezy",
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Content-Length": Buffer.byteLength(seedBody),
+            "X-Signature": seedSig,
+          },
+        },
+        () => resolve()
+      );
+      req.on("error", reject);
+      req.write(seedBody);
+      req.end();
+    });
+
+    allowOwnerMatch = false;
+    const res = await httpPost(`http://localhost:${TEST_PORT}/api/billing/cancel`, {}, { Cookie: cookie });
+    assert.strictEqual(res.status, 403);
   });
 });
