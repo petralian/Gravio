@@ -8,6 +8,29 @@
 
 # PART A — Gravio (this project)
 
+## TOP RULE: Session Memory Loop (Obsidian)
+
+Every chat session **must** follow this loop — no exceptions:
+
+1. **Session start:** Call `mcp_gravio-obsidi_obsidian_write` to create (or overwrite) a session note at `Operations/Sessions/YYYY-MM-DD <Topic>.md`. The note must contain:
+   - Session goals as checkboxes
+   - Current state: uncommitted files, blockers, last deployed commit
+   - Active phase roadmap with ✅ / ⚠️ / 🔲 status markers
+   - Manual steps the user must perform (never omit these)
+   - Key decisions and notes
+
+2. **During the session — after every suggestion or implementation:**
+   - Mark completed items ✅ in the session note via `mcp_gravio-obsidi_obsidian_write` (full overwrite keeps it clean) or `mcp_gravio-obsidi_obsidian_append` for additions.
+   - Add any new todos, blockers, or dependencies immediately — do not wait until end.
+   - If you suggest something that was not implemented yet, mark it 🔲 with "SUGGESTED" tag.
+
+3. **Session end:** Update the note one final time — all items resolved, all manual steps listed, next session priority noted. Then append a one-line summary to `Operations/Session Summaries.md`.
+
+**Vault path for session notes:** `Operations/Sessions/`
+**Never skip this loop.** If the Obsidian MCP tool is unavailable, log a warning and continue, but retry at session end.
+
+---
+
 ## Project Identity
 
 - **App:** Gravio — AI Agent Quality Engine (scan, score, encrypted publish, decrypt-in-browser dashboard)
@@ -138,11 +161,14 @@ At the end of **every** response that involved code changes, file edits, or depl
 **Deploy needed:** <Yes/No> — <why> — <done ✓ / pending>
 **Rollback tag:** <`vX.Y.Z` if tagged, else `None`>
 **Notes updated:** <Yes / No / N/A>
+**Obsidian:** <read ✓ / written ✓ / path — OR "skipped: <reason>"> — proof the memory loop ran
 **Git commit:** <short hash + message, or `N/A`>
 **Self-improvements:** <`None` OR exact file path + line(s) where the rule was written>
 **Next session priority:** <highest open item or `None`>
 **Test plan:** <how the change was verified, or `N/A`>
 ```
+
+The `Obsidian` line is **mandatory** on every footer — never `N/A`. It proves the memory loop ran: note was read at session start, updated after each change, and will be closed at session end. If the MCP tool is unavailable, write `skipped: MCP unavailable` and retry at session end.
 
 Skip this block only for purely conversational answers (no files touched).
 
