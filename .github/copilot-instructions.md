@@ -19,6 +19,7 @@ Every chat session **must** follow this loop — no exceptions:
    - Manual steps the user must perform (never omit these)
    - Key decisions and notes
    - **Obsidian scan results** — list of related notes read and what was found (see rule 1a below)
+   - **Relational links** — `[[WikiLinks]]` to every feature, design, and prior session note touched (see rule 1b below)
 
 1a. **Before implementing any new feature:** Read `Operations/Session Summaries.md` and any topically related notes in the vault (e.g. `Design/UX Guidelines.md`, phase roadmap notes, prior session notes on the same topic). List in the session note:
    - Which notes were read
@@ -26,14 +27,66 @@ Every chat session **must** follow this loop — no exceptions:
    - Any contradictions or dependencies found
    This scan result must appear under a `## Obsidian Pre-Scan` heading in the session note. Never skip this — prior notes may contain design decisions, phase contracts, or manual steps that invalidate a naive implementation.
 
+1b. **Vault knowledge graph — relational linking rules:**
+
+   **Vault structure:**
+   - `Features/<FeatureName>.md` — one note per major feature (Billing, Auth, Dashboard, Scanner, CLI, E2EE). Lives permanently, updated each session that touches it.
+   - `Design/UX Guidelines.md` — UI/UX patterns. Read before any front-end work.
+   - `Operations/Sessions/YYYY-MM-DD <Topic>.md` — per-session notes.
+   - `Operations/Session Summaries.md` — running log, one line per session.
+
+   **Linking rules (use `[[WikiLink]]` syntax throughout):**
+   - Every session note must open with a `## Related Notes` section listing `[[WikiLinks]]` to every Feature and Design note it touches.
+   - Every Feature note must contain a `## Sessions` section listing `[[WikiLinks]]` back to every session that changed it.
+   - Every Feature note must contain a `## Related Features` section listing `[[WikiLinks]]` to features it depends on or that depend on it.
+   - When a new feature touches an existing feature's code (e.g. Billing reads Auth user state), add a cross-link in both Feature notes.
+
+   **When to update Feature notes:**
+   - Session start: read every Feature note that will be touched; add session link to its `## Sessions` section.
+   - New feature request: check if a Feature note exists; create one if not, using the template below.
+   - After implementation: update the Feature note's status, decisions, and phase tracking.
+   - After git commit: add the commit hash to the Feature note's `## Commits` section.
+   - After deploy: mark the Feature note's current deployed phase.
+
+   **Feature note template:**
+   ```markdown
+   # Feature: <Name>
+   **Status:** 🔲 Planned | ⚠️ In Progress | ✅ Live
+   **Owner files:** `src/...`
+   **Related features:** [[Feature A]] · [[Feature B]]
+
+   ## Phases
+   ### ✅ Phase N — <title> (commit abc1234)
+   - bullet points of what was done
+
+   ### 🔲 Phase N+1 — <title>
+   - bullet points planned
+
+   ## Decisions
+   - key architectural decisions
+
+   ## Sessions
+   [[YYYY-MM-DD Session Title]] · [[...]]
+
+   ## Commits
+   - `abc1234` — description
+   ```
+
 2. **During the session — after every suggestion or implementation:**
    - Mark completed items ✅ in the session note via `mcp_gravio-obsidi_obsidian_write` (full overwrite keeps it clean) or `mcp_gravio-obsidi_obsidian_append` for additions.
    - Add any new todos, blockers, or dependencies immediately — do not wait until end.
    - If you suggest something that was not implemented yet, mark it 🔲 with "SUGGESTED" tag.
+   - Update the relevant Feature note(s) with the change.
 
-3. **Session end:** Update the note one final time — all items resolved, all manual steps listed, next session priority noted. Then append a one-line summary to `Operations/Session Summaries.md`.
+3. **After every git commit or deploy:**
+   - Add the commit hash + description to the Feature note's `## Commits` section.
+   - Mark the deployed phase as ✅ in the Feature note.
+   - Update the session note with the commit hash.
+
+4. **Session end:** Update the session note and all touched Feature notes one final time. Append a one-line summary to `Operations/Session Summaries.md`.
 
 **Vault path for session notes:** `Operations/Sessions/`
+**Vault path for feature notes:** `Features/`
 **Never skip this loop.** If the Obsidian MCP tool is unavailable, log a warning and continue, but retry at session end.
 
 ---
