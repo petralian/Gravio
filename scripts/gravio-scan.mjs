@@ -295,7 +295,14 @@ function dependencyInstallPlan(targetDir) {
   const has = (file) => existsSync(path.join(dir, file));
 
   if (has("package.json")) {
-    if (has("pnpm-lock.yaml")) {
+    // If node_modules already exists and the internal lockfile is present,
+    // skip install — treats as already up-to-date. User can force via `node gravio.mjs setup`.
+    const nmReady = existsSync(path.join(dir, "node_modules", ".package-lock.json"))
+                 || existsSync(path.join(dir, "node_modules", ".yarn-integrity"))
+                 || existsSync(path.join(dir, "node_modules", ".modules.yaml")); // pnpm
+    if (nmReady) {
+      // Already installed — nothing to do for this step
+    } else if (has("pnpm-lock.yaml")) {
       plan.push({
         cmd: "pnpm",
         args: ["install", "--frozen-lockfile"],
@@ -469,33 +476,53 @@ function runInstallStep(targetDir, step, { setupVerbose = false, retryCount = 0,
 
     const pipFiltered = isPipStep(step) && !setupVerbose;
     const isNpmLike = ["npm", "yarn", "pnpm"].includes(step.cmd);
+    const resolvedCmd = findExecutable(step.cmd);
 
-    if (!pipFiltered && !isNpmLike) {
-      // Generic fallback — resolveNativeCmd handles Windows .cmd extension without shell: true.
-      const res = spawnSync(resolveNativeCmd(step.cmd), step.args, {
+    const retry = (reason) => {
+      if (retryCount < maxRetries) {
+        process.stdout.write(`       ⚠️  ${reason}. Retrying (attempt ${retryCount + 2}/${maxRetries + 1})...\n`);
+        setTimeout(() => {
+          runInstallStep(targetDir, step, { setupVerbose, retryCount: retryCount + 1, maxRetries }).then(resolve);
+        }, 1500);
+      } else {
+        process.stdout.write(`       ✖  Failed after ${maxRetries + 1} attempts: ${reason}\n`);
+        if (isNpmLike) {
+          process.stdout.write(`       Hint: Try 'npm install' manually in this folder, then re-run.\n`);
+          process.stdout.write(`       Hint: If npm is missing: https://nodejs.org/en/download\n`);
+        }
+        resolve(false);
+      }
+    };
+
+    // pip / generic step — use shell on Windows for best compatibility
+    if (!isNpmLike) {
+      const res = spawnSync(resolvedCmd, step.args, {
         cwd: path.resolve(targetDir),
         stdio: "inherit",
+        shell: process.platform === "win32",
       });
       resolve(res.status === 0);
       return;
     }
 
-    if (isNpmLike && !setupVerbose) {
+    // npm / yarn / pnpm — quiet mode (default)
+    if (!setupVerbose) {
       process.stdout.write("     Note: deprecation notices and audit warnings are suppressed. Use --setup-verbose to see all output.\n");
-      const resolvedCmd = resolveNativeCmd(step.cmd);
-      const child = spawn(resolvedCmd, step.args, {
-        cwd: path.resolve(targetDir),
-        stdio: ["ignore", "pipe", "pipe"],
-      });
 
       let elapsed = 0;
       writeSetupProgress(0, "Starting install...");
       const progressTimer = setInterval(() => {
         elapsed += 1;
-        // Logistic curve: smooth approach up to ~88%, leaves room to jump to 100% on done.
         const pct = Math.min(88, Math.round(100 * (1 - Math.exp(-elapsed / 25))));
         writeSetupProgress(pct, `Installing packages... (${elapsed}s)`);
       }, 1000);
+
+      // First attempt: spawn without shell (clean environment)
+      const child = spawn(resolvedCmd, step.args, {
+        cwd: path.resolve(targetDir),
+        stdio: ["ignore", "pipe", "pipe"],
+        shell: false,
+      });
 
       const npmNoise = /^(npm warn|added \d|audited \d|found \d|up to date|changed \d)/i;
       const consumeNpmStream = (stream) => {
@@ -529,15 +556,45 @@ function runInstallStep(targetDir, step, { setupVerbose = false, retryCount = 0,
       child.on("error", (err) => {
         clearInterval(progressTimer);
         process.stdout.write("\n");
-        if (retryCount < maxRetries) {
-          process.stdout.write(`       ⚠️  Process error: ${err.code ?? err.message}. Retrying (attempt ${retryCount + 2}/${maxRetries + 1})...\n`);
-          setTimeout(() => {
-            runInstallStep(targetDir, step, { setupVerbose, retryCount: retryCount + 1, maxRetries }).then(resolve);
+
+        // EINVAL / ENOENT on Windows: retry with shell:true as fallback
+        if ((err.code === "EINVAL" || err.code === "ENOENT") && process.platform === "win32" && retryCount === 0) {
+          process.stdout.write(`       ⚠️  Spawn error (${err.code}), retrying with shell compatibility mode...\n`);
+          const plainCmd = step.cmd; // use plain name with shell:true
+          const shellChild = spawn(plainCmd, step.args, {
+            cwd: path.resolve(targetDir),
+            stdio: ["ignore", "pipe", "pipe"],
+            shell: true,
+          });
+          let elapsed2 = 0;
+          writeSetupProgress(0, "Starting install (shell mode)...");
+          const progressTimer2 = setInterval(() => {
+            elapsed2 += 1;
+            const pct = Math.min(88, Math.round(100 * (1 - Math.exp(-elapsed2 / 25))));
+            writeSetupProgress(pct, `Installing packages... (${elapsed2}s)`);
           }, 1000);
-        } else {
-          process.stdout.write(`       Failed after ${maxRetries + 1} attempts: ${err.code ?? err.message}\n`);
-          resolve(false);
+          consumeNpmStream(shellChild.stdout);
+          consumeNpmStream(shellChild.stderr);
+          shellChild.on("error", (e2) => {
+            clearInterval(progressTimer2);
+            process.stdout.write("\n");
+            retry(`${e2.code ?? e2.message} (shell mode also failed)`);
+          });
+          shellChild.on("close", (code) => {
+            clearInterval(progressTimer2);
+            if (code === 0) {
+              writeSetupProgress(100, "Complete");
+              process.stdout.write("\n");
+              resolve(true);
+            } else {
+              process.stdout.write("\n");
+              retry(`Exit code ${code} (shell mode)`);
+            }
+          });
+          return;
         }
+
+        retry(`${err.code ?? err.message}`);
       });
 
       child.on("close", (code) => {
@@ -546,97 +603,21 @@ function runInstallStep(targetDir, step, { setupVerbose = false, retryCount = 0,
           writeSetupProgress(100, "Complete");
           process.stdout.write("\n");
           resolve(true);
-        } else if (retryCount < maxRetries) {
-          process.stdout.write("\n");
-          process.stdout.write(`       ⚠️  Exit code ${code}. Retrying (attempt ${retryCount + 2}/${maxRetries + 1})...\n`);
-          setTimeout(() => {
-            runInstallStep(targetDir, step, { setupVerbose, retryCount: retryCount + 1, maxRetries }).then(resolve);
-          }, 1000);
         } else {
-          writeSetupProgress(100, "Failed");
           process.stdout.write("\n");
-          resolve(false);
+          retry(`Exit code ${code}`);
         }
       });
       return;
     }
 
-    if (isNpmLike) {
-      // setupVerbose=true: pass raw output through.
-      const resolvedCmd = resolveNativeCmd(step.cmd);
-      const res = spawnSync(resolvedCmd, step.args, {
-        cwd: path.resolve(targetDir),
-        stdio: "inherit",
-      });
-      resolve(res.status === 0);
-      return;
-    }
-
-    process.stdout.write("     Note: pip may replace package versions to satisfy pinned compatibility.\n");
-    process.stdout.write("     This affects only the virtual environment, not your source files.\n");
-
-    const child = spawn(step.cmd, step.args, {
+    // npm / yarn / pnpm — verbose mode (setupVerbose:true): pass raw output through.
+    const res = spawnSync(resolvedCmd, step.args, {
       cwd: path.resolve(targetDir),
-      stdio: ["ignore", "pipe", "pipe"],
-      shell: process.platform === "win32",
+      stdio: "inherit",
+      shell: process.platform === "win32", // shell:true on Windows for max compatibility
     });
-
-    let alreadySatisfied = 0;
-    const important = /^(Collecting|Using cached|Downloading|Installing collected packages|Attempting uninstall|Found existing installation|Uninstalling|Successfully installed|ERROR:|WARNING:)/;
-    const consumeStream = (stream) => {
-      let pending = "";
-      stream.setEncoding("utf8");
-      stream.on("data", (chunk) => {
-        pending += chunk;
-        const lines = pending.split(/\r?\n/);
-        pending = lines.pop() ?? "";
-        for (const line of lines) {
-          const text = line.trim();
-          if (!text) continue;
-          if (text.startsWith("Requirement already satisfied:")) {
-            alreadySatisfied += 1;
-            continue;
-          }
-          if (important.test(text)) process.stdout.write(`       ${text}\n`);
-        }
-      });
-      stream.on("end", () => {
-        const text = pending.trim();
-        if (text && important.test(text)) process.stdout.write(`       ${text}\n`);
-      });
-    };
-
-    consumeStream(child.stdout);
-    consumeStream(child.stderr);
-
-    child.on("error", (err) => {
-      if (retryCount < maxRetries) {
-        process.stdout.write(`     ⚠️  Process error: ${err.code ?? err.message}. Retrying (attempt ${retryCount + 2}/${maxRetries + 1})...\n`);
-        setTimeout(() => {
-          runInstallStep(targetDir, step, { setupVerbose, retryCount: retryCount + 1, maxRetries }).then(resolve);
-        }, 1000);
-      } else {
-        process.stdout.write(`     Failed after ${maxRetries + 1} attempts: ${err.code ?? err.message}\n`);
-        resolve(false);
-      }
-    });
-
-    child.on("close", (code) => {
-      if (code === 0) {
-        if (alreadySatisfied > 0) {
-          process.stdout.write(`     pip summary: ${alreadySatisfied} dependencies were already satisfied.\n`);
-        }
-        resolve(true);
-      } else if (retryCount < maxRetries) {
-        process.stdout.write(`     ⚠️  Exit code ${code}. Retrying (attempt ${retryCount + 2}/${maxRetries + 1})...\n`);
-        setTimeout(() => {
-          runInstallStep(targetDir, step, { setupVerbose, retryCount: retryCount + 1, maxRetries }).then(resolve);
-        }, 1000);
-      } else {
-        process.stdout.write(`     Failed after ${maxRetries + 1} attempts (exit code ${code}).\n`);
-        resolve(false);
-      }
-    });
+    resolve(res.status === 0);
   });
 }
 
@@ -652,12 +633,14 @@ async function runSetup(targetDir, { silentNoWork = false, setupVerbose = false 
   
   // Only check npm availability if npm-based installs are planned
   if (plan.some((s) => ["npm", "yarn", "pnpm"].includes(s.cmd))) {
-    const preflightCheck = spawnSync(resolveNativeCmd("npm"), ["--version"], { stdio: "pipe" });
+    const npmExe = findExecutable("npm");
+    const preflightCheck = spawnSync(npmExe, ["--version"], { stdio: "pipe", shell: process.platform === "win32" });
     if (preflightCheck.status !== 0) {
       process.stderr.write(`\n  \x1b[91m\x1b[1m✖  Preflight failed\x1b[0m\n`);
-      process.stderr.write(`     npm is not available. Check your Node.js installation or PATH.\n`);
-      process.stderr.write(`     Hint: Try 'npm --version' in a new terminal to diagnose.\n`);
-      process.stderr.write(`     Workaround: Install dependencies manually, then re-run this setup.\n\n`);
+      process.stderr.write(`     npm is not available. Tried: ${npmExe}\n`);
+      process.stderr.write(`     Fix: Open a fresh terminal after installing Node.js, then re-run.\n`);
+      process.stderr.write(`     Download Node.js: https://nodejs.org/en/download\n`);
+      process.stderr.write(`     Workaround: Run 'npm install' manually in this folder, then re-run.\n\n`);
       return false;
     }
   }
