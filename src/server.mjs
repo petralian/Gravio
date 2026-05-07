@@ -628,6 +628,61 @@ function summarizeScans(scans) {
   };
 }
 
+/**
+ * Compute streak data from scan_history rows (ordered by scanned_at DESC).
+ * Streak = consecutive ISO calendar weeks with at least one scan.
+ */
+function computeStreak(rows) {
+  if (!rows.length) {
+    return { streakWeeks: 0, lastScannedAt: null, delta7d: null, delta30d: null, totalScans: 0, firstScannedAt: null, daysSinceFirst: 0 };
+  }
+  const totalScans = rows.length;
+  const lastScannedAt = rows[0].scanned_at;
+  const firstScannedAt = rows[rows.length - 1].scanned_at;
+  const daysSinceFirst = Math.floor((Date.now() - new Date(firstScannedAt).getTime()) / 86_400_000);
+
+  // Score deltas
+  const latestScore = Number.isFinite(rows[0].overall_score) ? rows[0].overall_score : null;
+  const now = Date.now();
+  const score7dAgo = rows.find((r) => new Date(r.scanned_at).getTime() <= now - 7 * 86_400_000)?.overall_score ?? null;
+  const score30dAgo = rows.find((r) => new Date(r.scanned_at).getTime() <= now - 30 * 86_400_000)?.overall_score ?? null;
+  const delta7d = latestScore !== null && Number.isFinite(score7dAgo) ? Number((latestScore - score7dAgo).toFixed(2)) : null;
+  const delta30d = latestScore !== null && Number.isFinite(score30dAgo) ? Number((latestScore - score30dAgo).toFixed(2)) : null;
+
+  // ISO week key: "YYYY-WW"
+  function isoWeekKey(dateStr) {
+    const d = new Date(dateStr);
+    // Thursday in current week decides the year; get Mon of current week
+    const dayOfWeek = (d.getUTCDay() + 6) % 7; // 0=Mon, 6=Sun
+    const monday = new Date(d);
+    monday.setUTCDate(d.getUTCDate() - dayOfWeek);
+    const yearStart = new Date(Date.UTC(monday.getUTCFullYear(), 0, 1));
+    const weekNo = Math.ceil(((monday - yearStart) / 86_400_000 + 1) / 7);
+    return `${monday.getUTCFullYear()}-${String(weekNo).padStart(2, "0")}`;
+  }
+
+  const weeksWithScans = new Set(rows.map((r) => isoWeekKey(r.scanned_at)));
+
+  // Count consecutive weeks backward from current week
+  const currentWeekKey = isoWeekKey(new Date().toISOString());
+  let streakWeeks = 0;
+  let checkDate = new Date();
+  // Check current week and walk backward
+  for (let i = 0; i < 104; i++) {
+    const key = isoWeekKey(checkDate.toISOString());
+    if (weeksWithScans.has(key)) {
+      streakWeeks++;
+    } else if (i === 0) {
+      // Current week not scanned yet — start checking from last week
+    } else {
+      break;
+    }
+    checkDate = new Date(checkDate.getTime() - 7 * 86_400_000);
+  }
+
+  return { streakWeeks, lastScannedAt, delta7d, delta30d, totalScans, firstScannedAt, daysSinceFirst };
+}
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const WEB_DIR = path.join(__dirname, "web");
 const PORT = process.env.PORT ?? 3000;
@@ -1552,6 +1607,75 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(400, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ error: err.message }));
     }
+    return;
+  }
+
+  // ── API: POST /api/scans/artifact ───────────────────────────────────────
+  // Receives plaintext *summary stats only* (no run payload) — zero-knowledge safe.
+  if (req.method === "POST" && req.url === "/api/scans/artifact") {
+    const user = getAuthUser(req);
+    if (!user) {
+      res.writeHead(401, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Authentication required. Use a Bearer API key." }));
+      return;
+    }
+    let body;
+    try {
+      body = JSON.parse(await readBody(req));
+    } catch {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Invalid JSON" }));
+      return;
+    }
+    const { projectId, gitCommit, overallScore, dimensionScores, checksRun, recommendations } = body ?? {};
+    if (!isValidProjectId(projectId)) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Invalid projectId" }));
+      return;
+    }
+    if (typeof overallScore !== "number" || !Number.isFinite(overallScore)) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "overallScore must be a finite number" }));
+      return;
+    }
+
+    const uid = user.uid ?? user.id;
+    stmts.insertScanHistory.run(
+      uid,
+      projectId,
+      typeof gitCommit === "string" && gitCommit.length > 0 ? gitCommit.slice(0, 40) : null,
+      Number(overallScore.toFixed(2)),
+      dimensionScores ? JSON.stringify(dimensionScores) : null,
+      checksRun ? JSON.stringify(checksRun) : null,
+      recommendations ? JSON.stringify(recommendations) : null,
+    );
+
+    const streak = computeStreak(stmts.getRecentScanScores.all(uid, projectId));
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ ok: true, streak }));
+    return;
+  }
+
+  // ── API: GET /api/projects/:id/streak ────────────────────────────────────
+  const streakMatch = req.method === "GET" && /^\/api\/projects\/([^/?]+)\/streak$/.exec(req.url);
+  if (streakMatch) {
+    const user = getAuthUser(req);
+    if (!user) {
+      res.writeHead(401, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Not authenticated" }));
+      return;
+    }
+    const projectId = decodeURIComponent(streakMatch[1]);
+    if (!isValidProjectId(projectId)) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Invalid projectId" }));
+      return;
+    }
+    const uid = user.uid ?? user.id;
+    const rows = stmts.getRecentScanScores.all(uid, projectId);
+    const streak = computeStreak(rows);
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify(streak));
     return;
   }
 

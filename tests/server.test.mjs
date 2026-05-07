@@ -728,6 +728,103 @@ describe("POST /api/publish + GET /api/runs/:projectId (authenticated)", () => {
   });
 });
 
+describe("POST /api/scans/artifact + GET /api/projects/:id/streak", () => {
+  const email = `streak-${Date.now()}@gravio.test`;
+  let apiKey;
+  let cookie;
+  const projectId = `streak-proj-${Date.now()}`;
+
+  it("setup: register user + create API key", async () => {
+    cookie = await registerAndGetCookie(email, "Str0ng!Alpha99");
+    const res = await httpPost(`http://localhost:${TEST_PORT}/api/keys`, { label: "streak" }, { Cookie: cookie });
+    apiKey = JSON.parse(res.body).key;
+    assert.ok(apiKey.startsWith("gv_"));
+  });
+
+  it("rejects artifact POST without auth", async () => {
+    const res = await httpPost(`http://localhost:${TEST_PORT}/api/scans/artifact`, {
+      projectId, overallScore: 75,
+    }, {});
+    assert.strictEqual(res.status, 401);
+  });
+
+  it("rejects artifact POST with invalid projectId", async () => {
+    const res = await httpPost(
+      `http://localhost:${TEST_PORT}/api/scans/artifact`,
+      { projectId: "bad id!!", overallScore: 75 },
+      { Authorization: `Bearer ${apiKey}` },
+    );
+    assert.strictEqual(res.status, 400);
+  });
+
+  it("rejects artifact POST with missing overallScore", async () => {
+    const res = await httpPost(
+      `http://localhost:${TEST_PORT}/api/scans/artifact`,
+      { projectId },
+      { Authorization: `Bearer ${apiKey}` },
+    );
+    assert.strictEqual(res.status, 400);
+  });
+
+  it("stores artifact and returns streak", async () => {
+    const res = await httpPost(
+      `http://localhost:${TEST_PORT}/api/scans/artifact`,
+      {
+        projectId,
+        overallScore: 72.5,
+        dimensionScores: { safety: 80, reliability: 70 },
+        checksRun: [{ id: "secret-exposure", pass: true }, { id: "test-coverage", pass: false }],
+        recommendations: [{ id: "test-coverage", severity: "high", difficulty: "medium" }],
+      },
+      { Authorization: `Bearer ${apiKey}` },
+    );
+    assert.strictEqual(res.status, 200);
+    const data = JSON.parse(res.body);
+    assert.strictEqual(data.ok, true);
+    assert.ok(data.streak);
+    assert.strictEqual(data.streak.totalScans, 1);
+    assert.ok(typeof data.streak.streakWeeks === "number");
+    assert.ok(typeof data.streak.daysSinceFirst === "number");
+  });
+
+  it("GET /api/projects/:id/streak returns streak data", async () => {
+    const res = await httpGet(
+      `http://localhost:${TEST_PORT}/api/projects/${projectId}/streak`,
+      { Cookie: cookie },
+    );
+    assert.strictEqual(res.status, 200);
+    const data = JSON.parse(res.body);
+    assert.strictEqual(data.totalScans, 1);
+    assert.ok(data.lastScannedAt !== null);
+    assert.ok(typeof data.streakWeeks === "number");
+  });
+
+  it("GET /api/projects/:id/streak returns 401 without auth", async () => {
+    const res = await httpGet(
+      `http://localhost:${TEST_PORT}/api/projects/${projectId}/streak`,
+      {},
+    );
+    assert.strictEqual(res.status, 401);
+  });
+
+  it("second artifact POST increments total and computes score deltas", async () => {
+    const res = await httpPost(
+      `http://localhost:${TEST_PORT}/api/scans/artifact`,
+      {
+        projectId,
+        overallScore: 78.0,
+        dimensionScores: { safety: 82, reliability: 75 },
+        checksRun: [{ id: "secret-exposure", pass: true }, { id: "test-coverage", pass: true }],
+        recommendations: [],
+      },
+      { Authorization: `Bearer ${apiKey}` },
+    );
+    assert.strictEqual(res.status, 200);
+    const data = JSON.parse(res.body);
+    assert.strictEqual(data.streak.totalScans, 2);
+  });
+});
+
 describe("Admin — user plan management", () => {
   let adminCookie;
   let targetId;

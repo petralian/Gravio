@@ -237,6 +237,33 @@ try {
   // Column already exists — ignore
 }
 
+try {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS scan_history (
+      id              INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id         INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      project_id      TEXT    NOT NULL,
+      scanned_at      TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
+      git_commit      TEXT,
+      overall_score   REAL,
+      dimension_scores TEXT,
+      checks_run      TEXT,
+      recommendations TEXT
+    )
+  `);
+} catch {
+  // Table already exists — ignore
+}
+
+try {
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS scan_history_user_project_scanned
+      ON scan_history(user_id, project_id, scanned_at DESC)
+  `);
+} catch {
+  // Index already exists — ignore
+}
+
 // Promote first registered user (or ADMIN_EMAIL) to admin if no admin exists yet
 function ensureAdminRole() {
   const adminCount = db.prepare(`SELECT COUNT(*) as c FROM users WHERE role='admin'`).get().c;
@@ -401,6 +428,25 @@ export const stmts = {
 
   // password management
   updatePasswordHash: db.prepare(`UPDATE users SET password_hash=? WHERE id=?`),
+
+  // scan_history
+  insertScanHistory: db.prepare(
+    `INSERT INTO scan_history (user_id, project_id, git_commit, overall_score, dimension_scores, checks_run, recommendations)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+  ),
+  listScanHistory: db.prepare(
+    `SELECT id, project_id, scanned_at, git_commit, overall_score, dimension_scores
+     FROM scan_history
+     WHERE user_id=? AND project_id=?
+     ORDER BY scanned_at DESC`,
+  ),
+  getRecentScanScores: db.prepare(
+    `SELECT scanned_at, overall_score
+     FROM scan_history
+     WHERE user_id=? AND project_id=?
+     ORDER BY scanned_at DESC
+     LIMIT 60`,
+  ),
 };
 
 export { db, ensureAdminRole };

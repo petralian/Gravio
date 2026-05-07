@@ -134,7 +134,7 @@ const DIM_META  = {
  * difficulty: "quick-win" | "medium" | "deep-refactor" | "architectural"
  * impactScore: estimated pts added to overall score if this check is fixed
  */
-function buildCatalog(scan) {
+export function buildCatalog(scan) {
   const {
     committedEnvFiles, securityPolicyExists,
     testSignal, cicdExists, hasTypeSafety,
@@ -731,13 +731,26 @@ export function printScanStep(step) {
 /**
  * Print the publish result.
  */
-export function printPublishResult({ server, project, success, error }) {
+export function printPublishResult({ server, project, success, error, streak }) {
   console.log();
   if (success) {
     const dashUrl = `${server}/dashboard`;
     console.log(`  ${c.bgreen}${c.bold}✔  Published${c.reset}  ${c.dim}→${c.reset}  ${c.cyan}${c.under}${dashUrl}${c.reset}`);
     console.log(`  ${c.dim}Project${c.reset}  ${c.white}${project}${c.reset}`);
     console.log();
+    if (streak && streak.totalScans > 0) {
+      if (streak.totalScans === 1) {
+        console.log(`  ${c.bgreen}${c.bold}✦  First scan! Streak starts now.${c.reset}`);
+      } else if (streak.streakWeeks >= 2) {
+        const deltaStr = streak.delta30d !== null
+          ? (streak.delta30d >= 0 ? `  ${c.bgreen}+${streak.delta30d} pts${c.reset}` : `  ${c.bred}${streak.delta30d} pts${c.reset}`) + `${c.dim} over 30d${c.reset}`
+          : "";
+        console.log(`  ${c.byellow}${c.bold}🔥 ${streak.streakWeeks}-week streak${c.reset}${deltaStr}  ${c.dim}→  ${server}/dashboard${c.reset}`);
+      } else if (streak.delta7d !== null && streak.delta7d !== 0) {
+        const sign = streak.delta7d > 0 ? "+" : "";
+        console.log(`  ${c.dim}Score change 7d:${c.reset}  ${streak.delta7d > 0 ? c.bgreen : c.bred}${sign}${streak.delta7d} pts${c.reset}`);
+      }
+    }
     console.log(`  ${c.dim}Open your dashboard to view trends, history, and issue details.${c.reset}`);
   } else {
     console.log(`  ${c.bred}${c.bold}✖  Publish failed${c.reset}  ${c.dim}${error ?? "unknown error"}${c.reset}`);

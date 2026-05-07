@@ -19,7 +19,7 @@ import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { spawn, spawnSync } from "node:child_process";
 import { scanTargetProject } from "../src/core/scan-signals.mjs";
-import { printScanReport, printPublishResult, printScanStep } from "../src/core/reporter.mjs";
+import { printScanReport, printPublishResult, printScanStep, buildCatalog } from "../src/core/reporter.mjs";
 import { deriveKey, encrypt, generateKey } from "../src/core/crypto-e2ee.mjs";
 
 // eslint-disable-next-line no-undef
@@ -841,7 +841,37 @@ async function handleRun(args) {
   );
 
   if (result.status === 200 && result.data?.ok) {
-    printPublishResult({ server, project: projectId, success: true });
+    // POST summary artifact (zero-knowledge: scores + check IDs only, no run payload)
+    let streak = null;
+    try {
+      const catalog = buildCatalog(scan);
+      const checksRun = catalog.map((ch) => ({ id: ch.id, pass: ch.pass }));
+      const dimensionScores = run.scorecard ?? {};
+      const topRecs = catalog
+        .filter((ch) => !ch.pass)
+        .sort((a, b) => (b.impactScore ?? 0) - (a.impactScore ?? 0))
+        .slice(0, 5)
+        .map((ch) => ({ id: ch.id, severity: ch.severity, difficulty: ch.difficulty ?? "medium" }));
+      const gitCommit = (scan.gitHeadCommit ?? "").slice(0, 40) || null;
+      const artifactResult = await httpPost(
+        new URL("/api/scans/artifact", server).toString(),
+        {
+          projectId,
+          gitCommit,
+          overallScore: run.summary?.overallScore ?? 0,
+          dimensionScores,
+          checksRun,
+          recommendations: topRecs,
+        },
+        { Authorization: `Bearer ${apiKey}` },
+      );
+      if (artifactResult.status === 200 && artifactResult.data?.streak) {
+        streak = artifactResult.data.streak;
+      }
+    } catch {
+      // Artifact POST is best-effort; don't block the success exit
+    }
+    printPublishResult({ server, project: projectId, success: true, streak });
     process.exit(0);
   }
 
