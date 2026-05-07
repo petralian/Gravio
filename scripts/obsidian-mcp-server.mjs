@@ -23,7 +23,16 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
 import { dirname, join, resolve, normalize } from "node:path";
 
 // ── Vault root — only paths inside here are accessible ─────────────────────
-const VAULT_ROOT = resolve("C:\\Obsidian\\obsidian\\40_VSCode\\Gravio");
+const EXPECTED_VAULT_ROOT = normalize(resolve("C:\\Obsidian\\obsidian\\40_VSCode\\Gravio"));
+const requestedVaultRoot = process.env.GRAVIO_OBSIDIAN_VAULT_ROOT || EXPECTED_VAULT_ROOT;
+const VAULT_ROOT = normalize(resolve(requestedVaultRoot));
+
+// Fail closed if the runtime root ever drifts away from the VSCode vault.
+if (VAULT_ROOT !== EXPECTED_VAULT_ROOT || /40_Projects/i.test(VAULT_ROOT)) {
+  throw new Error(
+    `Unsafe VAULT_ROOT '${VAULT_ROOT}'. Expected '${EXPECTED_VAULT_ROOT}' under 40_VSCode.`
+  );
+}
 
 // ── MCP protocol helpers ────────────────────────────────────────────────────
 function send(obj) {

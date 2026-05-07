@@ -10,6 +10,87 @@
 
 const $ = (id) => document.getElementById(id);
 
+// ─── E2EE Decryption (Web Crypto API) ───
+/** Derive key from API key using Web Crypto API (PBKDF2-SHA256). */
+async function deriveKeyForDecryption(apiKey, saltHex) {
+  const encoder = new TextEncoder();
+  const salt = new Uint8Array(saltHex.match(/.{1,2}/g).map((b) => parseInt(b, 16)));
+  const keyMaterial = await window.crypto.subtle.importKey(
+    "raw",
+    encoder.encode(apiKey),
+    "PBKDF2",
+    false,
+    ["deriveBits"]
+  );
+  const keyBits = await window.crypto.subtle.deriveBits(
+    { name: "PBKDF2", hash: "SHA-256", salt, iterations: 210000 },
+    keyMaterial,
+    256
+  );
+  return await window.crypto.subtle.importKey("raw", keyBits, "AES-GCM", false, ["decrypt"]);
+}
+
+/** Decrypt AES-256-GCM ciphertext. Expects: IV (12) + tag (16) + ciphertext (var). */
+async function decryptAES256GCM(keyOrHex, combinedBase64) {
+  try {
+    const combined = Uint8Array.from(atob(combinedBase64), (c) => c.charCodeAt(0));
+    if (combined.length < 12 + 16) throw new Error("Payload too short");
+    const iv = combined.subarray(0, 12);
+    const tag = combined.subarray(12, 28);
+    const ciphertext = combined.subarray(28);
+
+    let key = keyOrHex;
+    // If string (64-char hex), convert to CryptoKey
+    if (typeof keyOrHex === "string") {
+      const keyBuf = new Uint8Array(keyOrHex.match(/.{1,2}/g).map((b) => parseInt(b, 16)));
+      key = await window.crypto.subtle.importKey("raw", keyBuf, "AES-GCM", false, ["decrypt"]);
+    }
+
+    const decrypted = await window.crypto.subtle.decrypt(
+      { name: "AES-GCM", iv, tagLength: 128 },
+      key,
+      Buffer.concat([ciphertext, tag])
+    );
+    return new TextDecoder().decode(decrypted);
+  } catch (err) {
+    throw new Error(`Decryption failed: ${err.message}`);
+  }
+}
+
+/** Try to decrypt run envelope with saved E2EE keys. */
+async function tryDecryptRun(envelope) {
+  if (!envelope?.ciphertext || !envelope?.keyMode) return null;
+
+  try {
+    const keys = getE2EEKeys();
+    for (const savedKey of keys) {
+      try {
+        let key = savedKey.key;
+        if (envelope.keyMode === "api-key" && envelope.kdf?.saltHex) {
+          key = await deriveKeyForDecryption(savedKey.key, envelope.kdf.saltHex);
+        }
+        const plaintext = await decryptAES256GCM(key, envelope.ciphertext);
+        return JSON.parse(plaintext);
+      } catch {
+        // Try next key
+      }
+    }
+  } catch (err) {
+    console.warn("E2EE decryption error:", err);
+  }
+  return null;
+}
+
+function getE2EEKeys() {
+  try {
+    return Array.isArray(JSON.parse(localStorage.getItem("gravio_e2ee_keys") || "[]"))
+      ? JSON.parse(localStorage.getItem("gravio_e2ee_keys") || "[]")
+      : [];
+  } catch {
+    return [];
+  }
+}
+
 const state = {
   user: null,
   projects: [],

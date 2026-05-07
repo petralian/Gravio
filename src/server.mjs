@@ -1298,6 +1298,169 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // ── API: GET /api/policy-packs — list custom dimension targets (Team-gated) ──
+  if (req.method === "GET" && req.url === "/api/policy-packs") {
+    const user = getAuthUser(req);
+    if (!user) {
+      res.writeHead(401, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Authentication required" }));
+      return;
+    }
+    if (user.plan !== "team") {
+      res.writeHead(403, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Policy packs are a Team feature" }));
+      return;
+    }
+    const uid = user.uid ?? user.id;
+    const packs = stmts.listPolicyPacksForUser.all(uid) ?? [];
+    const parsed = packs.map((p) => ({
+      id: p.id,
+      name: p.name,
+      targets: safeJsonParse(p.targets) ?? {},
+      createdAt: p.created_at,
+      updatedAt: p.updated_at,
+    }));
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify(parsed));
+    return;
+  }
+
+  // ── API: POST /api/policy-packs — create custom dimension targets (Team-gated) ──
+  if (req.method === "POST" && req.url === "/api/policy-packs") {
+    const user = getAuthUser(req);
+    if (!user) {
+      res.writeHead(401, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Authentication required" }));
+      return;
+    }
+    if (user.plan !== "team") {
+      res.writeHead(403, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Policy packs are a Team feature" }));
+      return;
+    }
+    try {
+      const { name, targets } = JSON.parse(await readBody(req));
+      if (!name || typeof name !== "string" || name.trim().length === 0) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "name is required" }));
+        return;
+      }
+      if (!targets || typeof targets !== "object" || Array.isArray(targets)) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "targets must be a JSON object mapping dimensions to numeric thresholds" }));
+        return;
+      }
+      const uid = user.uid ?? user.id;
+      const targetsJson = JSON.stringify(targets);
+      stmts.createPolicyPack.run(uid, name, targetsJson);
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ ok: true, name, targets }));
+    } catch (err) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: err.message }));
+    }
+    return;
+  }
+
+  // ── API: DELETE /api/policy-packs/:id — delete custom dimension targets (Team-gated) ──
+  const deletePolicyMatch = req.method === "DELETE" && /^\/api\/policy-packs\/(\d+)$/.exec(req.url);
+  if (deletePolicyMatch) {
+    const user = getAuthUser(req);
+    if (!user) {
+      res.writeHead(401, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Authentication required" }));
+      return;
+    }
+    if (user.plan !== "team") {
+      res.writeHead(403, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Policy packs are a Team feature" }));
+      return;
+    }
+    const packId = Number(deletePolicyMatch[1]);
+    const uid = user.uid ?? user.id;
+    const result = stmts.deletePolicyPack.run(packId, uid);
+    if (result.changes === 0) {
+      res.writeHead(404, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Policy pack not found or does not belong to you" }));
+      return;
+    }
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ ok: true }));
+    return;
+  }
+
+  // ── API: GET /api/projects/:id/benchmarks — peer percentile (Team-gated) ──
+  const benchmarkMatch = req.method === "GET" && /^\/api\/projects\/([^/?]+)\/benchmarks$/.exec(req.url);
+  if (benchmarkMatch) {
+    const user = getAuthUser(req);
+    if (!user) {
+      res.writeHead(401, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Authentication required" }));
+      return;
+    }
+    if (user.plan !== "team") {
+      res.writeHead(403, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Peer benchmarking is a Team feature" }));
+      return;
+    }
+    const projectId = decodeURIComponent(benchmarkMatch[1]);
+    if (!isValidProjectId(projectId)) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Invalid projectId" }));
+      return;
+    }
+    const uid = user.uid ?? user.id;
+
+    // Get latest score for this user's project
+    const latest = stmts.getLatestRun.get(projectId, uid);
+    if (!latest) {
+      res.writeHead(404, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "No scans found for this project" }));
+      return;
+    }
+    const latestData = safeJsonParse(latest.ciphertext);
+    const latestScore = Number(latestData?.summary?.overallScore ?? NaN);
+    if (!Number.isFinite(latestScore)) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Unable to determine score for this project" }));
+      return;
+    }
+
+    // Aggregate scores across all users: median, 25th percentile, 75th percentile, percentile rank
+    const allScores = db.prepare(`
+      SELECT r.ciphertext
+      FROM runs r
+      GROUP BY r.project_id, r.user_id
+      HAVING r.published_at = MAX(r.published_at)
+    `).all() ?? [];
+
+    const scores = [];
+    for (const row of allScores) {
+      const data = safeJsonParse(row.ciphertext);
+      const score = Number(data?.summary?.overallScore ?? NaN);
+      if (Number.isFinite(score)) scores.push(score);
+    }
+
+    scores.sort((a, b) => a - b);
+    const percentile = Math.round((scores.filter((s) => s <= latestScore).length / Math.max(scores.length, 1)) * 100);
+    const median = scores[Math.floor(scores.length / 2)] ?? null;
+    const p25 = scores[Math.floor(scores.length * 0.25)] ?? null;
+    const p75 = scores[Math.floor(scores.length * 0.75)] ?? null;
+
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({
+      projectScore: latestScore,
+      peerPercentile: percentile,
+      peerStats: {
+        count: scores.length,
+        median,
+        p25,
+        p75,
+      },
+    }));
+    return;
+  }
+
   // ── GET /auth/sso/providers ─────────────────────────────────────────────
   if (req.method === "GET" && pathOnly === "/auth/sso/providers") {
     res.writeHead(200, { "Content-Type": "application/json" });

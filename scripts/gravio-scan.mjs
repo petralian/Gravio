@@ -50,6 +50,7 @@ function parseArgs(argv) {
     key: null,
     passphrase: null,
     salt: null,
+    encrypt: false,     // --encrypt — enable client-side E2EE before publishing
     noUpdate: false,
     setupVerbose: false,
     help: false,
@@ -136,6 +137,10 @@ function parseArgs(argv) {
     }
     if (token === "--help" || token === "-h") {
       args.help = true;
+      continue;
+    }
+    if (token === "--encrypt") {
+      args.encrypt = true;
       continue;
     }
   }

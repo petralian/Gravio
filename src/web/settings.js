@@ -531,6 +531,83 @@ async function onPasswordSave() {
   }
 }
 
+// ─── E2EE key management ───
+
+function getE2EEKeys() {
+  const raw = localStorage.getItem("gravio_e2ee_keys");
+  try {
+    return Array.isArray(JSON.parse(raw ?? "[]")) ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveE2EEKeys(keys) {
+  localStorage.setItem("gravio_e2ee_keys", JSON.stringify(keys));
+}
+
+function renderE2EEKeys() {
+  const keys = getE2EEKeys();
+  const list = $("st-e2ee-keys-list");
+  if (!list) return;
+
+  if (keys.length === 0) {
+    list.innerHTML = '<p style="color:var(--text-3);font-size:12px">No saved keys yet.</p>';
+    return;
+  }
+
+  list.innerHTML = keys.map((k, i) => `
+    <div class="st-e2ee-key-item">
+      <span>${esc(k.label || `Key ${i + 1}`)}</span>
+      <button class="m-btn m-btn-sm m-btn-outline" data-e2ee-delete="${i}" type="button">Delete</button>
+    </div>
+  `).join("");
+
+  list.addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-e2ee-delete]");
+    if (!btn) return;
+    const idx = Number(btn.dataset.e2eeDelete);
+    keys.splice(idx, 1);
+    saveE2EEKeys(keys);
+    renderE2EEKeys();
+  });
+}
+
+function onSaveE2EEKey() {
+  const keyInput = $("st-e2ee-key-input");
+  const labelInput = $("st-e2ee-key-label");
+  const errorEl = $("st-e2ee-key-error");
+  const successEl = $("st-e2ee-key-success");
+  const key = (keyInput?.value ?? "").trim();
+  const label = (labelInput?.value ?? "").trim();
+
+  errorEl?.setAttribute("hidden", "");
+  successEl?.setAttribute("hidden", "");
+
+  if (!key) {
+    errorEl?.removeAttribute("hidden");
+    errorEl && (errorEl.textContent = "Decryption key is required.");
+    return;
+  }
+
+  if (!/^[0-9a-fA-F]{64}$/.test(key) && !key.startsWith("gv_")) {
+    errorEl?.removeAttribute("hidden");
+    errorEl && (errorEl.textContent = "Key must be 64-char hex or start with gv_");
+    return;
+  }
+
+  const keys = getE2EEKeys();
+  keys.push({ label: label || "Saved key", key, savedAt: new Date().toISOString() });
+  saveE2EEKeys(keys);
+
+  keyInput && (keyInput.value = "");
+  labelInput && (labelInput.value = "");
+  successEl?.removeAttribute("hidden");
+  successEl && (successEl.textContent = "Key saved securely in browser localStorage.");
+  setTimeout(() => successEl?.setAttribute("hidden", ""), 3000);
+  renderE2EEKeys();
+}
+
 // ─── Init ───
 
 async function init() {
@@ -544,6 +621,7 @@ async function init() {
 
     if (user.plan === "team" || user.role === "admin") {
       $("st-e2ee-section")?.removeAttribute("hidden");
+      renderE2EEKeys();
     }
 
     // Hide current-password field for SSO-only users
@@ -562,6 +640,7 @@ async function init() {
     $("st-cancel-no")?.addEventListener("click", onCancelNo);
     $("st-billing-resume")?.addEventListener("click", onResumePlan);
     $("st-seats-save")?.addEventListener("click", onAdjustSeats);
+    $("st-e2ee-save-key")?.addEventListener("click", onSaveE2EEKey);
 
     $("st-copy-key")?.addEventListener("click", async () => {
       const val = $("st-new-key-value").textContent;

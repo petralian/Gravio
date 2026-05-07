@@ -14,6 +14,8 @@ The Gravio repo ships a lightweight MCP (Model Context Protocol) server at `scri
 
 All three tools are sandboxed to `C:\Obsidian\obsidian\40_VSCode\Gravio\` — paths that escape the vault root are rejected.
 
+The server is fail-closed: startup aborts if `GRAVIO_OBSIDIAN_VAULT_ROOT` is set to anything other than `C:\Obsidian\obsidian\40_VSCode\Gravio` (or if a path includes `40_Projects`).
+
 ---
 
 ## Claude Desktop configuration
