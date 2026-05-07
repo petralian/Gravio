@@ -493,6 +493,14 @@ export const stmts = {
      ORDER BY scanned_at DESC
      LIMIT 60`,
   ),
+  getScoreHistoryChart: db.prepare(
+    `SELECT scanned_at, overall_score, dimension_scores, git_commit
+     FROM scan_history
+     WHERE user_id=? AND project_id=?
+       AND overall_score IS NOT NULL
+     ORDER BY scanned_at ASC
+     LIMIT 60`,
+  ),
   listScanContextsForProject: db.prepare(
     `SELECT scan_id, context_note, action_items, updated_at
      FROM scan_contexts

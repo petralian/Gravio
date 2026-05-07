@@ -2701,6 +2701,62 @@ button#evaluate-btn:hover {
   line-height: 1.6;
 }
 
+/* ── Score trend chart ── */
+.db-ov-chart-wrap {
+  margin: 0 0 24px;
+}
+.db-chart-svg-wrap {
+  width: 100%;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: rgba(255,255,255,0.02);
+  padding: 4px 8px 0;
+}
+.db-chart-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.db-chart-grid {
+  stroke: var(--border);
+  stroke-width: 1;
+}
+.db-chart-fill {
+  fill: rgba(0, 255, 136, 0.07);
+}
+.db-chart-line {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.db-chart-dot {
+  fill: var(--accent);
+  cursor: pointer;
+}
+.db-chart-dot:hover {
+  fill: #fff;
+  r: 5;
+}
+.db-chart-label {
+  font-size: 10px;
+  fill: var(--text-3);
+  font-family: var(--font-mono);
+}
+.db-chart-label-y {
+  text-anchor: end;
+}
+.db-chart-label-x {
+  text-anchor: middle;
+}
+.db-chart-empty {
+  font-size: 13px;
+  color: var(--text-3);
+  padding: 8px 0 16px;
+}
+
 /* ── Recommendations tab ── */
 .db-recs-list { list-style: none; display: flex; flex-direction: column; gap: 8px; }
 

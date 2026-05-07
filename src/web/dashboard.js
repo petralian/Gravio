@@ -816,6 +816,87 @@ async function mergeCurrentProject(destinationProjectId) {
   switchTab("runscans");
 }
 
+// ─── Score History Chart ─────────────────────────────────────────────────────
+
+async function loadAndRenderScoreChart(projectId) {
+  const el = $("db-ov-chart");
+  if (!el) return;
+  el.innerHTML = "";
+  try {
+    const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}/score-history`);
+    if (!res.ok) return;
+    const { history } = await res.json();
+    renderScoreChart(el, history);
+  } catch {
+    // Non-fatal: chart is enhancement only
+  }
+}
+
+function renderScoreChart(container, history) {
+  if (!Array.isArray(history) || history.length < 2) {
+    container.innerHTML = `<p class="db-chart-empty">Not enough scan history to display a trend chart. Run at least 2 scans.</p>`;
+    return;
+  }
+
+  const W = 640, H = 180, PAD = { top: 16, right: 20, bottom: 36, left: 40 };
+  const plotW = W - PAD.left - PAD.right;
+  const plotH = H - PAD.top - PAD.bottom;
+
+  const scores = history.map((r) => Number(r.overallScore));
+  const minScore = Math.max(0, Math.min(...scores) - 5);
+  const maxScore = Math.min(100, Math.max(...scores) + 5);
+  const yRange = maxScore - minScore || 10;
+
+  const xScale = (i) => PAD.left + (i / (history.length - 1)) * plotW;
+  const yScale = (v) => PAD.top + plotH - ((v - minScore) / yRange) * plotH;
+
+  const gridVals = [25, 50, 75, 100].filter((v) => v >= minScore - 5 && v <= maxScore + 5);
+
+  const gridLines = gridVals.map((v) => {
+    const y = yScale(v);
+    return `<line x1="${PAD.left}" y1="${y.toFixed(1)}" x2="${W - PAD.right}" y2="${y.toFixed(1)}" class="db-chart-grid"/>
+            <text x="${PAD.left - 6}" y="${(y + 4).toFixed(1)}" class="db-chart-label db-chart-label-y">${v}</text>`;
+  }).join("");
+
+  const points = history.map((r, i) => `${xScale(i).toFixed(1)},${yScale(Number(r.overallScore)).toFixed(1)}`).join(" ");
+
+  const firstX = xScale(0).toFixed(1), lastX = xScale(history.length - 1).toFixed(1);
+  const bottomY = (PAD.top + plotH).toFixed(1);
+  const fillPoints = `${firstX},${bottomY} ${points} ${lastX},${bottomY}`;
+
+  const labelIdxs = history.length <= 6
+    ? history.map((_, i) => i)
+    : [0, ...Array.from({ length: 4 }, (_, k) => Math.round((k + 1) * (history.length - 1) / 5)), history.length - 1];
+  const uniqueLabelIdxs = [...new Set(labelIdxs)];
+
+  const xLabels = uniqueLabelIdxs.map((i) => {
+    const d = new Date(history[i].scannedAt);
+    const label = Number.isNaN(d.valueOf()) ? "" : `${d.getMonth() + 1}/${d.getDate()}`;
+    return `<text x="${xScale(i).toFixed(1)}" y="${(H - 8).toFixed(1)}" class="db-chart-label db-chart-label-x">${label}</text>`;
+  }).join("");
+
+  const circles = history.map((r, i) => {
+    const cx = xScale(i).toFixed(1), cy = yScale(Number(r.overallScore)).toFixed(1);
+    const d = new Date(r.scannedAt);
+    const dateStr = Number.isNaN(d.valueOf()) ? "" : d.toLocaleDateString();
+    const commit = r.gitCommit;
+    const tip = `Score: ${Math.round(r.overallScore)}${commit ? " · " + commit.slice(0, 7) : ""} · ${dateStr}`;
+    return `<circle cx="${cx}" cy="${cy}" r="4" class="db-chart-dot"><title>${esc(tip)}</title></circle>`;
+  }).join("");
+
+  container.innerHTML = `
+    <p class="db-subtitle" style="margin-bottom:8px">Score trend</p>
+    <div class="db-chart-svg-wrap">
+      <svg viewBox="0 0 ${W} ${H}" class="db-chart-svg" role="img" aria-label="Score history chart">
+        ${gridLines}
+        <polygon points="${fillPoints}" class="db-chart-fill"/>
+        <polyline points="${points}" class="db-chart-line"/>
+        ${circles}
+        ${xLabels}
+      </svg>
+    </div>`;
+}
+
 function renderWorkspaceRecs(scans) {
   const recList = $("db-recs-list");
   const latest = scans[0];
@@ -1010,7 +1091,7 @@ async function openProject(projectId) {
   const payload = await res.json();
   renderWorkspace(projectId, payload);
   setProjectInUrl(projectId);
-}
+  loadAndRenderScoreChart(projectId);
 
 async function deleteSelectedScans() {
   clearError(elWsError);

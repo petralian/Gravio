@@ -1792,6 +1792,40 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // ── API: GET /api/projects/:id/score-history ────────────────────────────
+  const scoreHistoryMatch = req.method === "GET" && /^\/api\/projects\/([^/?]+)\/score-history$/.exec(req.url);
+  if (scoreHistoryMatch) {
+    const user = getAuthUser(req);
+    if (!user) {
+      res.writeHead(401, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Not authenticated" }));
+      return;
+    }
+    const projectId = decodeURIComponent(scoreHistoryMatch[1]);
+    if (!isValidProjectId(projectId)) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Invalid projectId" }));
+      return;
+    }
+    const uid = user.uid ?? user.id;
+    const rows = stmts.getScoreHistoryChart.all(uid, projectId);
+    const history = rows.map((row) => {
+      let dimScores = null;
+      if (row.dimension_scores) {
+        try { dimScores = JSON.parse(row.dimension_scores); } catch { /* ignore */ }
+      }
+      return {
+        scannedAt: row.scanned_at,
+        overallScore: row.overall_score,
+        dimensionScores: dimScores,
+        gitCommit: row.git_commit ?? null,
+      };
+    });
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ history }));
+    return;
+  }
+
   // ── API: POST /api/projects/rename ─────────────────────────────────────
   if (req.method === "POST" && req.url === "/api/projects/rename") {
     const user = getAuthUser(req);
