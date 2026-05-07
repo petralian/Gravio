@@ -87,6 +87,8 @@ Every chat session **must** follow this loop — no exceptions:
 
 **Vault path for session notes:** `Operations/Sessions/`
 **Vault path for feature notes:** `Features/`
+**Vault path for architecture notes:** `Architecture/` — `Tech Stack.md`, `Database Schema.md`, `API Routes.md`, `Security Model.md`
+**Master methodology note:** `Meta/AI Agent Methodology.md` — read this at session start if unsure about the system.
 **Never skip this loop.** If the Obsidian MCP tool is unavailable, log a warning and continue, but retry at session end.
 
 ---
