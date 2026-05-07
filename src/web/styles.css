@@ -729,6 +729,7 @@ body.marketing {
   flex-wrap: wrap;
 }
 .m-footer-copy { font-size: 13px; color: var(--text-3); }
+.m-footer-links { display: flex; align-items: center; gap: 20px; }
 .m-footer-link { font-size: 13px; color: var(--text-3); transition: color 0.14s; }
 .m-footer-link:hover { color: var(--neon-cyan); }
 
