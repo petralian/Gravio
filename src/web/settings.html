@@ -67,13 +67,33 @@
         </div>
         <div class="db-form-card">
           <div class="st-billing-grid">
-            <div class="st-billing-item"><span class="st-billing-k">Plan</span><span class="st-billing-v" id="st-billing-plan">free</span></div>
-            <div class="st-billing-item"><span class="st-billing-k">Status</span><span class="st-billing-v" id="st-billing-status">none</span></div>
+            <div class="st-billing-item"><span class="st-billing-k">Plan</span><span class="st-billing-v" id="st-billing-plan"></span></div>
+            <div class="st-billing-item"><span class="st-billing-k">Status</span><span class="st-billing-v" id="st-billing-status"></span></div>
             <div class="st-billing-item"><span class="st-billing-k">Seats</span><span class="st-billing-v" id="st-billing-seats">1</span></div>
-            <div class="st-billing-item"><span class="st-billing-k">Renews</span><span class="st-billing-v" id="st-billing-renews">-</span></div>
+            <div class="st-billing-item"><span class="st-billing-k">Renews</span><span class="st-billing-v" id="st-billing-renews" title="">-</span></div>
+          </div>
+          <p class="st-billing-cancel-warn" id="st-billing-cancel-warn" hidden>
+            Subscription set to cancel at end of current billing period.
+          </p>
+          <div class="st-seats-adjuster" id="st-seats-adjuster" hidden>
+            <label class="st-billing-k" for="st-seats-input">Adjust seats (2–10)</label>
+            <div class="st-seats-row">
+              <input type="number" id="st-seats-input" min="2" max="10" class="st-seats-input" />
+              <button class="m-btn m-btn-outline m-btn-sm" id="st-seats-save" type="button">Update seats</button>
+            </div>
+            <p class="db-error" id="st-seats-error" hidden></p>
           </div>
           <div class="st-billing-actions">
-            <a class="m-btn m-btn-outline" id="st-billing-manage" href="https://app.lemonsqueezy.com/my-orders" target="_blank" rel="noopener noreferrer">Manage billing</a>
+            <a class="m-btn m-btn-outline" id="st-billing-manage" href="https://app.lemonsqueezy.com/my-orders" target="_blank" rel="noopener noreferrer">Customer portal</a>
+            <button class="m-btn m-btn-outline st-btn-resume" id="st-billing-resume" type="button" hidden>Resume plan</button>
+            <button class="m-btn m-btn-outline st-btn-cancel" id="st-billing-cancel" type="button" hidden>Cancel plan</button>
+          </div>
+          <div class="st-cancel-confirm" id="st-cancel-confirm" hidden>
+            <span>Cancel your subscription? You'll keep access until the billing period ends.</span>
+            <div class="st-cancel-confirm-btns">
+              <button class="m-btn m-btn-sm st-btn-cancel-yes" id="st-cancel-yes" type="button">Yes, cancel</button>
+              <button class="m-btn m-btn-outline m-btn-sm" id="st-cancel-no" type="button">Keep plan</button>
+            </div>
           </div>
           <p class="db-error" id="st-billing-error" hidden></p>
         </div>

@@ -50,7 +50,64 @@ function fmtDate(iso) {
   if (!iso) return "-";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "-";
-  return d.toLocaleString([], { dateStyle: "medium", timeStyle: "short" });
+  return d.toLocaleDateString([], { dateStyle: "medium" });
+}
+
+function planBadgeHtml(plan) {
+  const p = String(plan ?? "free").toLowerCase();
+  return `<span class="st-plan-badge st-plan-${p}">${p.toUpperCase()}</span>`;
+}
+
+function statusPillHtml(status) {
+  const s = String(status ?? "none").toLowerCase();
+  const label = s === "none" ? "No subscription" : s.replace(/_/g, " ");
+  return `<span class="st-status-pill st-status-${s}">${label}</span>`;
+}
+
+function renderBillingCard(data) {
+  const plan      = String(data.plan ?? "free").toLowerCase();
+  const status    = String(data.status ?? "none").toLowerCase();
+  const cancelled = Boolean(data.cancelled);
+
+  $("st-billing-plan").innerHTML     = planBadgeHtml(plan);
+  $("st-billing-status").innerHTML   = statusPillHtml(status);
+  $("st-billing-seats").textContent  = String(data.seats ?? 1);
+
+  const renewEl = $("st-billing-renews");
+  renewEl.textContent   = fmtDate(data.renewsAt);
+  renewEl.title         = data.renewsAt ?? "";
+
+  // Cancels-at-period-end warning
+  const warnEl = $("st-billing-cancel-warn");
+  if (cancelled && status === "active") {
+    warnEl.removeAttribute("hidden");
+  } else {
+    warnEl.setAttribute("hidden", "");
+  }
+
+  // Portal link
+  const manage = $("st-billing-manage");
+  if (manage && data.portalUrl) {
+    manage.setAttribute("href", data.portalUrl);
+  }
+
+  // Seats adjuster (team plan only, active subscription)
+  const seatsAdj = $("st-seats-adjuster");
+  if (plan === "team" && status === "active") {
+    seatsAdj.removeAttribute("hidden");
+    $("st-seats-input").value = String(data.seats ?? 2);
+  } else {
+    seatsAdj.setAttribute("hidden", "");
+  }
+
+  // Cancel / Resume buttons
+  const canCancel = status === "active" && !cancelled;
+  const canResume = status === "active" && cancelled;
+  $("st-billing-cancel").toggleAttribute("hidden", !canCancel);
+  $("st-billing-resume").toggleAttribute("hidden", !canResume);
+
+  // Always hide the confirm bar on re-render
+  $("st-cancel-confirm").setAttribute("hidden", "");
 }
 
 async function loadBillingStatus() {
@@ -61,15 +118,103 @@ async function loadBillingStatus() {
     showBillingError(data.error ?? "Failed to load billing status.");
     return;
   }
+  renderBillingCard(data);
+}
 
-  $("st-billing-plan").textContent = String(data.plan ?? "free").toUpperCase();
-  $("st-billing-status").textContent = String(data.status ?? "none");
-  $("st-billing-seats").textContent = String(data.seats ?? 1);
-  $("st-billing-renews").textContent = fmtDate(data.renewsAt);
+// ─── Billing actions ───
 
-  const manage = $("st-billing-manage");
-  if (manage && data.portalUrl) {
-    manage.setAttribute("href", data.portalUrl);
+function onCancelClick() {
+  // Two-step: first click shows confirmation bar, hides cancel button
+  $("st-billing-cancel").setAttribute("hidden", "");
+  $("st-cancel-confirm").removeAttribute("hidden");
+}
+
+function onCancelNo() {
+  $("st-cancel-confirm").setAttribute("hidden", "");
+  $("st-billing-cancel").removeAttribute("hidden");
+}
+
+async function onCancelYes() {
+  const btn = $("st-cancel-yes");
+  btn.disabled = true;
+  btn.textContent = "Cancelling…";
+  clearBillingError();
+  try {
+    const res  = await fetch("/api/billing/cancel", { method: "POST" });
+    const data = await res.json();
+    if (!res.ok) {
+      showBillingError(data.error ?? "Failed to cancel subscription.");
+      $("st-cancel-confirm").setAttribute("hidden", "");
+      $("st-billing-cancel").removeAttribute("hidden");
+      return;
+    }
+    await loadBillingStatus();
+  } catch {
+    showBillingError("Network error — please try again.");
+    $("st-cancel-confirm").setAttribute("hidden", "");
+    $("st-billing-cancel").removeAttribute("hidden");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Yes, cancel";
+  }
+}
+
+async function onResumePlan() {
+  const btn = $("st-billing-resume");
+  btn.disabled = true;
+  btn.textContent = "Resuming…";
+  clearBillingError();
+  try {
+    const res  = await fetch("/api/billing/resume", { method: "POST" });
+    const data = await res.json();
+    if (!res.ok) {
+      showBillingError(data.error ?? "Failed to resume subscription.");
+      return;
+    }
+    await loadBillingStatus();
+  } catch {
+    showBillingError("Network error — please try again.");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Resume plan";
+  }
+}
+
+async function onAdjustSeats() {
+  const seatsEl  = $("st-seats-input");
+  const btn      = $("st-seats-save");
+  const errorEl  = $("st-seats-error");
+  const seats    = Number(seatsEl.value);
+  errorEl.setAttribute("hidden", "");
+
+  if (!Number.isInteger(seats) || seats < 2 || seats > 10) {
+    errorEl.textContent = "Seats must be between 2 and 10.";
+    errorEl.removeAttribute("hidden");
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = "Updating…";
+  clearBillingError();
+  try {
+    const res  = await fetch("/api/billing/seats", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ seats }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      errorEl.textContent = data.error ?? "Failed to update seats.";
+      errorEl.removeAttribute("hidden");
+      return;
+    }
+    await loadBillingStatus();
+  } catch {
+    errorEl.textContent = "Network error — please try again.";
+    errorEl.removeAttribute("hidden");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Update seats";
   }
 }
 
@@ -304,6 +449,11 @@ async function init() {
     $("st-gen-key")?.addEventListener("click", onGenerateKey);
     $("st-keys-list")?.addEventListener("click", onRevokeKeyClick);
     $("st-pw-save")?.addEventListener("click", onPasswordSave);
+    $("st-billing-cancel")?.addEventListener("click", onCancelClick);
+    $("st-cancel-yes")?.addEventListener("click", onCancelYes);
+    $("st-cancel-no")?.addEventListener("click", onCancelNo);
+    $("st-billing-resume")?.addEventListener("click", onResumePlan);
+    $("st-seats-save")?.addEventListener("click", onAdjustSeats);
 
     $("st-copy-key")?.addEventListener("click", async () => {
       const val = $("st-new-key-value").textContent;
