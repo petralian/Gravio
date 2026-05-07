@@ -1095,6 +1095,7 @@ async function openProject(projectId) {
   renderWorkspace(projectId, payload);
   setProjectInUrl(projectId);
   loadAndRenderScoreChart(projectId);
+}
 
 async function deleteSelectedScans() {
   clearError(elWsError);
