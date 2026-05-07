@@ -757,6 +757,186 @@ function buildScanRecordsForExport(scans) {
   });
 }
 
+function htmlEsc(str) {
+  return String(str ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function buildManagerReportHtml(projectId, records, dateRange) {
+  const latest = records[0] ?? null;
+  const first  = records[records.length - 1] ?? null;
+  const latestScore = Number.isFinite(latest?.overallScore) ? latest.overallScore : null;
+  const firstScore  = Number.isFinite(first?.overallScore)  ? first.overallScore  : null;
+  const totalDelta  = latestScore !== null && firstScore !== null
+    ? Number((latestScore - firstScore).toFixed(2))
+    : null;
+
+  function scoreClass(score) {
+    if (!Number.isFinite(score)) return "";
+    if (score >= 80) return "score-high";
+    if (score >= 60) return "score-mid";
+    return "score-low";
+  }
+
+  function ratingBadge(rating) {
+    const map = {
+      Exemplary: "badge-exemplary",
+      Strong: "badge-strong",
+      Emerging: "badge-emerging",
+      Developing: "badge-developing",
+    };
+    const cls = map[rating] ?? "badge-unknown";
+    return `<span class="badge ${cls}">${htmlEsc(rating ?? "Unknown")}</span>`;
+  }
+
+  function deltaHtml(delta) {
+    if (!Number.isFinite(delta)) return "";
+    const cls = delta >= 0 ? "delta-pos" : "delta-neg";
+    return ` <span class="${cls}">${delta >= 0 ? "+" : ""}${delta}</span>`;
+  }
+
+  function progressBar(done, total) {
+    if (!Number.isFinite(total) || total === 0) return "";
+    const pct = Math.round((done / total) * 100);
+    return `<div class="progress-bar-wrap"><div class="progress-bar-fill" style="width:${pct}%"></div></div> ${done}/${total}`;
+  }
+
+  const timelineRows = records.map((row) => {
+    const score = Number.isFinite(row.overallScore) ? Math.round(row.overallScore) : "—";
+    const date  = row.publishedAt ? new Date(row.publishedAt).toLocaleDateString("en-GB", { year: "numeric", month: "short", day: "numeric" }) : "—";
+    return `<tr>
+      <td style="font-family:monospace;font-size:12px;color:#64748b">${htmlEsc(row.runId ?? "")}</td>
+      <td>${date}</td>
+      <td class="${scoreClass(row.overallScore)}" style="font-weight:700">${score}${deltaHtml(row.deltaFromPrevious)}</td>
+      <td>${ratingBadge(row.rating)}</td>
+      <td>${progressBar(row.checklistDone, row.checklistTotal)}</td>
+    </tr>`;
+  }).join("\n");
+
+  const detailCards = records.map((row) => {
+    const score = Number.isFinite(row.overallScore) ? Math.round(row.overallScore) : "—";
+    const date  = row.publishedAt ? new Date(row.publishedAt).toLocaleString() : "—";
+    const note  = row.context?.note ?? "";
+    const actions = Array.isArray(row.context?.actions) ? row.context.actions.filter(Boolean) : [];
+    return `<div class="scan-card">
+      <div class="scan-card-header">
+        <span class="scan-card-score ${scoreClass(row.overallScore)}">${score}</span>
+        ${ratingBadge(row.rating)}
+        <span class="scan-card-run">${htmlEsc(row.runId ?? "")}</span>
+        <span class="scan-card-date">${date}</span>
+      </div>
+      ${row.checklistTotal ? `<p style="font-size:12px;color:#64748b;margin-bottom:6px">Ready checklist: ${progressBar(row.checklistDone, row.checklistTotal)}</p>` : ""}
+      ${note ? `<div class="context-note">${htmlEsc(note)}</div>` : ""}
+      ${actions.length ? `<ul class="action-list">${actions.map((a) => `<li>${htmlEsc(a)}</li>`).join("")}</ul>` : ""}
+    </div>`;
+  }).join("\n");
+
+  const generatedDate = new Date().toLocaleString();
+  const dateRangeNote = dateRange ? ` · Date range: ${htmlEsc(dateRange)}` : "";
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Gravio Improvement Report — ${htmlEsc(projectId)}</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#111;background:#fff;padding:48px;max-width:920px;margin:0 auto;line-height:1.5}
+@media print{body{padding:0}.no-print{display:none!important}h2{page-break-before:auto}.scan-card{page-break-inside:avoid}}
+h1{font-size:26px;font-weight:700;color:#0f172a;margin-bottom:4px}
+h2{font-size:16px;font-weight:600;margin:32px 0 12px;color:#0f172a;border-bottom:2px solid #e2e8f0;padding-bottom:8px;text-transform:uppercase;letter-spacing:.04em}
+.meta{font-size:13px;color:#64748b;margin-top:4px}
+.print-hint{background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;padding:12px 16px;margin-bottom:28px;font-size:13px;color:#1e40af}
+.print-hint strong{display:block;font-weight:600;margin-bottom:2px}
+.summary-cards{display:flex;gap:16px;flex-wrap:wrap;margin:24px 0}
+.summary-card{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:20px 24px;flex:1;min-width:140px}
+.summary-card-label{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#64748b;margin-bottom:8px}
+.summary-card-value{font-size:30px;font-weight:700;line-height:1}
+.summary-card-sub{font-size:12px;color:#94a3b8;margin-top:4px}
+.score-high{color:#16a34a}.score-mid{color:#d97706}.score-low{color:#dc2626}
+.badge{display:inline-block;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap}
+.badge-exemplary{background:#dcfce7;color:#166534}
+.badge-strong{background:#dbeafe;color:#1e40af}
+.badge-emerging{background:#fef9c3;color:#92400e}
+.badge-developing{background:#ffe4e6;color:#9f1239}
+.badge-unknown{background:#f1f5f9;color:#475569}
+table{width:100%;border-collapse:collapse;font-size:13px;margin:8px 0}
+th{text-align:left;padding:8px 12px;background:#f8fafc;border-bottom:2px solid #e2e8f0;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#64748b;white-space:nowrap}
+td{padding:10px 12px;border-bottom:1px solid #f1f5f9;vertical-align:middle}
+tr:last-child td{border-bottom:none}
+.progress-bar-wrap{background:#e2e8f0;border-radius:4px;height:8px;width:80px;display:inline-block;vertical-align:middle;overflow:hidden}
+.progress-bar-fill{height:8px;border-radius:4px;background:#2563eb}
+.scan-card{border:1px solid #e2e8f0;border-radius:8px;padding:16px 20px;margin-bottom:12px}
+.scan-card-header{display:flex;align-items:center;gap:12px;margin-bottom:8px;flex-wrap:wrap}
+.scan-card-run{font-family:monospace;font-size:12px;color:#64748b}
+.scan-card-date{font-size:12px;color:#94a3b8;margin-left:auto}
+.scan-card-score{font-size:24px;font-weight:700;line-height:1}
+.context-note{font-size:13px;color:#334155;background:#f8fafc;border-left:3px solid #94a3b8;padding:8px 12px;border-radius:0 4px 4px 0;margin:8px 0}
+.action-list{list-style:none;padding:0;margin:4px 0}
+.action-list li{font-size:13px;padding:2px 0 2px 20px;position:relative;color:#334155}
+.action-list li::before{content:"✓";position:absolute;left:0;color:#16a34a;font-weight:600}
+.delta-pos{color:#16a34a;font-weight:600;font-size:12px}
+.delta-neg{color:#dc2626;font-weight:600;font-size:12px}
+.footer{margin-top:48px;font-size:11px;color:#94a3b8;border-top:1px solid #e2e8f0;padding-top:16px;display:flex;justify-content:space-between}
+</style>
+</head>
+<body>
+<div class="no-print print-hint">
+  <strong>To save as PDF:</strong> Use File → Print (Ctrl+P / Cmd+P) → select "Save as PDF" as the destination.
+</div>
+<h1>Gravio Improvement Report</h1>
+<p class="meta">Project: <strong>${htmlEsc(projectId)}</strong>${dateRangeNote} · Generated: ${generatedDate} · ${records.length} scan${records.length !== 1 ? "s" : ""}</p>
+
+<div class="summary-cards">
+  <div class="summary-card">
+    <div class="summary-card-label">Latest score</div>
+    <div class="summary-card-value ${scoreClass(latestScore)}">${latestScore !== null ? Math.round(latestScore) : "—"}</div>
+    <div class="summary-card-sub">${latest ? ratingBadge(latest.rating) : ""}</div>
+  </div>
+  <div class="summary-card">
+    <div class="summary-card-label">Score change</div>
+    <div class="summary-card-value ${totalDelta !== null ? (totalDelta >= 0 ? "score-high" : "score-low") : ""}">${totalDelta !== null ? (totalDelta >= 0 ? "+" : "") + totalDelta : "—"}</div>
+    <div class="summary-card-sub">first → latest</div>
+  </div>
+  <div class="summary-card">
+    <div class="summary-card-label">Total scans</div>
+    <div class="summary-card-value">${records.length}</div>
+    <div class="summary-card-sub">${first?.publishedAt ? "since " + new Date(first.publishedAt).toLocaleDateString("en-GB", { year: "numeric", month: "short" }) : ""}</div>
+  </div>
+  ${(() => {
+    const total = records.reduce((s, r) => s + (r.checklistTotal ?? 0), 0);
+    const done  = records.reduce((s, r) => s + (r.checklistDone  ?? 0), 0);
+    if (!total) return "";
+    const pct = Math.round((done / total) * 100);
+    return `<div class="summary-card">
+      <div class="summary-card-label">Checklist (all scans)</div>
+      <div class="summary-card-value">${pct}%</div>
+      <div class="summary-card-sub">${done}/${total} items complete</div>
+    </div>`;
+  })()}
+</div>
+
+<h2>Scan timeline</h2>
+<table>
+  <thead><tr><th>Run</th><th>Published</th><th>Score</th><th>Rating</th><th>Checklist</th></tr></thead>
+  <tbody>${timelineRows}</tbody>
+</table>
+
+<h2>Scan details &amp; context</h2>
+${detailCards || "<p style=\"color:#64748b;font-size:13px\">No scans in this date range.</p>"}
+
+<div class="footer">
+  <span>Generated by <strong>Gravio</strong> &mdash; <a href="https://gravio.dev" style="color:#2563eb">gravio.dev</a></span>
+  <span>${generatedDate}</span>
+</div>
+</body>
+</html>`;
+}
+
 /**
  * Compute streak data from scan_history rows (ordered by scanned_at DESC).
  * Streak = consecutive ISO calendar weeks with at least one scan.
@@ -2031,9 +2211,24 @@ const server = http.createServer(async (req, res) => {
       };
     });
 
-    const records = buildScanRecordsForExport(scans);
     const requestUrl = new URL(req.url, "http://localhost");
     const format = String(requestUrl.searchParams.get("format") ?? "json").toLowerCase();
+
+    // Date-range filter
+    const dateRx = /^\d{4}-\d{2}-\d{2}$/;
+    const fromParam = requestUrl.searchParams.get("from");
+    const toParam   = requestUrl.searchParams.get("to");
+    const fromDate  = fromParam && dateRx.test(fromParam) ? new Date(fromParam + "T00:00:00Z") : null;
+    const toDate    = toParam   && dateRx.test(toParam)   ? new Date(toParam   + "T23:59:59Z") : null;
+    const filtered  = (fromDate || toDate) ? scans.filter((s) => {
+      if (!s.publishedAt) return true;
+      const dt = new Date(s.publishedAt);
+      if (fromDate && dt < fromDate) return false;
+      if (toDate   && dt > toDate)   return false;
+      return true;
+    }) : scans;
+
+    const records = buildScanRecordsForExport(filtered);
 
     if (format === "csv" || req.url.includes(".csv")) {
       const csv = buildScansCsv(projectId, records);
@@ -2100,9 +2295,24 @@ const server = http.createServer(async (req, res) => {
       };
     });
 
-    const records = buildScanRecordsForExport(scans);
     const requestUrl = new URL(req.url, "http://localhost");
     const format = String(requestUrl.searchParams.get("format") ?? "md").toLowerCase();
+
+    // Date-range filter
+    const dateRx2 = /^\d{4}-\d{2}-\d{2}$/;
+    const fromParam2 = requestUrl.searchParams.get("from");
+    const toParam2   = requestUrl.searchParams.get("to");
+    const fromDate2  = fromParam2 && dateRx2.test(fromParam2) ? new Date(fromParam2 + "T00:00:00Z") : null;
+    const toDate2    = toParam2   && dateRx2.test(toParam2)   ? new Date(toParam2   + "T23:59:59Z") : null;
+    const filtered2  = (fromDate2 || toDate2) ? scans.filter((s) => {
+      if (!s.publishedAt) return true;
+      const dt = new Date(s.publishedAt);
+      if (fromDate2 && dt < fromDate2) return false;
+      if (toDate2   && dt > toDate2)   return false;
+      return true;
+    }) : scans;
+
+    const records = buildScanRecordsForExport(filtered2);
 
     if (format === "json") {
       res.writeHead(200, { "Content-Type": "application/json" });
@@ -2118,6 +2328,20 @@ const server = http.createServer(async (req, res) => {
           scans: records,
         },
       }));
+      return;
+    }
+
+    if (format === "html") {
+      const dateRange = fromParam2 || toParam2
+        ? `${fromParam2 ?? "start"} → ${toParam2 ?? "now"}`
+        : null;
+      const html = buildManagerReportHtml(projectId, records, dateRange);
+      const fileName = `gravio-report-${projectId}.html`;
+      res.writeHead(200, {
+        "Content-Type": "text/html; charset=utf-8",
+        "Content-Disposition": `attachment; filename=\"${fileName}\"`,
+      });
+      res.end(html);
       return;
     }
 

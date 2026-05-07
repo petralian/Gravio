@@ -19,6 +19,8 @@ const state = {
   currentScans: [],
   selectedScanId: null,
   compareScanId: null,
+  filterFrom: "",
+  filterTo: "",
   searchQuery: "",
   sortMode: "recent",
   cliToken: null,
@@ -34,8 +36,12 @@ const elDeleteSelected = $("db-delete-selected");
 const elDeleteConfirm  = $("db-delete-confirm");
 const elConfirmDelete  = $("db-confirm-delete");
 const elCancelDelete   = $("db-cancel-delete");
-const elExportScans    = $("db-export-scans");
-const elExportReport   = $("db-export-report");
+const elExportScans       = $("db-export-scans");
+const elExportReport      = $("db-export-report");
+const elExportReportHtml  = $("db-export-report-html");
+const elFilterFrom        = $("db-filter-from");
+const elFilterTo          = $("db-filter-to");
+const elFilterClear       = $("db-filter-clear");
 const elScanDetail     = $("db-scan-detail");
 const elScanDetailTitle = $("db-scan-detail-title");
 const elScanDetailMeta = $("db-scan-detail-meta");
@@ -521,17 +527,35 @@ function renderWorkspace(projectId, payload) {
   showView("workspace");
 }
 
+function getFilteredScans() {
+  const from = state.filterFrom ? new Date(state.filterFrom + "T00:00:00Z") : null;
+  const to   = state.filterTo   ? new Date(state.filterTo   + "T23:59:59Z") : null;
+  if (!from && !to) return state.currentScans;
+  return state.currentScans.filter((s) => {
+    if (!s.publishedAt) return true;
+    const dt = new Date(s.publishedAt);
+    if (from && dt < from) return false;
+    if (to   && dt > to)   return false;
+    return true;
+  });
+}
+
 function renderWorkspaceScans(scans) {
   state.selectedScanIds.clear();
   elDeleteConfirm.setAttribute("hidden", "");
   elDeleteSelected.textContent = "Delete selected";
 
-  if (!scans.length) {
-    elScanRows.innerHTML = `<tr><td colspan="6" style="color:var(--text-3);padding:16px">No scans found.</td></tr>`;
+  // Apply date filter
+  const visible = scans === state.currentScans ? getFilteredScans() : scans;
+
+  if (!visible.length) {
+    elScanRows.innerHTML = `<tr><td colspan="6" style="color:var(--text-3);padding:16px">${
+      state.filterFrom || state.filterTo ? "No scans in selected date range." : "No scans found."
+    }</td></tr>`;
     return;
   }
 
-  elScanRows.innerHTML = scans.map((s) => `
+  elScanRows.innerHTML = visible.map((s) => `
     <tr class="${Number(s.id) === Number(state.selectedScanId) ? "db-scan-row-active" : ""}">
       <td><input type="checkbox" data-scan-id="${s.id}" /></td>
       <td style="font-family:var(--font-mono);font-size:12px">${esc(s.runId ?? "run")}</td>
@@ -1092,6 +1116,31 @@ function bindEvents() {
 
   elSaveScanContext.addEventListener("click", saveSelectedScanContext);
 
+  // ─── Date-range filter ──────────────────────────────────────────────────
+  function buildDateParams() {
+    const params = new URLSearchParams();
+    if (state.filterFrom) params.set("from", state.filterFrom);
+    if (state.filterTo)   params.set("to",   state.filterTo);
+    return params.toString() ? `&${params.toString()}` : "";
+  }
+
+  elFilterFrom.addEventListener("change", () => {
+    state.filterFrom = elFilterFrom.value;
+    renderWorkspaceScans(state.currentScans);
+  });
+  elFilterTo.addEventListener("change", () => {
+    state.filterTo = elFilterTo.value;
+    renderWorkspaceScans(state.currentScans);
+  });
+  elFilterClear.addEventListener("click", () => {
+    state.filterFrom = "";
+    state.filterTo = "";
+    elFilterFrom.value = "";
+    elFilterTo.value = "";
+    renderWorkspaceScans(state.currentScans);
+  });
+  // ───────────────────────────────────────────────────────────────────────
+
   elExportScans.addEventListener("click", async () => {
     if (!state.selectedProject) return;
     clearError(elWsError);
@@ -1100,7 +1149,7 @@ function bindEvents() {
     elExportScans.textContent = "Loading…";
     try {
       await triggerDownload(
-        `/api/projects/${encodeURIComponent(state.selectedProject)}/export/scans?format=csv`,
+        `/api/projects/${encodeURIComponent(state.selectedProject)}/export/scans?format=csv${buildDateParams()}`,
         `gravio-scans-${state.selectedProject}.csv`,
       );
     } catch (err) {
@@ -1119,7 +1168,7 @@ function bindEvents() {
     elExportReport.textContent = "Loading…";
     try {
       await triggerDownload(
-        `/api/projects/${encodeURIComponent(state.selectedProject)}/export/report?format=md`,
+        `/api/projects/${encodeURIComponent(state.selectedProject)}/export/report?format=md${buildDateParams()}`,
         `gravio-report-${state.selectedProject}.md`,
       );
     } catch (err) {
@@ -1127,6 +1176,25 @@ function bindEvents() {
     } finally {
       elExportReport.disabled = false;
       elExportReport.textContent = prev;
+    }
+  });
+
+  elExportReportHtml.addEventListener("click", async () => {
+    if (!state.selectedProject) return;
+    clearError(elWsError);
+    elExportReportHtml.disabled = true;
+    const prev = elExportReportHtml.textContent;
+    elExportReportHtml.textContent = "Loading…";
+    try {
+      await triggerDownload(
+        `/api/projects/${encodeURIComponent(state.selectedProject)}/export/report?format=html${buildDateParams()}`,
+        `gravio-report-${state.selectedProject}.html`,
+      );
+    } catch (err) {
+      showError(elWsError, err.message);
+    } finally {
+      elExportReportHtml.disabled = false;
+      elExportReportHtml.textContent = prev;
     }
   });
 

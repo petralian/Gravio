@@ -116,9 +116,17 @@
       <!-- Tab: Scans -->
       <div class="db-tab-panel" id="db-tab-scans" hidden>
         <div class="db-scan-actions">
+          <div class="db-scan-date-range">
+            <label for="db-filter-from" class="db-date-label">From</label>
+            <input type="date" id="db-filter-from" class="db-date-input" />
+            <label for="db-filter-to" class="db-date-label">To</label>
+            <input type="date" id="db-filter-to" class="db-date-input" />
+            <button class="m-btn m-btn-outline m-btn-sm" id="db-filter-clear" type="button">Clear dates</button>
+          </div>
           <button class="m-btn m-btn-outline m-btn-sm" id="db-delete-selected" type="button">Delete selected</button>
-          <button class="m-btn m-btn-outline m-btn-sm" id="db-export-scans" type="button">Export scans CSV</button>
-          <button class="m-btn m-btn-outline m-btn-sm" id="db-export-report" type="button">Export manager report</button>
+          <button class="m-btn m-btn-outline m-btn-sm" id="db-export-scans" type="button">Export CSV</button>
+          <button class="m-btn m-btn-outline m-btn-sm" id="db-export-report" type="button">Export .md</button>
+          <button class="m-btn m-btn-outline m-btn-sm" id="db-export-report-html" type="button">Export PDF-ready</button>
         </div>
         <div class="db-delete-confirm" id="db-delete-confirm" hidden>
           <p>Delete selected scans? This cannot be undone.</p>
