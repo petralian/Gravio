@@ -1508,6 +1508,94 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // ── API: GET /api/projects/:id/gate — get quality gate policy (Team-gated) ──
+  const gateGetMatch = req.method === "GET" && /^\/api\/projects\/([^/?]+)\/gate$/.exec(req.url);
+  if (gateGetMatch) {
+    const user = getAuthUser(req);
+    if (!user) {
+      res.writeHead(401, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Authentication required" }));
+      return;
+    }
+    if (user.plan !== "team") {
+      res.writeHead(403, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Quality gates are a Team feature" }));
+      return;
+    }
+    const projectId = decodeURIComponent(gateGetMatch[1]);
+    if (!isValidProjectId(projectId)) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Invalid projectId" }));
+      return;
+    }
+    const uid = user.uid ?? user.id;
+    const gate = stmts.getQualityGate.get(projectId, uid);
+    res.writeHead(200, { "Content-Type": "application/json" });
+    if (!gate) {
+      res.end(JSON.stringify({
+        projectId,
+        minimumScore: 80,
+        dimensionThresholds: {
+          safety: 90,
+          reliability: 85,
+          evaluation: 80,
+          observability: 80,
+          governance: 80,
+        },
+      }));
+    } else {
+      res.end(JSON.stringify({
+        projectId,
+        minimumScore: gate.minimum_score,
+        dimensionThresholds: safeJsonParse(gate.dimension_thresholds) || {},
+      }));
+    }
+    return;
+  }
+
+  // ── API: PUT /api/projects/:id/gate — set quality gate policy (Team-gated) ──
+  const gatePutMatch = req.method === "PUT" && /^\/api\/projects\/([^/?]+)\/gate$/.exec(req.url);
+  if (gatePutMatch) {
+    const user = getAuthUser(req);
+    if (!user) {
+      res.writeHead(401, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Authentication required" }));
+      return;
+    }
+    if (user.plan !== "team") {
+      res.writeHead(403, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Quality gates are a Team feature" }));
+      return;
+    }
+    const projectId = decodeURIComponent(gatePutMatch[1]);
+    if (!isValidProjectId(projectId)) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Invalid projectId" }));
+      return;
+    }
+    try {
+      const { minimumScore, dimensionThresholds } = JSON.parse(await readBody(req));
+      if (!Number.isInteger(minimumScore) || minimumScore < 0 || minimumScore > 100) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "minimumScore must be an integer 0-100" }));
+        return;
+      }
+      if (!dimensionThresholds || typeof dimensionThresholds !== "object" || Array.isArray(dimensionThresholds)) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "dimensionThresholds must be a JSON object" }));
+        return;
+      }
+      const uid = user.uid ?? user.id;
+      stmts.setQualityGate.run(projectId, uid, minimumScore, JSON.stringify(dimensionThresholds));
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ ok: true }));
+    } catch (err) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: err.message }));
+    }
+    return;
+  }
+
   // ── GET /auth/sso/providers ─────────────────────────────────────────────
   if (req.method === "GET" && pathOnly === "/auth/sso/providers") {
     res.writeHead(200, { "Content-Type": "application/json" });
@@ -2330,14 +2418,29 @@ const server = http.createServer(async (req, res) => {
         return;
       }
 
+      // Insert the run
       stmts.insertRun.run(projectId, uid, JSON.stringify(run));
       stmts.incrementScansPublished.run(uid);
       if (!isPaid(user)) {
         // Free tier keeps only the latest 3 visible records.
         stmts.trimRunsForFreeUser.run(uid, uid);
       }
+
+      // Evaluate against quality gate (Team feature)
+      let gateStatus = { passed: true, breaches: [], reason: "No gate configured" };
+      if (user.plan === "team") {
+        const gatePolicy = stmts.getQualityGate.get(projectId, uid);
+        if (gatePolicy) {
+          const policy = {
+            minimum_score: gatePolicy.minimum_score,
+            dimension_thresholds: safeJsonParse(gatePolicy.dimension_thresholds) || {},
+          };
+          gateStatus = gateEvaluate(run, policy);
+        }
+      }
+
       res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ ok: true, projectId }));
+      res.end(JSON.stringify({ ok: true, projectId, gateStatus }));
     } catch (err) {
       res.writeHead(400, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ error: err.message }));
