@@ -18,6 +18,13 @@ Every chat session **must** follow this loop — no exceptions:
    - Active phase roadmap with ✅ / ⚠️ / 🔲 status markers
    - Manual steps the user must perform (never omit these)
    - Key decisions and notes
+   - **Obsidian scan results** — list of related notes read and what was found (see rule 1a below)
+
+1a. **Before implementing any new feature:** Read `Operations/Session Summaries.md` and any topically related notes in the vault (e.g. `Design/UX Guidelines.md`, phase roadmap notes, prior session notes on the same topic). List in the session note:
+   - Which notes were read
+   - Any prior decisions, constraints, or completed work that affects this feature
+   - Any contradictions or dependencies found
+   This scan result must appear under a `## Obsidian Pre-Scan` heading in the session note. Never skip this — prior notes may contain design decisions, phase contracts, or manual steps that invalidate a naive implementation.
 
 2. **During the session — after every suggestion or implementation:**
    - Mark completed items ✅ in the session note via `mcp_gravio-obsidi_obsidian_write` (full overwrite keeps it clean) or `mcp_gravio-obsidi_obsidian_append` for additions.
@@ -194,6 +201,7 @@ The footer's `Self-improvements` field must contain a verifiable file citation (
 ## Pre-Implementation Checklist
 
 Before writing a single line of code:
+- [ ] **Obsidian pre-scan:** Read `Operations/Session Summaries.md` and any topically related vault notes. Record findings under `## Obsidian Pre-Scan` in the session note. Never skip.
 - [ ] Read the relevant existing file(s) fully — not just snippets.
 - [ ] **For 3+ file changes:** state a plan first, list every file + reason, flag destructive steps, wait for user confirmation.
 - [ ] If extending a multi-item system: read **all existing items** of the same kind, list their behavioural contract, replicate 1:1.
