@@ -518,6 +518,53 @@ ${steps}${cmds}
 Please analyze my codebase and implement these improvements. Identify the specific files and configurations that need to change, then make the changes.`.trim();
 }
 
+/**
+ * Evaluate a run against quality gate thresholds.
+ * Returns { passed, breaches } where breaches is an array of { type, threshold, actual, detail }.
+ */
+function gateEvaluate(runData, gatePolicy) {
+  if (!gatePolicy) {
+    return { passed: true, breaches: [], reason: "No gate policy defined" };
+  }
+
+  const breaches = [];
+  const summary = extractScoreSummary(runData);
+  const scorecard = runData?.scorecard ?? {};
+  
+  // Check minimum overall score
+  const overall = summary.overallScore ?? 0;
+  if (gatePolicy.minimum_score && overall < gatePolicy.minimum_score) {
+    breaches.push({
+      type: "overall_score",
+      threshold: gatePolicy.minimum_score,
+      actual: overall,
+      detail: `Overall score ${overall} is below minimum ${gatePolicy.minimum_score}`,
+    });
+  }
+
+  // Check dimension thresholds
+  const dimThresholds = gatePolicy.dimension_thresholds || {};
+  for (const [dim, threshold] of Object.entries(dimThresholds)) {
+    if (threshold === null || threshold === undefined) continue;
+    const actual = scorecard[dim] ?? 0;
+    if (actual < threshold) {
+      breaches.push({
+        type: `dimension_${dim}`,
+        threshold,
+        actual,
+        detail: `${dim} score ${actual} is below threshold ${threshold}`,
+      });
+    }
+  }
+
+  return {
+    passed: breaches.length === 0,
+    breaches,
+    reason: breaches.length === 0 ? "All gates passed" : `${breaches.length} gate(s) breached`,
+  };
+}
+
+
 function buildActionPlan(runData, dimensionPlan) {
   // Direct API calls have full workflowResults; encrypted envelopes use publicSummary.failedChecks only.
   const workflowResults = Array.isArray(runData?.workflowResults) ? runData.workflowResults : [];

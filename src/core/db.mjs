@@ -306,6 +306,24 @@ try {
   // Table already exists — ignore
 }
 
+try {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS quality_gates (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      project_id  TEXT    NOT NULL,
+      user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      minimum_score INTEGER NOT NULL DEFAULT 80,
+      dimension_thresholds TEXT NOT NULL DEFAULT '{"safety":90,"reliability":85,"evaluation":80,"observability":80,"governance":80}',
+      enabled     INTEGER NOT NULL DEFAULT 1,
+      created_at  TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
+      updated_at  TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
+      UNIQUE(project_id, user_id)
+    )
+  `);
+} catch {
+  // Table already exists — ignore
+}
+
 // Promote first registered user (or ADMIN_EMAIL) to admin if no admin exists yet
 function ensureAdminRole() {
   const adminCount = db.prepare(`SELECT COUNT(*) as c FROM users WHERE role='admin'`).get().c;
@@ -556,6 +574,22 @@ export const stmts = {
   ),
   deletePolicyPack: db.prepare(
     `DELETE FROM policy_packs WHERE id=? AND user_id=?`,
+  ),
+  
+  // quality_gates
+  getQualityGate: db.prepare(
+    `SELECT * FROM quality_gates WHERE project_id=? AND user_id=?`,
+  ),
+  setQualityGate: db.prepare(
+    `INSERT INTO quality_gates (project_id, user_id, minimum_score, dimension_thresholds, enabled)
+     VALUES (?, ?, ?, ?, 1)
+     ON CONFLICT(project_id, user_id) DO UPDATE SET
+       minimum_score=excluded.minimum_score,
+       dimension_thresholds=excluded.dimension_thresholds,
+       updated_at=strftime('%Y-%m-%dT%H:%M:%SZ','now')`,
+  ),
+  deleteQualityGate: db.prepare(
+    `DELETE FROM quality_gates WHERE project_id=? AND user_id=?`,
   ),
 };
 

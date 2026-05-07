@@ -558,23 +558,27 @@ function runInstallStep(targetDir, step, { setupVerbose = false, retryCount = 0,
 async function runSetup(targetDir, { silentNoWork = false, setupVerbose = false } = {}) {
   assertNodeSupported();
   
-  // Preflight: check if node and npm are available
   process.stdout.write("\n  \x1b[96m\x1b[1mGravio setup\x1b[0m\n");
   process.stdout.write(`  Folder: ${path.resolve(targetDir)}\n`);
   
-  const preflightCheck = spawnSync(resolveNativeCmd("npm"), ["--version"], { stdio: "pipe" });
-  if (preflightCheck.status !== 0) {
-    process.stderr.write(`\n  \x1b[91m\x1b[1m✖  Preflight failed\x1b[0m\n`);
-    process.stderr.write(`     npm is not available. Check your Node.js installation.\n`);
-    process.stderr.write(`     Hint: Try 'npm --version' manually to diagnose.\n\n`);
-    return false;
+  const totalStages = 3;
+  printSetupStage(1, totalStages, "Preflight checks", "Detect package managers and build a dependency plan.");
+  const plan = dependencyInstallPlan(targetDir);
+  
+  // Only check npm availability if npm-based installs are planned
+  if (plan.some((s) => ["npm", "yarn", "pnpm"].includes(s.cmd))) {
+    const preflightCheck = spawnSync(resolveNativeCmd("npm"), ["--version"], { stdio: "pipe" });
+    if (preflightCheck.status !== 0) {
+      process.stderr.write(`\n  \x1b[91m\x1b[1m✖  Preflight failed\x1b[0m\n`);
+      process.stderr.write(`     npm is not available. Check your Node.js installation or PATH.\n`);
+      process.stderr.write(`     Hint: Try 'npm --version' in a new terminal to diagnose.\n`);
+      process.stderr.write(`     Workaround: Install dependencies manually, then re-run this setup.\n\n`);
+      return false;
+    }
   }
   
   process.stdout.write("  Setup stages are shown before each action so changes are easy to follow.\n");
 
-  const totalStages = 3;
-  printSetupStage(1, totalStages, "Preflight checks", "Detect package managers and build a dependency plan.");
-  const plan = dependencyInstallPlan(targetDir);
   if (!plan.length) {
     if (!silentNoWork) process.stdout.write("  No package manager files detected. Skipping dependency install.\n");
     saveSetupState(targetDir, { version: 1, completedAt: new Date().toISOString(), installedSteps: [] });
