@@ -1,56 +1,63 @@
 # NEXT SESSION HANDOFF
 
-Last updated: 2026-05-05
-Owner session: Phase 2 — Zero-knowledge E2EE crypto + cloud endpoints
+Last updated: 2026-05-07
+Owner session: Evaluation Expansion — Phase 1 complete, Phase 2 next
 
 ## Current Priority
 
-Build Phase 3: client-side dashboard (decrypt + render in browser), user auth, cross-platform binary packaging.
+**Phase 2: Habit Mechanics + Cloud Audit Trail**  
+Every scan should store a timestamped artifact server-side (per-project history), and the CLI should show streak data and 7/30-day trends.
 
-## What Changed This Session
+## What Changed This Session (2026-05-07)
 
-### Phase 1 — Marketing website (prior session) ✅
-- `src/web/index.html` — gravio.dev marketing site
-- `src/web/tool.html` — evaluation tool at /tool
-- `src/web/styles.css` — complete design system (neon palette, dual-surface namespace)
-- `src/server.mjs` — /tool and /health routes
+### Phase 1 — CLI Evaluation Engine Expansion ✅
+- `src/core/scanner.mjs` — 18 new detection signals (cloud credential files, dep vuln check, test coverage config, integration/E2E tests, health check, feature flags, adversarial tests, prompt tests, SLO definition, alert config, API docs, ADR dir, commit-lint config, safety rules in instructions, model pinned, prompt versioning, tool whitelist). DEFAULT_CORPUS expanded 14 → 33. `computeRichScorecard` rebalanced.
+- `src/core/reporter.mjs` — `buildCatalog` expanded 22 → 35 entries, each with `subdim`, `difficulty`, `estimatedMinutes`, `impactScore`, `action`. New `printRecommendations()` function. `HEADER_CHECK_IDS` expanded to 14 checks.
+- `src/web/cli/gravio.mjs` — rebuilt at 67.1 KB via `npm run build:cli`.
+- Commit: `aff6eb3` — deployed to production, health check OK.
+- Tests: 96/96 passing.
 
-### Phase 2 — Zero-knowledge E2EE (this session) ✅
-- `src/core/crypto-e2ee.mjs` — AES-256-GCM module: `generateKey`, `generateSalt`, `deriveKey` (PBKDF2 210k iter), `encrypt`, `decrypt`
-- `src/server.mjs` — `POST /api/publish` (blind store), `GET /api/runs/:projectId` (blind retrieve). Server never decrypts.
-- `scripts/scanner-daemon.mjs` — `--publish`, `--project`, `--server`, `--key`, `--passphrase`, `--salt` flags; auto-generates + prints key if none provided
-- `tests/crypto-e2ee.test.mjs` — 17 unit tests for all crypto ops
-- `tests/server.test.mjs` — now wired into `npm test`; 4 publish/read tests added; Windows ESM fix applied
-- Total test suite: 47 tests, all passing
+## Phase 2 Plan (Next Session)
 
-## Open Loops
+### 2A — Per-scan cloud audit trail
+- New DB table: `scan_history` (id, user_id, project_id, timestamp, git_commit, overall_score, dimension_scores JSON, checks_run JSON, recommendations JSON)
+- New endpoint: `POST /api/scans/artifact` — authenticated, stores encrypted scan summary
+- CLI sends artifact on every `--once` run (after publish succeeds)
+- Endpoint returns scan streak data for display
 
-- [ ] Phase 3: `src/web/dashboard.html` + `src/web/dashboard.js` — client-side WebCrypto decrypt + scorecard render
-- [ ] Phase 3: User auth + project management (token or passphrase gated)
-- [ ] Phase 3: Binary packaging for macOS / Windows / Linux (`pkg` or `caxa`)
-- [ ] Phase 3: `npm publish` as `agentscored` global package
-- [ ] Server run store is in-memory only — restarts lose all data. Phase 3 should add file-backed or SQLite persistence.
-- [ ] Scanner daemon: replace some inferred workflow statuses with measured signals
-- [ ] CI workflow `.github/workflows/quality.yml` not yet added
-- [ ] Agent files still use Vouch naming — rename to scorecard-* variants
+### 2B — Streak tracking (CLI)
+- New endpoint: `GET /api/projects/:id/streak` — returns streak count, last-scan date, 7-day/30-day score deltas
+- CLI parses streak response and injects streak line into scan output:
+  ```
+  🔥 3-week streak  +12 pts over 30 days  →  gravio.dev/dash
+  ```
+- If no previous scans: shows "First scan! Streak starts now."
+
+### 2C — Time-based gates (scaffolding only)
+- Add `firstScannedAt` to `scan_history` summary query
+- Pass `daysSinceFirst` to reporter — filter `printRecommendations` to only show `quick-win` if `< 14 days`, `medium` if `>= 14 days`, all if `>= 30 days`
+- CLI doesn't need UI changes — just filter catalog before display
+
+## Open Loops (Roadmap Phases 3+)
+
+- [ ] Phase 3: Team dashboard + comparisons (90-day trajectory, peer benchmarks, industry baseline)
+- [ ] Phase 3: Weekly email digest (score delta, top recommendation, streak status)
+- [ ] Phase 3: Recommendation tracking (addressed / in-progress / false-positive feedback)
+- [ ] Phase 4: Dependency graph resolver (show prerequisite chains in CLI output)
+- [ ] Phase 4: Local-maxima detection (if score stagnant 4 weeks → pivot suggestion)
+- [ ] Phase 4: "Biggest win next" single-recommendation mode
+- [ ] Ongoing: CI workflow `.github/workflows/quality.yml` not yet added
+- [ ] Ongoing: Gravio scores itself — scorecard gate must stay green
 
 ## Risks / Constraints
 
-- In-memory run store loses data on server restart — documented, acceptable for Phase 2 MVP.
-- Key management UX: user must save their key. Auto-print on generation is a workaround; Phase 3 should add proper key store.
-- The app scores itself — test suite must stay green.
-- Scanner daemon must not read `.env` content.
+- CLI bundle must be rebuilt after every change to scanner.mjs or reporter.mjs (`npm run build:cli`).
+- Zero-knowledge constraint: server must never see plaintext run JSON. Scan artifacts stored must be summary stats only (scores + check IDs), not the full encrypted run payload.
+- `[hidden]` attribute is sacred — never add CSS `display:` to elements that may receive `hidden`.
 
-## Next 1-3 Executable Steps
+## Verification Snapshot (2026-05-07)
 
-1. Create `src/web/dashboard.html` — minimal single-page app: input for project ID + key, fetch `/api/runs/:projectId`, decrypt in-browser with WebCrypto, render scorecard.
-2. Create `src/web/dashboard.js` — browser-side AES-256-GCM decrypt using `window.crypto.subtle` (same wire format as server).
-3. Add `GET /dashboard` route to server.mjs + add WebCrypto decrypt helpers verified against Node crypto test vectors.
-
-## Verification Snapshot
-
-- Phase 2 E2EE module: Yes
-- Server publish/read endpoints: Yes
-- Scanner --publish CLI flags: Yes
-- Tests: 47/47 passing
-- Scorecard gate: PASS (score 100)
+- Tests: 96/96 passing
+- Deployed: commit `aff6eb3`, `curl https://gravio.dev/health` → `{"status":"ok"}`
+- Roadmap: `C:\Obsidian\obsidian\40_Projects (Personal)\Gravio\Operations\Gravio Evaluation Expansion Roadmap.md`
+- Phase 1 complete, Phase 2 not started

@@ -21,6 +21,15 @@ All notable changes to this project will be documented in this file.
 - Billing action APIs: `POST /api/billing/cancel`, `POST /api/billing/resume`, and `POST /api/billing/seats` (authenticated, ownership-verified against Lemon subscription).
 - Webhook idempotency persistence via new `webhook_events` table (`provider + event_key` unique) to prevent duplicate webhook side-effects.
 
+- **CLI evaluation engine Phase 1 expansion:** Scanner extended from ~25 checks to 35 checks across 6 dimensions with 18 new detection signals (cloud credential files, dependency vulnerability tooling, test coverage config, integration/E2E tests, health checks, adversarial test cases, SLO definitions, alert configs, API docs, ADR directories, commit-lint config, safety rules in instructions, pinned model versions, prompt versioning, tool whitelists, and more).
+- **Sub-dimension taxonomy:** Every check now tagged with `subdim` (e.g., `safety/secrets-exposure`, `reliability/testing-coverage`), `difficulty` (`quick-win` / `medium` / `deep-refactor`), `estimatedMinutes`, and `impactScore` for ROI-ranked recommendations.
+- **CLI Next Steps section:** `printRecommendations()` added to scan output — surfaces top 5 failing checks ordered by severity + impact ÷ time, each showing difficulty tier, time estimate, impact score, and a one-line action.
+- **`HEADER_CHECK_IDS` expanded** from 10 to 14 critical/high checks shown in the scan header summary.
+- **`DEFAULT_CORPUS` expanded** from 14 → 33 workflow IDs in the scanner's built-in corpus.
+- **`computeRichScorecard` rebalanced** across all 6 dimensions to incorporate new signals while staying within 100-pt caps.
+- **`src/web/cli/gravio.mjs` rebuilt** (67.1 KB) via `npm run build:cli` to include all Phase 1 scanner changes.
+- Test count: 96 tests, 0 failures (up from 70).
+
 ### Changed
 - Registration now enforces a stronger password policy (minimum 12 chars with upper/lowercase, number, and symbol) with matching validation hints in login/onboarding forms.
 - Shared header and homepage hero now link directly to `/why-gravio.html` as an educational conversion path for new prospects.
