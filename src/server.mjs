@@ -17,6 +17,9 @@ import {
   loginOrCreateSsoUser,
   generateMagicLink, consumeMagicLink, sendMagicLinkEmail,
   changePassword,
+  sendPaymentFailedEmail,
+  sendSubscriptionCancelledEmail,
+  sendSubscriptionExpiredEmail,
 } from "./core/auth.mjs";
 import { stmts } from "./core/db.mjs";
 
@@ -2531,6 +2534,17 @@ const server = http.createServer(async (req, res) => {
           nextState.portalUrl,
           dbUser.id,
         );
+
+        // Phase 6 — fire-and-forget billing lifecycle emails
+        if (eventName === "subscription_payment_failed") {
+          const updateUrl = attrs.urls?.update_payment_method ?? null;
+          sendPaymentFailedEmail(email, updateUrl).catch((e) => console.error("[EMAIL]", e.message));
+        } else if (eventName === "subscription_cancelled") {
+          sendSubscriptionCancelledEmail(email, nextState.renewsAt ?? attrs.ends_at ?? null)
+            .catch((e) => console.error("[EMAIL]", e.message));
+        } else if (eventName === "subscription_expired") {
+          sendSubscriptionExpiredEmail(email).catch((e) => console.error("[EMAIL]", e.message));
+        }
       }
       // If user is not found we still return 200 to avoid endless retries.
     }

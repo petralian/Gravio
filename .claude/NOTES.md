@@ -205,6 +205,13 @@ node gravio.mjs --logout --target . # remove local .gravio/auth.json
 - `GET /api/billing/invoices` fetches subscription invoices (up to 12, newest first) and payment method info in parallel from Lemon API. Returns `{ paymentMethod: { brand, lastFour, processor, updateUrl }, invoices: [...] }`. Returns `{ invoices: [], paymentMethod: null }` if no subscription ID exists in DB.
 - Settings (`/settings`) now includes a Billing section with plan badge, status pill, seats adjuster (team only), cancel/resume two-step actions, payment method display, and invoice history table.
 - Phase 4 billing status banners: `db-billing-banner` on both `/dashboard` and `/settings` for `past_due`, `unpaid`, `expired` states. Dashboard loads banner non-blocking after init; settings banner rendered in `renderBillingCard()`.
+- Phase 5 admin billing diagnostics: `GET /api/admin/billing/diagnostics` (admin-only) returns plan distribution summary, drift alerts (paid plan but missing or expired subscription), and last 100 webhook events. Admin panel shows all three as tables.
+- Phase 6 billing email nudges: Three lifecycle emails sent fire-and-forget from the webhook handler after DB state is persisted:
+  - `subscription_payment_failed` → `sendPaymentFailedEmail(to, updatePaymentUrl)` — card + CTA
+  - `subscription_cancelled` → `sendSubscriptionCancelledEmail(to, endsAt)` — grace period end date + reactivate CTA
+  - `subscription_expired` → `sendSubscriptionExpiredEmail(to)` — renew CTA
+  - All use `sendBillingEmail()` in `src/core/auth.mjs`; fallback to `console.log` in dev (no `RESEND_API_KEY`).
+  - Env: `RESEND_API_KEY` (Fly secret), `EMAIL_FROM` (optional, default `Gravio <noreply@gravio.dev>`).
 
 ---
 

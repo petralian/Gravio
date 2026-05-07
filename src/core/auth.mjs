@@ -392,6 +392,106 @@ export async function sendMagicLinkEmail(to, magicUrl) {
   });
 }
 
+// ─── Billing email helpers ────────────────────────────────────────────────────
+
+/**
+ * Low-level billing email sender using the same Resend HTTP path as magic links.
+ * Non-throwing — logs errors and returns {ok:false} on failure.
+ */
+async function sendBillingEmail(to, subject, html) {
+  const apiKey = process.env.RESEND_API_KEY;
+  const from = process.env.EMAIL_FROM || "Gravio <noreply@gravio.dev>";
+
+  if (!apiKey) {
+    console.log(`[DEV EMAIL] Billing email to ${to} — subject: ${subject}`);
+    return { ok: true, dev: true };
+  }
+
+  return new Promise((resolve) => {
+    const body = JSON.stringify({ from, to: [to], subject, html });
+    const opts = {
+      hostname: "api.resend.com",
+      path: "/emails",
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+        "Content-Length": Buffer.byteLength(body),
+      },
+    };
+    const req = https.request(opts, (r) => {
+      let d = "";
+      r.on("data", (c) => (d += c));
+      r.on("end", () => {
+        if (r.statusCode >= 200 && r.statusCode < 300) {
+          resolve({ ok: true });
+        } else {
+          console.error(`[EMAIL] Resend billing error ${r.statusCode}: ${d}`);
+          resolve({ ok: false });
+        }
+      });
+    });
+    req.on("error", (err) => {
+      console.error("[EMAIL] Billing email send error:", err.message);
+      resolve({ ok: false });
+    });
+    req.end(body);
+  });
+}
+
+function _billingEmailWrap(bodyContent) {
+  return `
+    <div style="font-family:Inter,sans-serif;max-width:520px;margin:0 auto;padding:32px 24px;background:#0d0d0f;color:#e2e8f0;border-radius:12px">
+      <p style="font-size:24px;font-weight:700;color:#00e5ff;margin:0 0 24px">Gravio</p>
+      ${bodyContent}
+      <p style="margin:24px 0 0;font-size:12px;color:#94a3b8">You're receiving this because you have a Gravio subscription. Questions? Reply to this email.</p>
+    </div>
+  `;
+}
+
+/**
+ * Notify a paid user their payment has failed and prompt them to update their card.
+ * Triggered by subscription_payment_failed.
+ */
+export async function sendPaymentFailedEmail(to, updatePaymentUrl) {
+  const ctaUrl = updatePaymentUrl || "https://gravio.dev/settings";
+  const html = _billingEmailWrap(`
+    <p style="font-size:18px;font-weight:700;color:#ff4466;margin:0 0 16px">Payment failed</p>
+    <p style="margin:0 0 16px;font-size:15px">We weren't able to process your last payment. Please update your payment method to keep your access to Gravio.</p>
+    <a href="${ctaUrl}" style="display:inline-block;padding:12px 24px;background:#ff4466;color:#fff;font-weight:700;border-radius:6px;text-decoration:none;font-size:15px">Update payment method</a>
+    <p style="margin:16px 0 0;font-size:13px;color:#94a3b8">If we can't collect payment, your subscription will be paused and you'll lose access to paid features.</p>
+  `);
+  return sendBillingEmail(to, "Action required: your Gravio payment failed", html);
+}
+
+/**
+ * Confirm cancellation and remind the user when access ends.
+ * Triggered by subscription_cancelled.
+ */
+export async function sendSubscriptionCancelledEmail(to, endsAt) {
+  const endLabel = endsAt ? new Date(endsAt).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }) : "the end of your billing period";
+  const html = _billingEmailWrap(`
+    <p style="font-size:18px;font-weight:700;color:#ffb347;margin:0 0 16px">Subscription cancelled</p>
+    <p style="margin:0 0 16px;font-size:15px">Your Gravio subscription has been cancelled. You'll continue to have full access until <strong>${endLabel}</strong>.</p>
+    <a href="https://gravio.dev/settings" style="display:inline-block;padding:12px 24px;background:#00e5ff;color:#0d0d0f;font-weight:700;border-radius:6px;text-decoration:none;font-size:15px">Reactivate subscription</a>
+    <p style="margin:16px 0 0;font-size:13px;color:#94a3b8">Changed your mind? You can reactivate from your Settings page before your access ends.</p>
+  `);
+  return sendBillingEmail(to, "Your Gravio subscription has been cancelled", html);
+}
+
+/**
+ * Notify a user their subscription has fully expired and how to renew.
+ * Triggered by subscription_expired.
+ */
+export async function sendSubscriptionExpiredEmail(to) {
+  const html = _billingEmailWrap(`
+    <p style="font-size:18px;font-weight:700;color:#ff4466;margin:0 0 16px">Your subscription has expired</p>
+    <p style="margin:0 0 16px;font-size:15px">Your Gravio subscription has expired and your account has been downgraded to the free plan. Your existing data is safe, but you'll no longer have access to paid features.</p>
+    <a href="https://gravio.dev/settings" style="display:inline-block;padding:12px 24px;background:#00e5ff;color:#0d0d0f;font-weight:700;border-radius:6px;text-decoration:none;font-size:15px">Renew subscription</a>
+  `);
+  return sendBillingEmail(to, "Your Gravio subscription has expired", html);
+}
+
 // ─── Password change ───────────────────────────────────────────────────────────
 
 /**
