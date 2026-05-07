@@ -2420,12 +2420,7 @@ const server = http.createServer(async (req, res) => {
 
       // Insert the run
       stmts.insertRun.run(projectId, uid, JSON.stringify(run));
-      stmts.incrementScansPublished.run(uid);
-      if (!isPaid(user)) {
-        // Free tier keeps only the latest 3 visible records.
-        stmts.trimRunsForFreeUser.run(uid, uid);
-      }
-
+      
       // Evaluate against quality gate (Team feature)
       let gateStatus = { passed: true, breaches: [], reason: "No gate configured" };
       if (user.plan === "team") {
@@ -2437,6 +2432,15 @@ const server = http.createServer(async (req, res) => {
           };
           gateStatus = gateEvaluate(run, policy);
         }
+      }
+      
+      // Store gate_status with the run
+      stmts.updateRunGateStatus.run(JSON.stringify(gateStatus));
+      
+      stmts.incrementScansPublished.run(uid);
+      if (!isPaid(user)) {
+        // Free tier keeps only the latest 3 visible records.
+        stmts.trimRunsForFreeUser.run(uid, uid);
       }
 
       res.writeHead(200, { "Content-Type": "application/json" });
@@ -2486,6 +2490,7 @@ const server = http.createServer(async (req, res) => {
     const scans = rows.map((row) => {
       const parsed = safeJsonParse(row.ciphertext);
       const summary = extractScoreSummary(parsed);
+      const gateStatus = row.gate_status ? safeJsonParse(row.gate_status) : null;
       return {
         id: row.id,
         projectId: row.project_id,
@@ -2494,6 +2499,7 @@ const server = http.createServer(async (req, res) => {
         overallScore: summary.overallScore,
         rating: summary.rating,
         limitedDetails: limited,
+        gateStatus: gateStatus ?? { passed: true, breaches: [], reason: "No gate configured" },
         summary: {
           overallScore: summary.overallScore,
           rating: summary.rating,

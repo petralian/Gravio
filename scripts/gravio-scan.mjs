@@ -362,6 +362,91 @@ function resolveNativeCmd(cmd) {
   return scriptCmds.includes(cmd) ? `${cmd}.cmd` : cmd;
 }
 
+/**
+ * Returns the first executable path for `cmd` that exists on disk,
+ * searching well-known install locations for Windows (nvm, volta, fnm,
+ * system) and Unix (nvm, homebrew, system). Falls back to the plain
+ * `resolveNativeCmd` result (PATH-based lookup) if nothing is found.
+ */
+function findExecutable(cmd) {
+  const isNpmLike = ["npm", "yarn", "pnpm", "npx"].includes(cmd);
+  if (!isNpmLike) return resolveNativeCmd(cmd);
+
+  if (process.platform === "win32") {
+    const home = process.env.USERPROFILE ?? "C:\\Users\\User";
+    const candidates = [
+      // nvm-windows installs node here
+      path.join(process.env.NVM_HOME ?? path.join(home, "AppData\\Roaming\\nvm"), `${cmd}.cmd`),
+      // volta
+      path.join(process.env.VOLTA_HOME ?? path.join(home, "AppData\\Local\\Volta"), "bin", `${cmd}.cmd`),
+      // fnm
+      path.join(process.env.FNM_DIR ?? path.join(home, ".fnm"), "aliases", "default", `${cmd}.cmd`),
+      // standard system Node paths
+      `C:\\Program Files\\nodejs\\${cmd}.cmd`,
+      `C:\\Program Files (x86)\\nodejs\\${cmd}.cmd`,
+      // plain PATH-resolved .cmd
+      `${cmd}.cmd`,
+    ];
+    for (const c of candidates) {
+      if (existsSync(c)) return c;
+    }
+    return `${cmd}.cmd`; // let spawn try via PATH
+  }
+
+  // Unix / macOS
+  const home = process.env.HOME ?? "/root";
+  const candidates = [
+    // nvm
+    path.join(home, `.nvm/versions/node/${process.version}/bin/${cmd}`),
+    // volta
+    path.join(process.env.VOLTA_HOME ?? path.join(home, ".volta"), `bin/${cmd}`),
+    // homebrew (Apple Silicon)
+    `/opt/homebrew/bin/${cmd}`,
+    `/usr/local/bin/${cmd}`,
+    `/usr/bin/${cmd}`,
+    cmd, // PATH
+  ];
+  for (const c of candidates) {
+    if (existsSync(c)) return c;
+  }
+  return cmd;
+}
+
+/**
+ * Spawn a child process, automatically falling back to `shell: true` on
+ * Windows if the first attempt fails with EINVAL or ENOENT. This handles
+ * the common case where nvm/volta/fnm installs a .cmd shim that can't be
+ * launched via spawn without a shell on certain Windows configurations.
+ */
+function spawnWithFallback(resolvedCmd, args, options) {
+  return new Promise((resolve) => {
+    const child = spawn(resolvedCmd, args, { ...options, shell: false });
+    let usedShell = false;
+
+    const onError = (err) => {
+      if (!usedShell && (err.code === "EINVAL" || err.code === "ENOENT") && process.platform === "win32") {
+        usedShell = true;
+        // Strip .cmd — when shell: true is set, the plain name works better
+        const plainCmd = resolvedCmd.endsWith(".cmd") ? resolvedCmd.slice(0, -4) : resolvedCmd;
+        const shellChild = spawn(plainCmd, args, { ...options, shell: true });
+        shellChild.on("error", (e2) => resolve({ child: null, error: e2 }));
+        shellChild.on("close", (code) => resolve({ child: shellChild, code, error: null }));
+        if (options.stdio === "inherit") return;
+        // Re-pipe streams if caller is collecting output
+        shellChild.stdout?.on("data", (d) => child.stdout?.emit("data", d));
+        shellChild.stderr?.on("data", (d) => child.stderr?.emit("data", d));
+      } else {
+        resolve({ child, code: null, error: err });
+      }
+    };
+
+    child.on("error", onError);
+    child.on("close", (code) => {
+      if (!usedShell) resolve({ child, code, error: null });
+    });
+  });
+}
+
 function writeSetupProgress(pct, label) {
   if (!process.stdout.isTTY) return;
   const barW   = 30;

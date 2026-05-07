@@ -324,6 +324,12 @@ try {
   // Table already exists — ignore
 }
 
+try {
+  db.exec(`ALTER TABLE runs ADD COLUMN gate_status TEXT`);
+} catch {
+  // Column already exists — ignore
+}
+
 // Promote first registered user (or ADMIN_EMAIL) to admin if no admin exists yet
 function ensureAdminRole() {
   const adminCount = db.prepare(`SELECT COUNT(*) as c FROM users WHERE role='admin'`).get().c;
@@ -408,6 +414,9 @@ export const stmts = {
   insertRun: db.prepare(
     `INSERT INTO runs (project_id, user_id, ciphertext, published_at)
      VALUES (?, ?, ?, strftime('%Y-%m-%dT%H:%M:%SZ','now'))`,
+  ),
+  updateRunGateStatus: db.prepare(
+    `UPDATE runs SET gate_status=? WHERE id=(SELECT last_insert_rowid())`,
   ),
   getLatestRun: db.prepare(
     `SELECT * FROM runs
