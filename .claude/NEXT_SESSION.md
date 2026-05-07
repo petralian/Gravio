@@ -59,5 +59,5 @@ Every scan should store a timestamped artifact server-side (per-project history)
 
 - Tests: 96/96 passing
 - Deployed: commit `aff6eb3`, `curl https://gravio.dev/health` → `{"status":"ok"}`
-- Roadmap: `C:\Obsidian\obsidian\40_Projects (Personal)\Gravio\Operations\Gravio Evaluation Expansion Roadmap.md`
+- Roadmap: `C:\Obsidian\obsidian\40_VSCode\Gravio\Operations\Gravio Evaluation Expansion Roadmap.md`
 - Phase 1 complete, Phase 2 not started

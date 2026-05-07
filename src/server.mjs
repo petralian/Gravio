@@ -110,6 +110,21 @@ function isPaid(user) {
   return user?.plan === "pro" || user?.plan === "team";
 }
 
+const PRO_MAX_PROJECTS = 10;
+
+/** Returns true if user has reached their project limit for a new project_id. */
+function isAtProjectLimit(user, uid, projectId) {
+  if (user?.role === "admin" || user?.plan === "team") return false; // unlimited
+  if (user?.plan === "pro") {
+    // Check if project already exists — if so, no limit applies
+    const existing = stmts.countRunsForProjectUser.get(projectId, uid);
+    if (Number(existing?.c ?? 0) > 0) return false;
+    const distinctCount = Number(stmts.countDistinctProjectsForUser.get(uid)?.c ?? 0);
+    return distinctCount >= PRO_MAX_PROJECTS;
+  }
+  return false; // free tier: no project limit (scan limit handles it)
+}
+
 function scoreBand(score) {
   if (!Number.isFinite(score)) return "Unknown";
   if (score >= 90) return "Excellent";
@@ -465,7 +480,7 @@ function buildDimensionPlan(scorecard) {
 }
 
 function synthesizeActionFromDimension(item) {
-  return {
+  const base = {
     source: "dimension",
     dimension: item.dimension,
     priority: item.status === "critical" ? "critical" : (item.status === "at-risk" ? "high" : "medium"),
@@ -475,6 +490,32 @@ function synthesizeActionFromDimension(item) {
     commands: item.commands.slice(0, 2),
     expectedLift: item.gap,
   };
+  return { ...base, fixPrompt: generateFixPrompt(base) };
+}
+
+/**
+ * Generate a ready-to-paste AI prompt for fixing a single action plan item.
+ * Included in action plan items for Pro/Team users (prompt packs feature).
+ */
+function generateFixPrompt(item) {
+  const steps = Array.isArray(item.actions) && item.actions.length
+    ? item.actions.map((a, i) => `${i + 1}. ${a}`).join("\n")
+    : "";
+  const cmds = Array.isArray(item.commands) && item.commands.length
+    ? `\nRelevant commands to run:\n${item.commands.map((c) => `  ${c}`).join("\n")}`
+    : "";
+  return `You are an expert code quality engineer. I need help resolving a quality issue in my codebase.
+
+Issue: ${item.title}
+Category: ${item.dimension ?? "general"}
+Priority: ${item.priority ?? "medium"}
+
+Why this matters: ${item.why ?? "Resolving this improves codebase quality."}
+
+Steps to fix:
+${steps}${cmds}
+
+Please analyze my codebase and implement these improvements. Identify the specific files and configurations that need to change, then make the changes.`.trim();
 }
 
 function buildActionPlan(runData, dimensionPlan) {
@@ -508,6 +549,7 @@ function buildActionPlan(runData, dimensionPlan) {
       commands: explain?.commands?.length ? explain.commands : item.commands,
       expectedLift: null,
     };
+    return { ...base, fixPrompt: generateFixPrompt(base) };
   });
 
   const byDimFromChecks = new Set(normalizedChecks.map((x) => x.dimension));
@@ -2069,6 +2111,13 @@ const server = http.createServer(async (req, res) => {
           res.end(JSON.stringify({ error: "Free tier limit reached (3 lifetime scans). Upgrade to Pro or Team to continue scanning." }));
           return;
         }
+      }
+
+      // Pro tier: enforce 10-project limit
+      if (isAtProjectLimit(user, uid, projectId)) {
+        res.writeHead(403, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: `Pro plan allows up to ${PRO_MAX_PROJECTS} projects. Upgrade to Team for unlimited projects.` }));
+        return;
       }
 
       stmts.insertRun.run(projectId, uid, JSON.stringify(run));

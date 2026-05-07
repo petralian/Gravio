@@ -8,6 +8,19 @@
 
 # PART A — Gravio (this project)
 
+## Session Continuity Bootstrap (Mandatory)
+
+At the start of every non-trivial session, read universal rules **before** project vault notes:
+
+1. **Brain first** — read via the `obsidian-brain` MCP server:
+   - `00_Brain/AI Agent Methodology.md` — note taxonomy, session loop, anti-patterns
+   - `00_Brain/Conventions/Deploy Playbook.md` — session-end footer template
+2. Then follow the Session Memory Loop below.
+
+If the `obsidian-brain` server isn't responding: Command Palette → **MCP: Reset Cached Tools**.
+
+---
+
 ## TOP RULE: Session Memory Loop (Obsidian)
 
 Every chat session **must** follow this loop — no exceptions:

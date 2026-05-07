@@ -291,6 +291,21 @@ try {
   // Index already exists — ignore
 }
 
+try {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS policy_packs (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      name        TEXT    NOT NULL,
+      targets     TEXT    NOT NULL DEFAULT '{}',
+      created_at  TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
+      updated_at  TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
+    )
+  `);
+} catch {
+  // Table already exists — ignore
+}
+
 // Promote first registered user (or ADMIN_EMAIL) to admin if no admin exists yet
 function ensureAdminRole() {
   const adminCount = db.prepare(`SELECT COUNT(*) as c FROM users WHERE role='admin'`).get().c;
@@ -406,6 +421,9 @@ export const stmts = {
   countRunsForProjectUser: db.prepare(
     `SELECT COUNT(*) AS c FROM runs WHERE project_id=? AND user_id=?`,
   ),
+  countDistinctProjectsForUser: db.prepare(
+    `SELECT COUNT(DISTINCT project_id) AS c FROM runs WHERE user_id=?`,
+  ),
   renameProjectRunsForUser: db.prepare(
     `UPDATE runs SET project_id=? WHERE project_id=? AND user_id=?`,
   ),
@@ -514,6 +532,30 @@ export const stmts = {
        context_note=excluded.context_note,
        action_items=excluded.action_items,
        updated_at=strftime('%Y-%m-%dT%H:%M:%SZ','now')`,
+  ),
+
+  // policy packs (custom dimension targets for Team users)
+  createPolicyPack: db.prepare(
+    `INSERT INTO policy_packs (user_id, name, targets)
+     VALUES (?, ?, ?)`,
+  ),
+  getPolicyPack: db.prepare(
+    `SELECT id, user_id, name, targets, created_at, updated_at
+     FROM policy_packs
+     WHERE id=?`,
+  ),
+  listPolicyPacksForUser: db.prepare(
+    `SELECT id, name, targets, created_at, updated_at
+     FROM policy_packs
+     WHERE user_id=?
+     ORDER BY updated_at DESC`,
+  ),
+  updatePolicyPack: db.prepare(
+    `UPDATE policy_packs SET name=?, targets=?, updated_at=strftime('%Y-%m-%dT%H:%M:%SZ','now')
+     WHERE id=? AND user_id=?`,
+  ),
+  deletePolicyPack: db.prepare(
+    `DELETE FROM policy_packs WHERE id=? AND user_id=?`,
   ),
 };
 

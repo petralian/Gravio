@@ -23,7 +23,7 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
 import { dirname, join, resolve, normalize } from "node:path";
 
 // ── Vault root — only paths inside here are accessible ─────────────────────
-const VAULT_ROOT = resolve("C:\\Obsidian\\obsidian\\40_Projects (Personal)\\Gravio");
+const VAULT_ROOT = resolve("C:\\Obsidian\\obsidian\\40_VSCode\\Gravio");
 
 // ── MCP protocol helpers ────────────────────────────────────────────────────
 function send(obj) {

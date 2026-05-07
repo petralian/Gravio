@@ -4,6 +4,14 @@
       "type": "stdio",
       "command": "node",
       "args": ["${workspaceFolder}/scripts/obsidian-mcp-server.mjs"]
+    },
+    "obsidian-brain": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "C:\\Obsidian\\obsidian\\00_Brain"
+      ]
     }
   }
 }

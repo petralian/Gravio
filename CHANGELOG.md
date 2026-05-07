@@ -153,4 +153,4 @@ All notable changes to this project will be documented in this file.
 - Test suite: `tests/evaluate.test.mjs` (unit), `tests/server.test.mjs` (integration)
 - Governance stack: `.github/agents/` (5 agents), `.github/skills/` (4 skills), `copilot-instructions.md`
 - Project notes: `.claude/NOTES.md`, `.claude/NEXT_SESSION.md`
-- Obsidian continuity note at `C:\Obsidian\obsidian\40_Projects (Personal)\Agent Scorecard\Kickoff.md`
+- Obsidian continuity note at `C:\Obsidian\obsidian\40_VSCode\Agent Scorecard\Kickoff.md`

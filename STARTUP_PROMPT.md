@@ -10,7 +10,7 @@ Session continuity is mandatory before coding:
 1) Read .claude/NOTES.md fully.
 2) Read .claude/NEXT_SESSION.md fully.
 3) Read these repo memory files: /memories/repo/index.md, /memories/repo/open-loops.md, /memories/repo/known-gotchas.md.
-4) Read Obsidian continuity note: C:/Obsidian/obsidian/40_Projects (Personal)/Agent Scorecard/Kickoff.md.
+4) Read Obsidian continuity note: C:/Obsidian/obsidian/40_VSCode/Gravio/Operations/Session Summaries.md (tail 60 lines).
 5) Output a 4-line kickoff summary: objective, constraints, risks, immediate next action.
 
 Current objective:
@@ -29,7 +29,7 @@ Execution plan requirements:
   - npm test
   - npm run scorecard:check
 - Update .claude/NEXT_SESSION.md with new open loops and exact next 1-3 steps.
-- Append a short session entry to Obsidian at C:/Obsidian/obsidian/40_Projects (Personal)/Agent Scorecard/Kickoff.md.
+- Append a short session entry to Obsidian at Operations/Session Summaries.md via the mcp_gravio-obsidi_obsidian_append tool.
 
 Deliverables for this session:
 - Working scanner daemon MVP command and code.

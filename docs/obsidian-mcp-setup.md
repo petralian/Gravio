@@ -12,7 +12,7 @@ The Gravio repo ships a lightweight MCP (Model Context Protocol) server at `scri
 | `obsidian_append` | Append text to a note (creates if missing) |
 | `obsidian_write` | Full overwrite of a note |
 
-All three tools are sandboxed to `C:\Obsidian\obsidian\40_Projects (Personal)\Gravio\` — paths that escape the vault root are rejected.
+All three tools are sandboxed to `C:\Obsidian\obsidian\40_VSCode\Gravio\` — paths that escape the vault root are rejected.
 
 ---
 
