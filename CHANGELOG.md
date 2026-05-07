@@ -29,6 +29,15 @@ All notable changes to this project will be documented in this file.
 - **`computeRichScorecard` rebalanced** across all 6 dimensions to incorporate new signals while staying within 100-pt caps.
 - **`src/web/cli/gravio.mjs` rebuilt** (67.1 KB) via `npm run build:cli` to include all Phase 1 scanner changes.
 - Test count: 96 tests, 0 failures (up from 70).
+- CLI setup now shows an animated progress bar (`████████ 53%  Installing packages... (12s)`) during npm install, suppresses deprecation/audit/funding noise by default (`--setup-verbose` to see all output), and eliminates the DEP0190 warning by resolving `npm.cmd` on Windows without `shell: true`.
+- Dashboard Recommendations tab now shows a "Top priorities" ROI strip at the very top: project-specific critical/high items with dimension label and expected score lift (`+Xpts`), derived from the actual scan results.
+- Server `quickActions` in the full-tier recommendations payload is now project-specific (derived from the top action plan items) rather than generic boilerplate.
+- `src/web/cli/gravio.mjs` rebuilt (54.4 KB) to include progress bar and npm noise suppression.
+- Test count: 103 tests, 0 failures.
+
+### Fixed
+- Safety dimension row in CLI terminal output was misaligned with other dimension rows due to `🛡️` having inconsistent terminal width; replaced with `🔒`.
+- Recommendations section was already absent from CLI terminal output (confirmed); no regression.
 
 ### Changed
 - Registration now enforces a stronger password policy (minimum 12 chars with upper/lowercase, number, and symbol) with matching validation hints in login/onboarding forms.
