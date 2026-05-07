@@ -510,6 +510,49 @@ describe("POST /api/publish + GET /api/runs/:projectId (authenticated)", () => {
     assert.strictEqual(data.scans[1].runId, "test-run-001");
   });
 
+  it("saves per-scan context and returns it in history", async () => {
+    const history = await httpGet(`http://localhost:${TEST_PORT}/api/runs/${projectId}/history`, { Cookie: cookie });
+    const scans = JSON.parse(history.body).scans;
+    const scanId = scans[0]?.id;
+    assert.ok(scanId);
+
+    const save = await httpPost(
+      `http://localhost:${TEST_PORT}/api/scans/context`,
+      {
+        projectId,
+        scanId,
+        note: "Improved CI and tests before this scan",
+        actions: ["Added workflow", "Raised test coverage"],
+      },
+      { Cookie: cookie },
+    );
+    assert.strictEqual(save.status, 200);
+    const savedBody = JSON.parse(save.body);
+    assert.strictEqual(savedBody.ok, true);
+    assert.ok(Array.isArray(savedBody.context.actions));
+
+    const historyAfter = await httpGet(`http://localhost:${TEST_PORT}/api/runs/${projectId}/history`, { Cookie: cookie });
+    const scanAfter = JSON.parse(historyAfter.body).scans.find((s) => s.id === scanId);
+    assert.strictEqual(scanAfter.context.note, "Improved CI and tests before this scan");
+    assert.deepStrictEqual(scanAfter.context.actions, ["Added workflow", "Raised test coverage"]);
+  });
+
+  it("exports scans as csv", async () => {
+    const res = await httpGet(`http://localhost:${TEST_PORT}/api/projects/${projectId}/export/scans?format=csv`, { Cookie: cookie });
+    assert.strictEqual(res.status, 200);
+    assert.ok(String(res.headers["content-type"]).includes("text/csv"));
+    assert.ok(res.body.includes("projectId,scanId,runId"));
+    assert.ok(res.body.includes(projectId));
+  });
+
+  it("exports manager report as markdown", async () => {
+    const res = await httpGet(`http://localhost:${TEST_PORT}/api/projects/${projectId}/export/report?format=md`, { Cookie: cookie });
+    assert.strictEqual(res.status, 200);
+    assert.ok(String(res.headers["content-type"]).includes("text/markdown"));
+    assert.ok(res.body.includes(`# Gravio Improvement Report — ${projectId}`));
+    assert.ok(res.body.includes("## Scan Timeline"));
+  });
+
   it("lists projects for relink flows", async () => {
     const res = await httpGet(`http://localhost:${TEST_PORT}/api/projects/list`, { Cookie: cookie });
     assert.strictEqual(res.status, 200);

@@ -17,6 +17,8 @@ const state = {
   currentTab: "overview",
   selectedScanIds: new Set(),
   currentScans: [],
+  selectedScanId: null,
+  compareScanId: null,
   searchQuery: "",
   sortMode: "recent",
   cliToken: null,
@@ -32,6 +34,19 @@ const elDeleteSelected = $("db-delete-selected");
 const elDeleteConfirm  = $("db-delete-confirm");
 const elConfirmDelete  = $("db-confirm-delete");
 const elCancelDelete   = $("db-cancel-delete");
+const elExportScans    = $("db-export-scans");
+const elExportReport   = $("db-export-report");
+const elScanDetail     = $("db-scan-detail");
+const elScanDetailTitle = $("db-scan-detail-title");
+const elScanDetailMeta = $("db-scan-detail-meta");
+const elScanCompareSelect = $("db-scan-compare-select");
+const elScanRecList = $("db-scan-rec-list");
+const elScanChecklistSummary = $("db-scan-checklist-summary");
+const elScanChecklistList = $("db-scan-checklist-list");
+const elScanNote = $("db-scan-note");
+const elScanActions = $("db-scan-actions");
+const elSaveScanContext = $("db-save-scan-context");
+const elScanContextStatus = $("db-scan-context-status");
 
 // ─── Utilities ───
 function esc(str) {
@@ -144,6 +159,180 @@ function showError(el, msg) {
 function clearError(el) {
   el.textContent = "";
   el.setAttribute("hidden", "");
+}
+
+function getScanById(scanId) {
+  return state.currentScans.find((s) => Number(s.id) === Number(scanId)) ?? null;
+}
+
+function scanRecommendations(scan) {
+  const recs = scan?.recommendations;
+  if (recs && typeof recs === "object" && !Array.isArray(recs) && Number(recs.version) >= 2) {
+    const fromActions = Array.isArray(recs.actionPlan)
+      ? recs.actionPlan.map((item) => item?.title).filter(Boolean)
+      : [];
+    const fromQuick = Array.isArray(recs.quickActions) ? recs.quickActions.filter(Boolean) : [];
+    const merged = [...fromActions, ...fromQuick];
+    return merged.slice(0, 8);
+  }
+  if (Array.isArray(recs)) return recs.slice(0, 8);
+  return [];
+}
+
+function scanChecklist(scan) {
+  const recs = scan?.recommendations;
+  if (recs && typeof recs === "object" && !Array.isArray(recs) && Number(recs.version) >= 2 && Array.isArray(recs.readyChecklist)) {
+    return recs.readyChecklist.map((item) => ({
+      id: String(item?.id ?? item?.label ?? "item"),
+      label: String(item?.label ?? "Checklist item"),
+      passed: Boolean(item?.passed),
+    }));
+  }
+  return [];
+}
+
+function setScanContextStatus(message, isError = false) {
+  elScanContextStatus.textContent = message;
+  elScanContextStatus.classList.toggle("db-scan-context-status-error", isError);
+}
+
+function buildCompareOptions(selectedScan) {
+  const options = [`<option value="">Previous scan</option>`];
+  for (const scan of state.currentScans) {
+    if (Number(scan.id) === Number(selectedScan?.id)) continue;
+    options.push(`<option value="${scan.id}">${esc(scan.runId ?? "run")} · ${formatDateRelative(scan.publishedAt)}</option>`);
+  }
+  elScanCompareSelect.innerHTML = options.join("");
+}
+
+function renderSelectedScanDetails() {
+  const selected = getScanById(state.selectedScanId);
+  if (!selected) {
+    elScanDetail.setAttribute("hidden", "");
+    return;
+  }
+
+  elScanDetail.removeAttribute("hidden");
+  elScanDetailTitle.textContent = `Scan ${selected.runId ?? "run"}`;
+  elScanDetailMeta.textContent = `${formatDateRelative(selected.publishedAt)} · score ${formatScore(selected.overallScore)} · ${selected.rating ?? "Unknown"}`;
+
+  const recs = scanRecommendations(selected);
+  if (recs.length === 0) {
+    elScanRecList.innerHTML = `<li class="db-scan-rec-empty">No explicit recommendations for this scan.</li>`;
+  } else {
+    elScanRecList.innerHTML = recs.map((item) => `<li>${esc(item)}</li>`).join("");
+  }
+
+  buildCompareOptions(selected);
+  let compare = getScanById(state.compareScanId);
+  if (!compare) {
+    const selectedIdx = state.currentScans.findIndex((s) => Number(s.id) === Number(selected.id));
+    compare = state.currentScans[selectedIdx + 1] ?? null;
+    state.compareScanId = compare?.id ?? null;
+  }
+  if (state.compareScanId) {
+    elScanCompareSelect.value = String(state.compareScanId);
+  } else {
+    elScanCompareSelect.value = "";
+  }
+
+  const currentChecklist = scanChecklist(selected);
+  const compareChecklist = scanChecklist(compare);
+  const compareMap = new Map(compareChecklist.map((item) => [item.id, item.passed]));
+  const completed = currentChecklist.filter((item) => item.passed).length;
+  const newlyDone = currentChecklist.filter((item) => item.passed && compareMap.get(item.id) === false).map((item) => item.label);
+  const compareLabel = compare ? `vs ${compare.runId ?? "previous"}` : "(no baseline selected)";
+  elScanChecklistSummary.textContent = `${completed}/${currentChecklist.length || 0} checklist items complete ${compareLabel}`;
+
+  if (currentChecklist.length === 0) {
+    elScanChecklistList.innerHTML = `<li class="db-scan-checklist-empty">Checklist data not available for this scan tier.</li>`;
+  } else {
+    elScanChecklistList.innerHTML = currentChecklist.map((item) => {
+      const wasPassed = compareMap.get(item.id) === true;
+      const justDone = item.passed && !wasPassed;
+      return `<li class="${item.passed ? "db-scan-check-pass" : "db-scan-check-fail"}">
+        <span>${item.passed ? "✓" : "!"}</span>
+        <span>${esc(item.label)}</span>
+        <span>${justDone ? "new" : (item.passed ? "done" : "open")}</span>
+      </li>`;
+    }).join("");
+  }
+
+  elScanNote.value = String(selected.context?.note ?? "");
+  elScanActions.value = Array.isArray(selected.context?.actions) ? selected.context.actions.join("\n") : "";
+  setScanContextStatus(selected.context?.updatedAt ? `Saved ${formatDateRelative(selected.context.updatedAt)}` : "", false);
+}
+
+function selectScan(scanId) {
+  state.selectedScanId = Number(scanId);
+  state.compareScanId = null;
+  renderWorkspaceScans(state.currentScans);
+  renderSelectedScanDetails();
+}
+
+async function saveSelectedScanContext() {
+  const scan = getScanById(state.selectedScanId);
+  if (!scan || !state.selectedProject) {
+    setScanContextStatus("Select a scan first.", true);
+    return;
+  }
+
+  const actions = String(elScanActions.value ?? "")
+    .split(/\r?\n/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .slice(0, 20);
+
+  elSaveScanContext.disabled = true;
+  const prevLabel = elSaveScanContext.textContent;
+  elSaveScanContext.textContent = "Loading…";
+  setScanContextStatus("");
+
+  try {
+    const res = await fetch("/api/scans/context", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        scanId: scan.id,
+        projectId: state.selectedProject,
+        note: String(elScanNote.value ?? ""),
+        actions,
+      }),
+    });
+    const body = await res.json();
+    if (!res.ok) {
+      setScanContextStatus(body.error ?? "Failed to save context.", true);
+      return;
+    }
+    scan.context = body.context ?? { note: "", actions: [], updatedAt: null };
+    setScanContextStatus("Saved.", false);
+    renderSelectedScanDetails();
+  } catch {
+    setScanContextStatus("Failed to save context.", true);
+  } finally {
+    elSaveScanContext.disabled = false;
+    elSaveScanContext.textContent = prevLabel;
+  }
+}
+
+async function triggerDownload(url, fallbackName) {
+  const res = await fetch(url);
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error ?? `Export failed (${res.status})`);
+  }
+  const blob = await res.blob();
+  const cd = String(res.headers.get("Content-Disposition") ?? "");
+  const fileMatch = /filename=\"([^\"]+)\"/.exec(cd);
+  const fileName = fileMatch?.[1] ?? fallbackName;
+  const link = document.createElement("a");
+  const objectUrl = URL.createObjectURL(blob);
+  link.href = objectUrl;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(objectUrl), 1200);
 }
 
 // ─── Views ───
@@ -259,6 +448,8 @@ function renderWorkspace(projectId, payload) {
   state.selectedProject = projectId;
   state.currentScans    = scans;
   state.selectedScanIds.clear();
+  state.selectedScanId = scans[0]?.id ?? null;
+  state.compareScanId = null;
 
   // Hero
   $("db-ws-project-name").textContent = projectId;
@@ -320,6 +511,7 @@ function renderWorkspace(projectId, payload) {
   renderWorkspaceScans(scans);
   renderWorkspaceRecs(scans);
   renderWorkspaceRunScans(projectId, scans.length > 0);
+  renderSelectedScanDetails();
   
   // Check for requested tab from URL
   const requestedTab = getRequestedTabFromUrl();
@@ -332,19 +524,21 @@ function renderWorkspace(projectId, payload) {
 function renderWorkspaceScans(scans) {
   state.selectedScanIds.clear();
   elDeleteConfirm.setAttribute("hidden", "");
+  elDeleteSelected.textContent = "Delete selected";
 
   if (!scans.length) {
-    elScanRows.innerHTML = `<tr><td colspan="5" style="color:var(--text-3);padding:16px">No scans found.</td></tr>`;
+    elScanRows.innerHTML = `<tr><td colspan="6" style="color:var(--text-3);padding:16px">No scans found.</td></tr>`;
     return;
   }
 
   elScanRows.innerHTML = scans.map((s) => `
-    <tr>
+    <tr class="${Number(s.id) === Number(state.selectedScanId) ? "db-scan-row-active" : ""}">
       <td><input type="checkbox" data-scan-id="${s.id}" /></td>
       <td style="font-family:var(--font-mono);font-size:12px">${esc(s.runId ?? "run")}</td>
       <td title="${esc(formatDate(s.publishedAt))}">${formatDateRelative(s.publishedAt)}</td>
       <td class="${scoreColorClass(s.overallScore ?? 0)}">${formatScore(s.overallScore)}</td>
       <td><span class="db-rating-badge ${ratingBadgeClass(s.rating)}">${esc(s.rating ?? "Unknown")}</span></td>
+      <td><button class="m-btn m-btn-outline m-btn-sm db-scan-view-btn" data-view-scan-id="${s.id}" type="button">View</button></td>
     </tr>`).join("");
 }
 
@@ -860,6 +1054,21 @@ function bindEvents() {
     elDeleteSelected.textContent = n > 0 ? `Delete selected (${n})` : "Delete selected";
   });
 
+  elScanRows.addEventListener("click", (e) => {
+    const viewBtn = e.target.closest("[data-view-scan-id]");
+    if (viewBtn) {
+      selectScan(Number(viewBtn.dataset.viewScanId));
+      return;
+    }
+
+    if (e.target.closest("input[type='checkbox']")) return;
+    const row = e.target.closest("tr");
+    if (!row) return;
+    const btn = row.querySelector("[data-view-scan-id]");
+    if (!btn) return;
+    selectScan(Number(btn.dataset.viewScanId));
+  });
+
   elDeleteSelected.addEventListener("click", () => {
     clearError(elWsError);
     if (state.selectedScanIds.size === 0) {
@@ -874,6 +1083,52 @@ function bindEvents() {
   });
 
   elConfirmDelete.addEventListener("click", deleteSelectedScans);
+
+  elScanCompareSelect.addEventListener("change", (e) => {
+    const val = Number(e.target.value);
+    state.compareScanId = Number.isInteger(val) && val > 0 ? val : null;
+    renderSelectedScanDetails();
+  });
+
+  elSaveScanContext.addEventListener("click", saveSelectedScanContext);
+
+  elExportScans.addEventListener("click", async () => {
+    if (!state.selectedProject) return;
+    clearError(elWsError);
+    elExportScans.disabled = true;
+    const prev = elExportScans.textContent;
+    elExportScans.textContent = "Loading…";
+    try {
+      await triggerDownload(
+        `/api/projects/${encodeURIComponent(state.selectedProject)}/export/scans?format=csv`,
+        `gravio-scans-${state.selectedProject}.csv`,
+      );
+    } catch (err) {
+      showError(elWsError, err.message);
+    } finally {
+      elExportScans.disabled = false;
+      elExportScans.textContent = prev;
+    }
+  });
+
+  elExportReport.addEventListener("click", async () => {
+    if (!state.selectedProject) return;
+    clearError(elWsError);
+    elExportReport.disabled = true;
+    const prev = elExportReport.textContent;
+    elExportReport.textContent = "Loading…";
+    try {
+      await triggerDownload(
+        `/api/projects/${encodeURIComponent(state.selectedProject)}/export/report?format=md`,
+        `gravio-report-${state.selectedProject}.md`,
+      );
+    } catch (err) {
+      showError(elWsError, err.message);
+    } finally {
+      elExportReport.disabled = false;
+      elExportReport.textContent = prev;
+    }
+  });
 
   // Copy buttons in the Run Scans tab (panel persists; content is re-rendered per project)
   $("db-tab-runscans").addEventListener("click", (e) => {

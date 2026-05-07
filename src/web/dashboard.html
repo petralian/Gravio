@@ -117,6 +117,8 @@
       <div class="db-tab-panel" id="db-tab-scans" hidden>
         <div class="db-scan-actions">
           <button class="m-btn m-btn-outline m-btn-sm" id="db-delete-selected" type="button">Delete selected</button>
+          <button class="m-btn m-btn-outline m-btn-sm" id="db-export-scans" type="button">Export scans CSV</button>
+          <button class="m-btn m-btn-outline m-btn-sm" id="db-export-report" type="button">Export manager report</button>
         </div>
         <div class="db-delete-confirm" id="db-delete-confirm" hidden>
           <p>Delete selected scans? This cannot be undone.</p>
@@ -134,10 +136,49 @@
                 <th>Published</th>
                 <th>Score</th>
                 <th>Rating</th>
+                <th>Details</th>
               </tr>
             </thead>
             <tbody id="db-scan-rows"></tbody>
           </table>
+        </div>
+
+        <div class="db-scan-detail" id="db-scan-detail" hidden>
+          <div class="db-scan-detail-head">
+            <div>
+              <p class="db-scan-detail-title" id="db-scan-detail-title">Scan details</p>
+              <p class="db-scan-detail-meta" id="db-scan-detail-meta"></p>
+            </div>
+            <label class="db-scan-compare-wrap" for="db-scan-compare-select">
+              Compare against
+              <select id="db-scan-compare-select" class="db-sort-select"></select>
+            </label>
+          </div>
+
+          <div class="db-scan-detail-grid">
+            <div class="db-scan-detail-card">
+              <p class="db-scan-detail-card-title">Recommendations for this scan</p>
+              <ul class="db-scan-rec-list" id="db-scan-rec-list"></ul>
+            </div>
+
+            <div class="db-scan-detail-card">
+              <p class="db-scan-detail-card-title">Checklist progress</p>
+              <p class="db-scan-checklist-summary" id="db-scan-checklist-summary"></p>
+              <ul class="db-scan-checklist-list" id="db-scan-checklist-list"></ul>
+            </div>
+          </div>
+
+          <div class="db-scan-detail-card">
+            <p class="db-scan-detail-card-title">Context and actions</p>
+            <label class="db-scan-field-label" for="db-scan-note">Context note</label>
+            <textarea id="db-scan-note" class="db-scan-textarea" rows="3" placeholder="What changed in this scan? What was fixed?"></textarea>
+            <label class="db-scan-field-label" for="db-scan-actions">Actions taken (one per line)</label>
+            <textarea id="db-scan-actions" class="db-scan-textarea" rows="4" placeholder="Added CI workflow&#10;Enabled secret scanning gate"></textarea>
+            <div class="db-scan-detail-actions-row">
+              <button class="m-btn m-btn-neon m-btn-sm" id="db-save-scan-context" type="button">Save context</button>
+              <span class="db-scan-context-status" id="db-scan-context-status"></span>
+            </div>
+          </div>
         </div>
       </div>
 

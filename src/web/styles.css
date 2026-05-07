@@ -2017,7 +2017,12 @@ button#evaluate-btn:hover {
   font-size: 14px;
 }
 
-.db-scan-actions { margin: 8px 0 12px; }
+.db-scan-actions {
+  margin: 8px 0 12px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
 
 .db-delete-confirm {
   border: 1px solid rgba(255,68,102,0.25);
@@ -2062,6 +2067,158 @@ button#evaluate-btn:hover {
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
+}
+
+.db-scan-row-active {
+  background: rgba(0,229,255,0.06);
+}
+
+.db-scan-view-btn {
+  min-width: 60px;
+}
+
+.db-scan-detail {
+  margin-top: 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: rgba(255,255,255,0.02);
+  padding: 14px;
+}
+
+.db-scan-detail-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.db-scan-detail-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-1);
+}
+
+.db-scan-detail-meta {
+  font-size: 13px;
+  color: var(--text-3);
+}
+
+.db-scan-compare-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+.db-scan-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.db-scan-detail-card {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-2);
+  padding: 12px;
+}
+
+.db-scan-detail-card-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-2);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  margin-bottom: 8px;
+}
+
+.db-scan-rec-list,
+.db-scan-checklist-list {
+  margin-left: 18px;
+  color: var(--text-2);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.db-scan-checklist-list {
+  margin-left: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.db-scan-checklist-list li {
+  display: grid;
+  grid-template-columns: 16px 1fr auto;
+  gap: 8px;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 6px 8px;
+}
+
+.db-scan-check-pass {
+  background: rgba(0,255,136,0.05);
+  border-color: rgba(0,255,136,0.18);
+}
+
+.db-scan-check-fail {
+  background: rgba(255,77,77,0.05);
+  border-color: rgba(255,77,77,0.18);
+}
+
+.db-scan-checklist-summary {
+  font-size: 12px;
+  color: var(--text-3);
+  margin-bottom: 8px;
+}
+
+.db-scan-field-label {
+  display: block;
+  font-size: 12px;
+  color: var(--text-3);
+  margin-bottom: 4px;
+  margin-top: 8px;
+}
+
+.db-scan-textarea {
+  width: 100%;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-1);
+  font-family: var(--font);
+  font-size: 13px;
+  padding: 10px;
+  resize: vertical;
+}
+
+.db-scan-detail-actions-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.db-scan-context-status {
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+.db-scan-context-status-error {
+  color: var(--danger);
+}
+
+.db-scan-rec-empty,
+.db-scan-checklist-empty {
+  color: var(--text-3);
+  font-size: 13px;
 }
 
 .db-scan-table tr:last-child td { border-bottom: none; }
@@ -3393,6 +3550,7 @@ details[open] > .db-cmd-ref-summary::before { transform: rotate(90deg); }
   .db-overview-stats { grid-template-columns: 1fr 1fr; }
   .db-ph-title-row { flex-direction: column; align-items: flex-start; gap: 12px; }
   .db-settings-section { padding: 20px; }
+  .db-scan-detail-grid { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 600px) {
@@ -3421,6 +3579,7 @@ details[open] > .db-cmd-ref-summary::before { transform: rotate(90deg); }
   .db-tabs { overflow-x: auto; }
   .db-tab { padding: 10px 14px; font-size: 13px; }
   .st-billing-grid { grid-template-columns: 1fr; }
+  .db-scan-actions { flex-direction: column; align-items: stretch; }
 }
 
 /* ─── DOWNLOAD PAGE ─── */
