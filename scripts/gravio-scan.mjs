@@ -377,7 +377,7 @@ function printSetupStage(index, total, title, reason) {
   process.stdout.write(`     Progress: step ${index}/${total}\n`);
 }
 
-function runInstallStep(targetDir, step, { setupVerbose = false } = {}) {
+function runInstallStep(targetDir, step, { setupVerbose = false, retryCount = 0, maxRetries = 2 } = {}) {
   return new Promise((resolve) => {
     const pretty = `${step.cmd} ${step.args.join(" ")}`;
     process.stdout.write(`     Running: ${pretty}\n`);
@@ -441,11 +441,37 @@ function runInstallStep(targetDir, step, { setupVerbose = false } = {}) {
       consumeNpmStream(child.stdout);
       consumeNpmStream(child.stderr);
 
+      child.on("error", (err) => {
+        clearInterval(progressTimer);
+        process.stdout.write("\n");
+        if (retryCount < maxRetries) {
+          process.stdout.write(`       ⚠️  Process error: ${err.code ?? err.message}. Retrying (attempt ${retryCount + 2}/${maxRetries + 1})...\n`);
+          setTimeout(() => {
+            runInstallStep(targetDir, step, { setupVerbose, retryCount: retryCount + 1, maxRetries }).then(resolve);
+          }, 1000);
+        } else {
+          process.stdout.write(`       Failed after ${maxRetries + 1} attempts: ${err.code ?? err.message}\n`);
+          resolve(false);
+        }
+      });
+
       child.on("close", (code) => {
         clearInterval(progressTimer);
-        writeSetupProgress(100, "Complete");
-        process.stdout.write("\n");
-        resolve(code === 0);
+        if (code === 0) {
+          writeSetupProgress(100, "Complete");
+          process.stdout.write("\n");
+          resolve(true);
+        } else if (retryCount < maxRetries) {
+          process.stdout.write("\n");
+          process.stdout.write(`       ⚠️  Exit code ${code}. Retrying (attempt ${retryCount + 2}/${maxRetries + 1})...\n`);
+          setTimeout(() => {
+            runInstallStep(targetDir, step, { setupVerbose, retryCount: retryCount + 1, maxRetries }).then(resolve);
+          }, 1000);
+        } else {
+          writeSetupProgress(100, "Failed");
+          process.stdout.write("\n");
+          resolve(false);
+        }
       });
       return;
     }
@@ -498,19 +524,52 @@ function runInstallStep(targetDir, step, { setupVerbose = false } = {}) {
     consumeStream(child.stdout);
     consumeStream(child.stderr);
 
-    child.on("close", (code) => {
-      if (alreadySatisfied > 0) {
-        process.stdout.write(`     pip summary: ${alreadySatisfied} dependencies were already satisfied.\n`);
+    child.on("error", (err) => {
+      if (retryCount < maxRetries) {
+        process.stdout.write(`     ⚠️  Process error: ${err.code ?? err.message}. Retrying (attempt ${retryCount + 2}/${maxRetries + 1})...\n`);
+        setTimeout(() => {
+          runInstallStep(targetDir, step, { setupVerbose, retryCount: retryCount + 1, maxRetries }).then(resolve);
+        }, 1000);
+      } else {
+        process.stdout.write(`     Failed after ${maxRetries + 1} attempts: ${err.code ?? err.message}\n`);
+        resolve(false);
       }
-      resolve(code === 0);
+    });
+
+    child.on("close", (code) => {
+      if (code === 0) {
+        if (alreadySatisfied > 0) {
+          process.stdout.write(`     pip summary: ${alreadySatisfied} dependencies were already satisfied.\n`);
+        }
+        resolve(true);
+      } else if (retryCount < maxRetries) {
+        process.stdout.write(`     ⚠️  Exit code ${code}. Retrying (attempt ${retryCount + 2}/${maxRetries + 1})...\n`);
+        setTimeout(() => {
+          runInstallStep(targetDir, step, { setupVerbose, retryCount: retryCount + 1, maxRetries }).then(resolve);
+        }, 1000);
+      } else {
+        process.stdout.write(`     Failed after ${maxRetries + 1} attempts (exit code ${code}).\n`);
+        resolve(false);
+      }
     });
   });
 }
 
 async function runSetup(targetDir, { silentNoWork = false, setupVerbose = false } = {}) {
   assertNodeSupported();
+  
+  // Preflight: check if node and npm are available
   process.stdout.write("\n  \x1b[96m\x1b[1mGravio setup\x1b[0m\n");
   process.stdout.write(`  Folder: ${path.resolve(targetDir)}\n`);
+  
+  const preflightCheck = spawnSync(resolveNativeCmd("npm"), ["--version"], { stdio: "pipe" });
+  if (preflightCheck.status !== 0) {
+    process.stderr.write(`\n  \x1b[91m\x1b[1m✖  Preflight failed\x1b[0m\n`);
+    process.stderr.write(`     npm is not available. Check your Node.js installation.\n`);
+    process.stderr.write(`     Hint: Try 'npm --version' manually to diagnose.\n\n`);
+    return false;
+  }
+  
   process.stdout.write("  Setup stages are shown before each action so changes are easy to follow.\n");
 
   const totalStages = 3;
@@ -1031,12 +1090,27 @@ async function handleDoctor(args) {
 
   process.stdout.write("\n  Gravio doctor\n");
   process.stdout.write(`  Folder: ${path.resolve(args.target)}\n`);
-  process.stdout.write(`  Setup: ${setup?.completedAt ? "ok" : "missing"}\n`);
-  process.stdout.write(`  Auth: ${auth?.apiKey ? "ok" : "missing"}\n`);
-  process.stdout.write(`  Linked project: ${project?.projectId ?? "missing"}\n`);
+  process.stdout.write(`  Setup: ${setup?.completedAt ? "✅ ok" : "❌ missing"}\n`);
+  process.stdout.write(`  Auth: ${auth?.apiKey ? "✅ ok" : "❌ missing"}\n`);
+  process.stdout.write(`  Linked project: ${project?.projectId ? "✅ " + project.projectId : "❌ missing"}\n`);
 
-  if (!auth?.apiKey) process.stdout.write("  Fix: node gravio.mjs --token <gv_...>\n");
-  if (auth?.apiKey && !project?.projectId) process.stdout.write("  Fix: node gravio.mjs link --project <id>\n");
+  const issues = [];
+  if (!setup?.completedAt) issues.push("Setup not completed");
+  if (!auth?.apiKey) issues.push("API key not configured");
+  if (!project?.projectId) issues.push("Project not linked");
+
+  if (issues.length > 0) {
+    process.stdout.write(`\n  Issues found:\n`);
+    for (const issue of issues) {
+      process.stdout.write(`    - ${issue}\n`);
+    }
+    process.stdout.write(`\n  Fixes:\n`);
+    if (!setup?.completedAt) process.stdout.write(`    $ node gravio.mjs setup\n`);
+    if (!auth?.apiKey) process.stdout.write(`    $ node gravio.mjs --token <gv_...>\n`);
+    if (auth?.apiKey && !project?.projectId) process.stdout.write(`    $ node gravio.mjs link --project <id>\n`);
+  } else {
+    process.stdout.write(`\n  ✅ All checks passed!\n`);
+  }
   process.stdout.write("\n");
 }
 
@@ -1125,6 +1199,34 @@ try {
 
   await handleRun(args);
 } catch (err) {
-  process.stderr.write(`\n  \x1b[91m\x1b[1m✖  Error\x1b[0m  ${err.message}\n\n`);
+  process.stderr.write(`\n  \x1b[91m\x1b[1m✖  Error\x1b[0m  ${err.message}\n`);
+  
+  // Auto-recovery suggestions based on error type
+  const msg = String(err.message).toLowerCase();
+  process.stderr.write("\n  \x1b[93m💡 Troubleshooting suggestions:\x1b[0m\n");
+  
+  if (msg.includes("setup") || msg.includes("package")) {
+    process.stderr.write(`    1. Run preflight diagnostics: \x1b[96mnode gravio.mjs doctor\x1b[0m\n`);
+    process.stderr.write(`    2. Try re-running setup: \x1b[96mnode gravio.mjs setup\x1b[0m\n`);
+    process.stderr.write(`    3. If setup fails persistently, try with verbose output: \x1b[96mnode gravio.mjs setup --setup-verbose\x1b[0m\n`);
+  }
+  
+  if (msg.includes("auth") || msg.includes("token") || msg.includes("api key")) {
+    process.stderr.write(`    1. Re-authenticate: \x1b[96mnode gravio.mjs --token <gv_YOUR_TOKEN>\x1b[0m\n`);
+    process.stderr.write(`    2. Get a fresh token at: \x1b[96mhttps://gravio.dev/onboarding\x1b[0m\n`);
+  }
+  
+  if (msg.includes("project") && msg.includes("link")) {
+    process.stderr.write(`    1. List and link a project: \x1b[96mnode gravio.mjs link --project <id>\x1b[0m\n`);
+    process.stderr.write(`    2. Or check status: \x1b[96mnode gravio.mjs doctor\x1b[0m\n`);
+  }
+  
+  if (msg.includes("spawn") || msg.includes("einval")) {
+    process.stderr.write(`    1. The CLI auto-retries process errors. This may indicate a system issue.\n`);
+    process.stderr.write(`    2. Check that Node.js 20+ is installed: \x1b[96mnode --version\x1b[0m\n`);
+    process.stderr.write(`    3. Try with setup verbose to see more details: \x1b[96mnode gravio.mjs setup --setup-verbose\x1b[0m\n`);
+  }
+  
+  process.stderr.write("\n");
   process.exit(1);
 }
