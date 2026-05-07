@@ -21,6 +21,7 @@ const state = {
   compareScanId: null,
   filterFrom: "",
   filterTo: "",
+  scanDimFilter: "all",
   searchQuery: "",
   sortMode: "recent",
   cliToken: null,
@@ -32,6 +33,7 @@ const elProjEmpty      = $("db-projects-empty");
 const elPhError        = $("db-ph-error");
 const elWsError        = $("db-ws-error");
 const elScanRows       = $("db-scan-rows");
+const elOverviewInsights = $("db-ov-insights");
 const elDeleteSelected = $("db-delete-selected");
 const elDeleteConfirm  = $("db-delete-confirm");
 const elConfirmDelete  = $("db-confirm-delete");
@@ -39,6 +41,7 @@ const elCancelDelete   = $("db-cancel-delete");
 const elExportScans       = $("db-export-scans");
 const elExportReport      = $("db-export-report");
 const elExportReportHtml  = $("db-export-report-html");
+const elScanDimFilter     = $("db-scan-dim-filter");
 const elFilterFrom        = $("db-filter-from");
 const elFilterTo          = $("db-filter-to");
 const elFilterClear       = $("db-filter-clear");
@@ -46,6 +49,12 @@ const elScanDetail     = $("db-scan-detail");
 const elScanDetailTitle = $("db-scan-detail-title");
 const elScanDetailMeta = $("db-scan-detail-meta");
 const elScanCompareSelect = $("db-scan-compare-select");
+const elScanOverall = $("db-scan-overall");
+const elScanToc = $("db-scan-toc");
+const elScanMoscow = $("db-scan-moscow");
+const elScanPassing = $("db-scan-passing");
+const elScanNa = $("db-scan-na");
+const elScanAssumptions = $("db-scan-assumptions");
 const elScanRecList = $("db-scan-rec-list");
 const elScanChecklistSummary = $("db-scan-checklist-summary");
 const elScanChecklistList = $("db-scan-checklist-list");
@@ -100,7 +109,7 @@ function getRequestedProjectFromUrl() {
 
 function getRequestedTabFromUrl() {
   const tab = new URLSearchParams(window.location.search).get("tab");
-  const valid = ["overview", "scans", "recommendations", "runscans"];
+  const valid = ["overview", "scans", "runscans"];
   return valid.includes(tab) ? tab : null;
 }
 
@@ -197,6 +206,284 @@ function scanChecklist(scan) {
   return [];
 }
 
+const DIM_ORDER = ["safety", "reliability", "evaluation", "observability", "governance", "agentic"];
+const DIM_META = {
+  safety: { label: "Safety", target: 90 },
+  reliability: { label: "Reliability", target: 85 },
+  evaluation: { label: "Evaluation", target: 85 },
+  observability: { label: "Observability", target: 80 },
+  governance: { label: "Governance", target: 80 },
+  agentic: { label: "Agentic", target: 80 },
+};
+
+function toDimLabel(dim) {
+  return DIM_META[dim]?.label ?? String(dim ?? "");
+}
+
+function normalizePriority(priority) {
+  const p = String(priority ?? "").toLowerCase();
+  if (p === "critical" || p === "high" || p === "medium" || p === "low") return p;
+  return "medium";
+}
+
+function progressBarHtml(value) {
+  if (!Number.isFinite(value)) {
+    return `<div class="db-inline-bar"><div class="db-inline-fill" style="width:0%"></div></div><span class="db-inline-score">n/a</span>`;
+  }
+  const score = Math.max(0, Math.min(100, Math.round(value)));
+  return `<div class="db-inline-bar"><div class="db-inline-fill" style="width:${score}%"></div></div><span class="db-inline-score">${score}</span>`;
+}
+
+function scanDimensionPlan(scan) {
+  const recs = scan?.recommendations;
+  if (recs && typeof recs === "object" && !Array.isArray(recs) && Array.isArray(recs.dimensionPlan)) {
+    return recs.dimensionPlan;
+  }
+  return [];
+}
+
+function scanActionPlan(scan) {
+  const recs = scan?.recommendations;
+  if (recs && typeof recs === "object" && !Array.isArray(recs) && Array.isArray(recs.actionPlan)) {
+    return recs.actionPlan;
+  }
+  return [];
+}
+
+function scanAssumptions(scan) {
+  const assumptions = [
+    "Analysis is based on this selected scan snapshot, not live unscanned code.",
+    "Priority and score-impact estimates are directional and should be validated after fixes.",
+    "Dimension targets follow Gravio ready-to-ship thresholds for this project type.",
+  ];
+  if (scan?.limitedDetails) {
+    assumptions.push("Your current plan tier limits remediation depth; upgrade for complete playbooks.");
+  }
+  return assumptions;
+}
+
+function buildScanMarkdownReport({ projectId, scan, dimFilter }) {
+  const actions = scanActionPlan(scan)
+    .filter((item) => dimFilter === "all" || item.dimension === dimFilter);
+  const dimensions = scanDimensionPlan(scan)
+    .filter((item) => dimFilter === "all" || item.dimension === dimFilter);
+  const checklist = scanChecklist(scan);
+  const passing = checklist.filter((item) => item.passed);
+  const naDimensions = dimensions.filter((d) => d.current === null || d.current === undefined);
+  const byPriority = {
+    critical: actions.filter((a) => normalizePriority(a.priority) === "critical"),
+    high: actions.filter((a) => normalizePriority(a.priority) === "high"),
+    medium: actions.filter((a) => normalizePriority(a.priority) === "medium"),
+    low: actions.filter((a) => normalizePriority(a.priority) === "low"),
+  };
+
+  const lines = [];
+  lines.push(`# Gravio Deep Scan Report — ${projectId}`);
+  lines.push("");
+  lines.push(`- Run: ${scan.runId ?? "run"}`);
+  lines.push(`- Published: ${scan.publishedAt ?? "unknown"}`);
+  lines.push(`- Overall score: ${formatScore(scan.overallScore)}/100 (${scan.rating ?? "Unknown"})`);
+  lines.push(`- Dimension filter: ${dimFilter === "all" ? "All dimensions" : toDimLabel(dimFilter)}`);
+  lines.push("");
+  lines.push("## Table of contents");
+  lines.push("- [Overall score summary](#overall-score-summary)");
+  lines.push("- [Dimension score table](#dimension-score-table)");
+  lines.push("- [MoSCoW priorities](#moscow-priorities)");
+  lines.push("- [Passing checks summary](#passing-checks-summary)");
+  lines.push("- [Not applicable](#not-applicable)");
+  lines.push("- [Assumptions](#assumptions)");
+  lines.push("");
+  lines.push("## Overall score summary");
+  lines.push(`- Current score: ${formatScore(scan.overallScore)}/100`);
+  lines.push(`- Rating: ${scan.rating ?? "Unknown"}`);
+  lines.push("");
+  lines.push("## Dimension score table");
+  lines.push("| Dimension | Score | Target | Gap |");
+  lines.push("|---|---:|---:|---:|");
+  for (const dim of dimensions) {
+    const cur = Number.isFinite(dim.current) ? Math.round(dim.current) : null;
+    const target = Number.isFinite(dim.target) ? Math.round(dim.target) : (DIM_META[dim.dimension]?.target ?? 80);
+    const gap = cur === null ? "n/a" : Math.max(0, target - cur);
+    lines.push(`| ${toDimLabel(dim.dimension)} | ${cur === null ? "n/a" : cur} | ${target} | ${gap} |`);
+  }
+  lines.push("");
+  lines.push("## MoSCoW priorities");
+  lines.push("");
+  const tiers = [
+    ["Must Have", byPriority.critical],
+    ["Should Have", byPriority.high],
+    ["Could Have", byPriority.medium],
+    ["Won't Fix (now)", byPriority.low],
+  ];
+  for (const [label, items] of tiers) {
+    lines.push(`### ${label}`);
+    if (!items.length) {
+      lines.push("- None");
+      lines.push("");
+      continue;
+    }
+    for (const item of items) {
+      lines.push(`#### ${item.title ?? "Recommended action"}`);
+      lines.push(`- Dimension: ${toDimLabel(item.dimension)}`);
+      lines.push(`- Effort: ${item.effort ?? "unknown"}`);
+      lines.push(`- Score impact: ${item.impact ?? item.expectedLift ?? "unknown"}`);
+      lines.push(`- Why: ${item.why ?? ""}`);
+      if (item.how) lines.push(`- How: ${item.how}`);
+      const actionSteps = Array.isArray(item.actions) ? item.actions : [];
+      for (const step of actionSteps) lines.push(`  - ${step}`);
+      lines.push("");
+    }
+  }
+  lines.push("## Passing checks summary");
+  if (!passing.length) {
+    lines.push("- No passing checks reported in this scan.");
+  } else {
+    for (const pass of passing) {
+      lines.push(`- ${pass.label}`);
+    }
+  }
+  lines.push("");
+  lines.push("## Not applicable");
+  if (!naDimensions.length) {
+    lines.push("- No N/A dimensions for this filtered view.");
+  } else {
+    for (const item of naDimensions) {
+      lines.push(`- ${toDimLabel(item.dimension)} marked as N/A for this project context.`);
+    }
+  }
+  lines.push("");
+  lines.push("## Assumptions");
+  for (const item of scanAssumptions(scan)) {
+    lines.push(`- ${item}`);
+  }
+  lines.push("");
+  return lines.join("\n");
+}
+
+function buildScanHtmlReport({ projectId, scan, dimFilter }) {
+  const markdown = buildScanMarkdownReport({ projectId, scan, dimFilter })
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Gravio Deep Scan Report</title><style>body{font-family:system-ui,-apple-system,Segoe UI,sans-serif;max-width:980px;margin:0 auto;padding:32px;line-height:1.55;color:#0f172a}pre{white-space:pre-wrap;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:16px}</style></head><body><pre>${markdown}</pre></body></html>`;
+}
+
+function downloadTextFile(fileName, text, mime = "text/plain") {
+  const blob = new Blob([text], { type: `${mime};charset=utf-8` });
+  const objectUrl = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = objectUrl;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(objectUrl), 1200);
+}
+
+function renderDeepScanSections(scan) {
+  const dimFilter = state.scanDimFilter;
+  const recs = scan?.recommendations;
+  const dimensions = scanDimensionPlan(scan)
+    .filter((item) => dimFilter === "all" || item.dimension === dimFilter);
+  const actions = scanActionPlan(scan)
+    .filter((item) => dimFilter === "all" || item.dimension === dimFilter);
+  const checklist = scanChecklist(scan);
+  const passing = checklist.filter((item) => item.passed);
+  const naDimensions = dimensions.filter((item) => item.current === null || item.current === undefined);
+
+  const tier = {
+    critical: actions.filter((item) => normalizePriority(item.priority) === "critical"),
+    high: actions.filter((item) => normalizePriority(item.priority) === "high"),
+    medium: actions.filter((item) => normalizePriority(item.priority) === "medium"),
+    low: actions.filter((item) => normalizePriority(item.priority) === "low"),
+  };
+
+  elScanOverall.innerHTML = `
+    <p class="db-scan-detail-card-title">Overall score summary and dimensions</p>
+    <p class="db-scan-overall-line">Score <strong>${formatScore(scan.overallScore)}/100</strong> · Rating <strong>${esc(scan.rating ?? "Unknown")}</strong> · Filter <strong>${esc(dimFilter === "all" ? "All dimensions" : toDimLabel(dimFilter))}</strong></p>
+    ${dimensions.length ? `
+      <table class="db-scan-dim-table">
+        <thead><tr><th>Dimension</th><th>Progress</th><th>Target</th><th>Gap</th></tr></thead>
+        <tbody>
+          ${dimensions.map((item) => {
+            const current = Number.isFinite(item.current) ? Math.round(item.current) : null;
+            const target = Number.isFinite(item.target) ? Math.round(item.target) : (DIM_META[item.dimension]?.target ?? 80);
+            const gap = current === null ? "n/a" : String(Math.max(0, target - current));
+            return `<tr>
+              <td>${esc(toDimLabel(item.dimension))}</td>
+              <td>${progressBarHtml(current)}</td>
+              <td>${target}</td>
+              <td>${gap}</td>
+            </tr>`;
+          }).join("")}
+        </tbody>
+      </table>` : `<p class="db-scan-rec-empty">No dimension plan data available for this scan.</p>`}
+  `;
+
+  elScanToc.innerHTML = `
+    <p class="db-scan-detail-card-title">Table of contents</p>
+    <nav class="db-scan-toc-list">
+      <a href="#db-sec-moscow">MoSCoW priorities</a>
+      <a href="#db-sec-passing">Passing checks summary</a>
+      <a href="#db-sec-na">N/A section</a>
+      <a href="#db-sec-assumptions">Assumptions</a>
+    </nav>
+  `;
+
+  const renderTier = (label, cssClass, items) => `
+    <div class="db-moscow-tier">
+      <p class="db-moscow-tier-title ${cssClass}">${label}</p>
+      ${items.length ? items.map((item) => `
+        <article class="db-moscow-card">
+          <div class="db-rec-action-head">
+            <span class="db-priority-chip db-priority-${normalizePriority(item.priority)}">${esc(normalizePriority(item.priority))}</span>
+            <span class="db-rec-dim-chip">${esc(toDimLabel(item.dimension))}</span>
+            ${item.effort ? `<span class="db-effort-chip db-effort-${esc(item.effort)}">effort: ${esc(item.effort)}</span>` : ""}
+            ${item.impact ? `<span class="db-impact-chip db-impact-${esc(item.impact)}">impact: ${esc(item.impact)}</span>` : ""}
+          </div>
+          <p class="db-rec-action-title">${esc(item.title ?? "Recommended action")}</p>
+          ${item.why ? `<p class="db-rec-action-why">${esc(item.why)}</p>` : ""}
+          ${item.how ? `<p class="db-rec-action-how">${esc(item.how)}</p>` : ""}
+          ${Array.isArray(item.actions) && item.actions.length ? `<ul class="db-rec-bullets">${item.actions.map((step) => `<li>${esc(step)}</li>`).join("")}</ul>` : ""}
+          ${Array.isArray(item.commands) && item.commands.length ? `<div class="db-rec-cmds">${item.commands.map((cmd) => `<code>${esc(cmd)}</code>`).join("")}</div>` : ""}
+          ${item.fixPrompt ? `<button class="db-copy-prompt-btn" data-prompt="${esc(item.fixPrompt)}" type="button">Copy fix prompt for AI tool</button>` : ""}
+        </article>`).join("") : `<p class="db-scan-rec-empty">No items in this tier for the selected filter.</p>`}
+    </div>
+  `;
+
+  elScanMoscow.innerHTML = `
+    <div id="db-sec-moscow"></div>
+    <p class="db-scan-detail-card-title">MoSCoW priorities</p>
+    ${renderTier("Must Have", "db-moscow-critical", tier.critical)}
+    ${renderTier("Should Have", "db-moscow-high", tier.high)}
+    ${renderTier("Could Have", "db-moscow-medium", tier.medium)}
+    ${renderTier("Won't Fix (now)", "db-moscow-low", tier.low)}
+  `;
+
+  elScanPassing.innerHTML = `
+    <div id="db-sec-passing"></div>
+    <p class="db-scan-detail-card-title">Passing checks summary</p>
+    ${passing.length ? `<ul class="db-scan-rec-list">${passing.map((item) => `<li>${esc(item.label)}</li>`).join("")}</ul>` : `<p class="db-scan-rec-empty">No passing checks reported in this scan.</p>`}
+  `;
+
+  elScanNa.innerHTML = `
+    <div id="db-sec-na"></div>
+    <p class="db-scan-detail-card-title">Not applicable</p>
+    ${naDimensions.length ? `<ul class="db-scan-rec-list">${naDimensions.map((item) => `<li>${esc(toDimLabel(item.dimension))} is marked as N/A for this project context.</li>`).join("")}</ul>` : `<p class="db-scan-rec-empty">No N/A dimensions in this filtered view.</p>`}
+  `;
+
+  const assumptions = scanAssumptions(scan);
+  elScanAssumptions.innerHTML = `
+    <div id="db-sec-assumptions"></div>
+    <p class="db-scan-detail-card-title">Assumptions</p>
+    <ul class="db-scan-rec-list">${assumptions.map((item) => `<li>${esc(item)}</li>`).join("")}</ul>
+  `;
+
+  if (!recs || Number(recs.version) < 2) {
+    elScanMoscow.innerHTML = `<p class="db-scan-detail-card-title">MoSCoW priorities</p><p class="db-scan-rec-empty">Detailed MoSCoW data is not available for this scan.</p>`;
+  }
+}
+
 function setScanContextStatus(message, isError = false) {
   elScanContextStatus.textContent = message;
   elScanContextStatus.classList.toggle("db-scan-context-status-error", isError);
@@ -263,6 +550,8 @@ function renderSelectedScanDetails() {
       </li>`;
     }).join("");
   }
+
+  renderDeepScanSections(selected);
 
   elScanNote.value = String(selected.context?.note ?? "");
   elScanActions.value = Array.isArray(selected.context?.actions) ? selected.context.actions.join("\n") : "";
@@ -456,6 +745,8 @@ function renderWorkspace(projectId, payload) {
   state.selectedScanIds.clear();
   state.selectedScanId = scans[0]?.id ?? null;
   state.compareScanId = null;
+  state.scanDimFilter = "all";
+  if (elScanDimFilter) elScanDimFilter.value = "all";
 
   // Hero
   $("db-ws-project-name").textContent = projectId;
@@ -898,7 +1189,8 @@ function renderScoreChart(container, history) {
 }
 
 function renderWorkspaceRecs(scans) {
-  const recList = $("db-recs-list");
+  const recList = elOverviewInsights;
+  if (!recList) return;
   const latest = scans[0];
   const recs = latest?.recommendations;
 
@@ -999,6 +1291,8 @@ function renderWorkspaceRecs(scans) {
                   <div class="db-rec-cmds">
                     ${item.commands.map((cmd) => `<code>${esc(cmd)}</code>`).join("")}
                   </div>` : ""}
+                ${item.fixPrompt ? `
+                  <button class="db-copy-prompt-btn" data-prompt="${esc(item.fixPrompt)}" type="button">Copy fix prompt</button>` : ""}
               </article>`).join("")}
           </div>
         </li>` : ""}
@@ -1131,6 +1425,22 @@ function bindEvents() {
     openProject(card.dataset.project);
   });
 
+  // Prompt pack: copy fix prompt to clipboard
+  document.addEventListener("click", (e) => {
+    const btn = e.target.closest(".db-copy-prompt-btn");
+    if (!btn) return;
+    const prompt = btn.dataset.prompt ?? "";
+    navigator.clipboard.writeText(prompt).then(() => {
+      const orig = btn.textContent;
+      btn.textContent = "Copied!";
+      btn.disabled = true;
+      setTimeout(() => { btn.textContent = orig; btn.disabled = false; }, 2000);
+    }).catch(() => {
+      btn.textContent = "Copy failed";
+      setTimeout(() => { btn.textContent = "Copy fix prompt"; }, 2000);
+    });
+  });
+
   $("db-back-btn").addEventListener("click", () => {
     state.selectedProject = null;
     clearProjectFromUrl();
@@ -1220,9 +1530,17 @@ function bindEvents() {
   elFilterClear.addEventListener("click", () => {
     state.filterFrom = "";
     state.filterTo = "";
+    state.scanDimFilter = "all";
     elFilterFrom.value = "";
     elFilterTo.value = "";
+    if (elScanDimFilter) elScanDimFilter.value = "all";
     renderWorkspaceScans(state.currentScans);
+    renderSelectedScanDetails();
+  });
+
+  elScanDimFilter.addEventListener("change", () => {
+    state.scanDimFilter = String(elScanDimFilter.value || "all");
+    renderSelectedScanDetails();
   });
   // ───────────────────────────────────────────────────────────────────────
 
@@ -1246,16 +1564,21 @@ function bindEvents() {
   });
 
   elExportReport.addEventListener("click", async () => {
-    if (!state.selectedProject) return;
+    if (!state.selectedProject || !state.selectedScanId) return;
     clearError(elWsError);
     elExportReport.disabled = true;
     const prev = elExportReport.textContent;
     elExportReport.textContent = "Loading…";
     try {
-      await triggerDownload(
-        `/api/projects/${encodeURIComponent(state.selectedProject)}/export/report?format=md${buildDateParams()}`,
-        `gravio-report-${state.selectedProject}.md`,
-      );
+      const selected = getScanById(state.selectedScanId);
+      if (!selected) throw new Error("Select a scan first.");
+      const markdown = buildScanMarkdownReport({
+        projectId: state.selectedProject,
+        scan: selected,
+        dimFilter: state.scanDimFilter,
+      });
+      const fileName = `gravio-scan-${selected.runId ?? selected.id}-${state.scanDimFilter}.md`;
+      downloadTextFile(fileName, markdown, "text/markdown");
     } catch (err) {
       showError(elWsError, err.message);
     } finally {
@@ -1265,16 +1588,21 @@ function bindEvents() {
   });
 
   elExportReportHtml.addEventListener("click", async () => {
-    if (!state.selectedProject) return;
+    if (!state.selectedProject || !state.selectedScanId) return;
     clearError(elWsError);
     elExportReportHtml.disabled = true;
     const prev = elExportReportHtml.textContent;
     elExportReportHtml.textContent = "Loading…";
     try {
-      await triggerDownload(
-        `/api/projects/${encodeURIComponent(state.selectedProject)}/export/report?format=html${buildDateParams()}`,
-        `gravio-report-${state.selectedProject}.html`,
-      );
+      const selected = getScanById(state.selectedScanId);
+      if (!selected) throw new Error("Select a scan first.");
+      const html = buildScanHtmlReport({
+        projectId: state.selectedProject,
+        scan: selected,
+        dimFilter: state.scanDimFilter,
+      });
+      const fileName = `gravio-scan-${selected.runId ?? selected.id}-${state.scanDimFilter}.html`;
+      downloadTextFile(fileName, html, "text/html");
     } catch (err) {
       showError(elWsError, err.message);
     } finally {

@@ -87,7 +87,6 @@
       <div class="db-tabs" role="tablist">
         <button class="db-tab db-tab-active" role="tab" data-tab="overview" type="button">Overview</button>
         <button class="db-tab" role="tab" data-tab="scans" type="button">Scans</button>
-        <button class="db-tab" role="tab" data-tab="recommendations" type="button">Recommendations</button>
         <button class="db-tab" role="tab" data-tab="runscans" type="button">Commands</button>
       </div>
 
@@ -112,6 +111,10 @@
         <div id="db-ov-chart" class="db-ov-chart-wrap"></div>
         <div id="db-ov-summary"></div>
         <div id="db-ov-recent"></div>
+        <div class="db-ov-insights-wrap">
+          <p class="db-subtitle" style="margin: 24px 0 10px">Overview insights and priorities</p>
+          <ul class="db-recs-list" id="db-ov-insights"></ul>
+        </div>
       </div>
 
       <!-- Tab: Scans -->
@@ -122,12 +125,22 @@
             <input type="date" id="db-filter-from" class="db-date-input" />
             <label for="db-filter-to" class="db-date-label">To</label>
             <input type="date" id="db-filter-to" class="db-date-input" />
+            <label for="db-scan-dim-filter" class="db-date-label">Dimension</label>
+            <select id="db-scan-dim-filter" class="db-sort-select">
+              <option value="all">All dimensions</option>
+              <option value="safety">Safety</option>
+              <option value="reliability">Reliability</option>
+              <option value="evaluation">Evaluation</option>
+              <option value="observability">Observability</option>
+              <option value="governance">Governance</option>
+              <option value="agentic">Agentic</option>
+            </select>
             <button class="m-btn m-btn-outline m-btn-sm" id="db-filter-clear" type="button">Clear dates</button>
           </div>
           <button class="m-btn m-btn-outline m-btn-sm" id="db-delete-selected" type="button">Delete selected</button>
           <button class="m-btn m-btn-outline m-btn-sm" id="db-export-scans" type="button">Export CSV</button>
-          <button class="m-btn m-btn-outline m-btn-sm" id="db-export-report" type="button">Export .md</button>
-          <button class="m-btn m-btn-outline m-btn-sm" id="db-export-report-html" type="button">Export PDF-ready</button>
+          <button class="m-btn m-btn-outline m-btn-sm" id="db-export-report" type="button">Export selected .md</button>
+          <button class="m-btn m-btn-outline m-btn-sm" id="db-export-report-html" type="button">Export selected HTML</button>
         </div>
         <div class="db-delete-confirm" id="db-delete-confirm" hidden>
           <p>Delete selected scans? This cannot be undone.</p>
@@ -164,9 +177,21 @@
             </label>
           </div>
 
+          <div class="db-scan-detail-card" id="db-scan-overall"></div>
+
+          <div class="db-scan-detail-card" id="db-scan-toc"></div>
+
+          <div class="db-scan-detail-card" id="db-scan-moscow"></div>
+
+          <div class="db-scan-detail-card" id="db-scan-passing"></div>
+
+          <div class="db-scan-detail-card" id="db-scan-na"></div>
+
+          <div class="db-scan-detail-card" id="db-scan-assumptions"></div>
+
           <div class="db-scan-detail-grid">
             <div class="db-scan-detail-card">
-              <p class="db-scan-detail-card-title">Recommendations for this scan</p>
+              <p class="db-scan-detail-card-title">Quick recommendations</p>
               <ul class="db-scan-rec-list" id="db-scan-rec-list"></ul>
             </div>
 
@@ -189,11 +214,6 @@
             </div>
           </div>
         </div>
-      </div>
-
-      <!-- Tab: Recommendations -->
-      <div class="db-tab-panel" id="db-tab-recommendations" hidden>
-        <ul class="db-recs-list" id="db-recs-list"></ul>
       </div>
 
       <!-- Tab: Run scans -->
