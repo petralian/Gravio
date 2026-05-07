@@ -1360,3 +1360,129 @@ describe("POST /api/billing actions", () => {
     assert.strictEqual(res.status, 403);
   });
 });
+
+describe("POST /api/scan-evaluate", () => {
+  const email = `scan-eval-${Date.now()}@gravio.test`;
+  let cookie;
+  let apiKey;
+
+  // Minimal shape that satisfies computeRichScorecard (all array/object fields present)
+  const MINIMAL_SCAN = {
+    committedEnvFiles: [],
+    envFiles: [],
+    gitignoreEnvPasses: false,
+    gitignoreExists: false,
+    hasSecretScanConfig: false,
+    securityPolicyExists: false,
+    hasAgentInstructions: false,
+    hasDependencyVulnCheck: false,
+    hasCloudCredentialFiles: false,
+    testSignal: { testSignal: false },
+    cicdExists: false,
+    hasTypeSafety: false,
+    hasLockFile: false,
+    hasLintConfig: false,
+    hasPreCommitHooks: false,
+    hasTestCoverage: false,
+    hasIntegrationTests: false,
+    hasE2eTests: false,
+    hasHealthCheck: false,
+    hasEvalDir: false,
+    hasEvalConfig: false,
+    hasBaseline: false,
+    hasGoldenDatasets: false,
+    hasEvalScript: false,
+    hasAdversarialTests: false,
+    hasPromptTests: false,
+    hasOtelDependency: false,
+    hasRunArtifacts: false,
+    hasStructuredLogging: false,
+    hasMonitoringConfig: false,
+    hasSloDefinition: false,
+    hasAlertConfig: false,
+    readmeExists: false,
+    hasChangelog: false,
+    hasAiDocs: false,
+    licenseExists: false,
+    hasDecisionLog: false,
+    hasVersion: false,
+    hasContributing: false,
+    hasCodeOwners: false,
+    hasApiDocs: false,
+    hasAdrDir: false,
+    hasCommitLintConfig: false,
+    hasDependencyUpdateConfig: false,
+    isAgenticProject: false,
+    hasAiSdkDependency: false,
+    hasAiSourceImports: false,
+    hasAiEnvVars: false,
+    hasAgentSkillCatalog: false,
+    hasPromptAssets: false,
+    hasAgentOrchestration: false,
+    hasSafetyRulesInInstructions: false,
+    hasModelPinned: false,
+    hasPromptVersioning: false,
+    hasToolWhitelist: false,
+  };
+
+  it("setup: register user and create API key", async () => {
+    cookie = await registerAndGetCookie(email, "Str0ng!Alpha99");
+    const res = await httpPost(`http://localhost:${TEST_PORT}/api/keys`, { label: "scan-eval-test" }, { Cookie: cookie });
+    assert.strictEqual(res.status, 200);
+    apiKey = JSON.parse(res.body).key;
+    assert.ok(apiKey.startsWith("gv_"), "Key must start with gv_");
+  });
+
+  it("returns 401 without authentication", async () => {
+    const res = await httpPost(`http://localhost:${TEST_PORT}/api/scan-evaluate`, { scan: MINIMAL_SCAN });
+    assert.strictEqual(res.status, 401);
+    const data = JSON.parse(res.body);
+    assert.ok(data.error);
+  });
+
+  it("returns 400 when scan field is missing", async () => {
+    const res = await httpPost(
+      `http://localhost:${TEST_PORT}/api/scan-evaluate`,
+      { notScan: true },
+      { Authorization: `Bearer ${apiKey}` },
+    );
+    assert.strictEqual(res.status, 400);
+    const data = JSON.parse(res.body);
+    assert.ok(data.error);
+  });
+
+  it("returns 400 when scan is not an object", async () => {
+    const res = await httpPost(
+      `http://localhost:${TEST_PORT}/api/scan-evaluate`,
+      { scan: "invalid" },
+      { Authorization: `Bearer ${apiKey}` },
+    );
+    assert.strictEqual(res.status, 400);
+    const data = JSON.parse(res.body);
+    assert.ok(data.error);
+  });
+
+  it("returns 200 with runId and scorecard for valid scan body (Bearer key)", async () => {
+    const res = await httpPost(
+      `http://localhost:${TEST_PORT}/api/scan-evaluate`,
+      { scan: MINIMAL_SCAN },
+      { Authorization: `Bearer ${apiKey}` },
+    );
+    assert.strictEqual(res.status, 200);
+    const data = JSON.parse(res.body);
+    assert.ok(typeof data.runId === "string" && data.runId.length > 0, "runId must be a non-empty string");
+    assert.ok(data.scorecard && typeof data.scorecard === "object", "scorecard must be an object");
+    assert.ok(data.summary && typeof data.summary === "object", "summary must be an object");
+  });
+
+  it("returns 200 with runId and scorecard for valid scan body (session cookie)", async () => {
+    const res = await httpPost(
+      `http://localhost:${TEST_PORT}/api/scan-evaluate`,
+      { scan: MINIMAL_SCAN },
+      { Cookie: cookie },
+    );
+    assert.strictEqual(res.status, 200);
+    const data = JSON.parse(res.body);
+    assert.ok(typeof data.runId === "string", "runId must be a string");
+  });
+});
