@@ -1485,4 +1485,39 @@ describe("POST /api/scan-evaluate", () => {
     const data = JSON.parse(res.body);
     assert.ok(typeof data.runId === "string", "runId must be a string");
   });
+
+  it("attaches explanation object to failed workflowResults", async () => {
+    // committedEnvFiles being non-empty triggers the secret-scan check to fail
+    const scanWithSecret = { ...MINIMAL_SCAN, committedEnvFiles: [".env"] };
+    const res = await httpPost(
+      `http://localhost:${TEST_PORT}/api/scan-evaluate`,
+      { scan: scanWithSecret },
+      { Authorization: `Bearer ${apiKey}` },
+    );
+    assert.strictEqual(res.status, 200);
+    const data = JSON.parse(res.body);
+    const secretResult = (data.workflowResults ?? []).find((w) => w.id === "secret-scan");
+    assert.ok(secretResult, "secret-scan workflow result must be present");
+    assert.strictEqual(secretResult.status, "fail", "secret-scan must fail when committedEnvFiles is non-empty");
+    assert.ok(secretResult.explanation && typeof secretResult.explanation === "object", "explanation must be an object on failed check");
+    assert.ok(typeof secretResult.explanation.why === "string" && secretResult.explanation.why.length > 0, "explanation.why must be a non-empty string");
+    assert.ok(typeof secretResult.explanation.how === "string" && secretResult.explanation.how.length > 0, "explanation.how must be a non-empty string");
+    assert.ok(["low", "medium", "high"].includes(secretResult.explanation.effort), "explanation.effort must be low/medium/high");
+    assert.ok(["low", "medium", "high"].includes(secretResult.explanation.impact), "explanation.impact must be low/medium/high");
+  });
+
+  it("does not attach explanation to passing workflowResults", async () => {
+    // MINIMAL_SCAN has no committed env files, so secret-scan passes
+    const res = await httpPost(
+      `http://localhost:${TEST_PORT}/api/scan-evaluate`,
+      { scan: MINIMAL_SCAN },
+      { Authorization: `Bearer ${apiKey}` },
+    );
+    assert.strictEqual(res.status, 200);
+    const data = JSON.parse(res.body);
+    const passing = (data.workflowResults ?? []).filter((w) => w.status === "pass");
+    for (const w of passing) {
+      assert.ok(!w.explanation, `Passing check '${w.id}' must not have an explanation`);
+    }
+  });
 });

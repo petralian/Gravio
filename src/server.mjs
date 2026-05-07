@@ -478,22 +478,37 @@ function synthesizeActionFromDimension(item) {
 }
 
 function buildActionPlan(runData, dimensionPlan) {
-  const failedChecks = runData?.publicSummary?.failedChecks;
-  const checkActions = Array.isArray(failedChecks)
-    ? failedChecks.map((id) => ({ id, ...CHECK_PLAYBOOK[id] })).filter((x) => x.dimension)
-    : [];
+  // Direct API calls have full workflowResults; encrypted envelopes use publicSummary.failedChecks only.
+  const workflowResults = Array.isArray(runData?.workflowResults) ? runData.workflowResults : [];
+  const failedWorkflow = workflowResults.filter((w) => w.status === "fail");
 
-  const normalizedChecks = checkActions.map((item) => ({
-    source: "check",
-    checkId: item.id,
-    dimension: item.dimension,
-    priority: item.priority,
-    title: item.title,
-    why: item.why,
-    actions: item.actions,
-    commands: item.commands,
-    expectedLift: null,
-  }));
+  const failedChecks = failedWorkflow.length > 0
+    ? failedWorkflow.map((w) => w.id)
+    : (Array.isArray(runData?.publicSummary?.failedChecks) ? runData.publicSummary.failedChecks : []);
+
+  const explainIndex = new Map(failedWorkflow.map((w) => [w.id, w.explanation ?? null]));
+
+  const checkActions = failedChecks
+    .map((id) => ({ id, ...CHECK_PLAYBOOK[id] }))
+    .filter((x) => x.dimension);
+
+  const normalizedChecks = checkActions.map((item) => {
+    const explain = explainIndex.get(item.id);
+    return {
+      source: "check",
+      checkId: item.id,
+      dimension: item.dimension,
+      priority: item.priority,
+      title: item.title,
+      why: explain?.why ?? item.why,
+      how: explain?.how ?? null,
+      effort: explain?.effort ?? null,
+      impact: explain?.impact ?? null,
+      actions: item.actions,
+      commands: explain?.commands?.length ? explain.commands : item.commands,
+      expectedLift: null,
+    };
+  });
 
   const byDimFromChecks = new Set(normalizedChecks.map((x) => x.dimension));
   const topDimActions = dimensionPlan

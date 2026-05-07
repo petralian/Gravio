@@ -100,6 +100,285 @@ function indexById(items) {
   return map;
 }
 
+/**
+ * Per-check explainability map.
+ * Every entry: { what, why, how, effort ("low"|"medium"|"high"), impact ("low"|"medium"|"high"), commands }
+ * Attached to workflowResults entries when status === "fail".
+ * Server-side only — never bundled into CLI.
+ */
+const EXPLAIN_MAP = {
+  // ── Safety ────────────────────────────────────────────────────────────────
+  "secret-scan": {
+    what: "One or more .env or secret files are committed to the git repository.",
+    why: "Committed secrets are immediately accessible to anyone with repo access and are indexed by code-search crawlers. Even deleted files persist in git history.",
+    how: "Purge the files from history with git-filter-repo or BFG Repo Cleaner, rotate all exposed credentials, and add .env patterns to .gitignore so they are never tracked again.",
+    effort: "medium",
+    impact: "high",
+    commands: ["npm run secret-scan", "git ls-files | grep -E '\\.env'"],
+  },
+  "gitignore-guard": {
+    what: "The .gitignore file is missing or does not cover .env / secret file patterns.",
+    why: "Without explicit ignore rules, a single `git add .` will accidentally stage environment files containing API keys, database passwords, and other credentials.",
+    how: "Add `.env`, `.env.*`, and `*.pem` patterns to .gitignore. Verify with `git check-ignore -v .env`.",
+    effort: "low",
+    impact: "high",
+    commands: ["git check-ignore -v .env", "echo '.env' >> .gitignore"],
+  },
+  "dep-vuln-check": {
+    what: "No dependency vulnerability scanning tool is configured.",
+    why: "Transitive dependencies frequently contain CVEs. Without automated scanning, vulnerabilities silently accumulate and reach production.",
+    how: "Enable GitHub Dependabot, add `npm audit` to CI, or configure Snyk/Renovate for automated pull requests on vulnerable packages.",
+    effort: "low",
+    impact: "medium",
+    commands: ["npm audit", "npx snyk test"],
+  },
+  "cloud-credential-files": {
+    what: "Cloud credential files (.aws/credentials, .gcloud/, etc.) are present in the repository.",
+    why: "Cloud credentials grant access to production infrastructure. Committed credentials have been responsible for many large-scale data breaches.",
+    how: "Remove credential files immediately, revoke and rotate the associated cloud keys, and add the credential file patterns to .gitignore.",
+    effort: "medium",
+    impact: "high",
+    commands: ["git rm -r --cached .aws .gcloud", "git ls-files | grep -E '\\.(aws|gcloud)'"],
+  },
+  // ── Reliability ───────────────────────────────────────────────────────────
+  "test-coverage": {
+    what: "No test files or test runner configuration were detected in the project.",
+    why: "Without tests, every change is a manual verification burden. Regressions reach production silently and fixing them costs orders of magnitude more than preventing them.",
+    how: "Create a tests/ directory with at least one test per critical path (auth, data mutation, external API calls). Use the framework already in your stack.",
+    effort: "high",
+    impact: "high",
+    commands: ["npm test", "node --test tests/"],
+  },
+  "ci-pipeline": {
+    what: "No CI/CD pipeline configuration was detected (GitHub Actions, GitLab CI, CircleCI, etc.).",
+    why: "Manual test runs are skipped under deadline pressure. CI creates an unbreakable quality gate that runs on every commit without human intervention.",
+    how: "Add a .github/workflows/ci.yml that runs tests and secret scan on every pull request. Block merges on failures.",
+    effort: "medium",
+    impact: "high",
+    commands: ["cat .github/workflows/ci.yml"],
+  },
+  "type-safety": {
+    what: "No static type system or type-checking tooling was detected.",
+    why: "Type errors are the most common source of runtime crashes in dynamically typed languages. A type system catches entire categories of bugs before code runs.",
+    how: "Adopt TypeScript or add JSDoc type annotations with `tsc --checkJs`. Run type checks in CI as a required gate.",
+    effort: "high",
+    impact: "medium",
+    commands: ["npx tsc --noEmit", "mypy src/"],
+  },
+  "test-coverage-config": {
+    what: "No test coverage threshold configuration was found.",
+    why: "Without enforced coverage thresholds, coverage quietly drops as features are added without tests. Teams discover the gap only after a production incident.",
+    how: "Add a coverage threshold to your test runner config (e.g. `--experimental-test-coverage` in Node, `coverageThreshold` in Jest, or `[coverage] fail_under` in pytest).",
+    effort: "low",
+    impact: "medium",
+    commands: ["node --test --experimental-test-coverage tests/"],
+  },
+  "integration-tests": {
+    what: "No integration or end-to-end test suite was detected.",
+    why: "Unit tests verify logic in isolation but miss the bugs that emerge at system boundaries — auth flows, database calls, and third-party API interactions.",
+    how: "Add at least one integration test that exercises a full request/response cycle for each critical API endpoint. E2E tests using Playwright cover browser flows.",
+    effort: "high",
+    impact: "medium",
+    commands: ["npx playwright test", "node --test tests/server.test.mjs"],
+  },
+  "health-check": {
+    what: "No health check endpoint or Dockerfile HEALTHCHECK instruction was found.",
+    why: "Without a health check, load balancers and orchestrators cannot detect a broken instance and remove it from the pool. Traffic continues routing to dead servers.",
+    how: "Add a `GET /health` endpoint that returns `{status:'ok'}` and wire it to Dockerfile HEALTHCHECK or your platform's health probe config.",
+    effort: "low",
+    impact: "medium",
+    commands: ["curl https://yourapp.com/health"],
+  },
+  "lock-file": {
+    what: "No dependency lock file (package-lock.json, yarn.lock, Pipfile.lock, etc.) was found.",
+    why: "Without a lock file, `npm install` resolves fresh semver ranges on every run. A minor version bump in a dependency can silently break production at deploy time.",
+    how: "Run `npm install` (or `pip install`, `cargo build`) once locally to generate a lock file, then commit it and use `npm ci` in CI.",
+    effort: "low",
+    impact: "medium",
+    commands: ["npm ci", "pip install --require-hashes -r requirements.txt"],
+  },
+  "lint-config": {
+    what: "No linting or static analysis configuration was detected.",
+    why: "Lint rules catch common bugs, security anti-patterns, and style drift before code review. Without them, technical debt accumulates silently.",
+    how: "Add ESLint, Pylint, golangci-lint, or equivalent. Configure rules that catch security issues (no eval, no hardcoded credentials) and run lint in CI.",
+    effort: "low",
+    impact: "low",
+    commands: ["npx eslint src/", "flake8 src/"],
+  },
+  "pre-commit-hooks": {
+    what: "No pre-commit hook configuration was found (.husky, pre-commit, lefthook, etc.).",
+    why: "Pre-commit hooks are the fastest feedback loop — they run in milliseconds before a commit is even recorded. Catching issues here is cheaper than CI or code review.",
+    how: "Add Husky (Node) or pre-commit (Python/universal) with hooks for secret scan, lint, and type check.",
+    effort: "low",
+    impact: "low",
+    commands: ["npx husky install", "pre-commit install"],
+  },
+  // ── Evaluation ────────────────────────────────────────────────────────────
+  "eval-suite": {
+    what: "No evaluation corpus, benchmark directory, or eval framework configuration was found.",
+    why: "Without systematic evals, quality changes are invisible. You cannot tell whether a model upgrade improved or regressed behavior on real user scenarios.",
+    how: "Create an evals/ directory with representative input/output pairs. Run evals before each release and track pass rates over time.",
+    effort: "high",
+    impact: "high",
+    commands: ["node scripts/scorecard-gate.mjs", "pytest evals/"],
+  },
+  "baseline-tracking": {
+    what: "No baseline run artifact or regression tracking file was found.",
+    why: "Without a baseline, every new score is meaningless — you cannot tell if things got better or worse. Decay is invisible until it's expensive.",
+    how: "Persist a known-good run JSON as your baseline and compare every new run against it. Gate releases on score regressions exceeding your threshold.",
+    effort: "medium",
+    impact: "high",
+    commands: ["node scripts/new-run.mjs", "node scripts/scorecard-gate.mjs"],
+  },
+  "adversarial-tests": {
+    what: "No adversarial, jailbreak, or prompt injection test cases were found.",
+    why: "Language models are vulnerable to instruction injection and jailbreaks. Without explicit adversarial tests, these attack surfaces go undetected until exploited.",
+    how: "Add test cases that attempt prompt injection (e.g. 'Ignore previous instructions and…'), jailbreaks, and boundary violations. Treat failures as blocking.",
+    effort: "medium",
+    impact: "high",
+    commands: ["node --test tests/adversarial.test.mjs"],
+  },
+  "golden-datasets": {
+    what: "No golden test data or fixture datasets for regression testing were found.",
+    why: "Golden datasets provide ground truth for deterministic checks. Without them, subtle quality regressions are invisible when outputs vary by run.",
+    how: "Create fixtures/ or testdata/ with known-good input/output pairs. Diff new outputs against golden files in CI.",
+    effort: "medium",
+    impact: "medium",
+    commands: ["diff expected.json actual.json"],
+  },
+  "eval-script": {
+    what: "No runnable eval script was found in package.json scripts or a Makefile.",
+    why: "If evals cannot be run with a single command, they are skipped under time pressure. Runnable evals are the only evals that get run.",
+    how: "Add an `eval` script to package.json or a Makefile target. It should run all eval cases and exit non-zero on any failure.",
+    effort: "low",
+    impact: "medium",
+    commands: ["npm run eval", "make eval"],
+  },
+  // ── Observability ─────────────────────────────────────────────────────────
+  "observability-config": {
+    what: "No OpenTelemetry, structured logging, or monitoring configuration was found.",
+    why: "Without structured telemetry, diagnosing production failures requires guesswork. Structured logs and traces reduce mean-time-to-resolution from hours to minutes.",
+    how: "Add the OpenTelemetry SDK and emit traces for key operations. Switch from `console.log` to a structured logger (pino, winston, structlog).",
+    effort: "high",
+    impact: "high",
+    commands: ["npm install @opentelemetry/sdk-node", "pip install opentelemetry-sdk"],
+  },
+  "run-artifacts": {
+    what: "Agent run output or trace artifacts are not being persisted.",
+    why: "Without persisted artifacts, post-incident analysis is impossible. You cannot answer 'what did the agent do?' after the fact.",
+    how: "Write run summaries, traces, and decision logs to a durable store (database, object storage, or files) after each agent execution.",
+    effort: "medium",
+    impact: "medium",
+    commands: ["ls agent-quality/runs/"],
+  },
+  "monitoring-config": {
+    what: "No monitoring dashboard or alerting configuration was found.",
+    why: "Without monitoring, production degradation is only discovered through user complaints. Proactive alerting detects issues in minutes instead of hours.",
+    how: "Connect your app to a monitoring service (Datadog, Grafana, Sentry) and configure alerts for error rate, latency, and uptime.",
+    effort: "high",
+    impact: "medium",
+    commands: ["curl https://yourapp.com/metrics"],
+  },
+  "slo-definition": {
+    what: "No Service Level Objective (SLO) definition was found.",
+    why: "Without SLOs, engineering teams have no agreed definition of 'working well enough.' Every outage becomes a debate about severity instead of triggering a pre-agreed response.",
+    how: "Define SLOs for uptime (e.g. 99.5%), latency (p95 < 2s), and error rate (< 1%). Document them in a SLO.md or runbook.",
+    effort: "low",
+    impact: "low",
+    commands: [],
+  },
+  // ── Governance ────────────────────────────────────────────────────────────
+  "readme-docs": {
+    what: "No README.md file was found.",
+    why: "Without a README, new contributors cannot onboard, AI agents make incorrect assumptions about the project, and operational runbooks are oral tradition.",
+    how: "Add README.md with: project purpose, setup instructions, key commands, and who to contact. Keep it accurate — an outdated README is worse than none.",
+    effort: "low",
+    impact: "medium",
+    commands: ["cat README.md"],
+  },
+  "changelog-hygiene": {
+    what: "No CHANGELOG or release notes file was found.",
+    why: "Without a changelog, correlating production regressions to specific code changes requires bisecting git history. Changelogs also build user trust.",
+    how: "Add CHANGELOG.md following Keep a Changelog format. Update it as part of your release checklist.",
+    effort: "low",
+    impact: "low",
+    commands: ["cat CHANGELOG.md"],
+  },
+  "agent-instructions": {
+    what: "No agent instructions file was found (AGENTS.md, .github/copilot-instructions.md, .cursorrules, etc.).",
+    why: "Without explicit instructions, AI agents make unconstrained decisions about code style, security posture, and architectural choices. This leads to drift and unsafe automation.",
+    how: "Add AGENTS.md or .github/copilot-instructions.md with: allowed actions, prohibited patterns, review requirements, and safety constraints.",
+    effort: "low",
+    impact: "high",
+    commands: ["cat AGENTS.md", "cat .github/copilot-instructions.md"],
+  },
+  "api-documentation": {
+    what: "No OpenAPI spec, Swagger file, or API documentation directory was found.",
+    why: "Undocumented APIs become black boxes. Consumers guess behavior, integrations break silently on changes, and onboarding new developers takes weeks instead of hours.",
+    how: "Add an openapi.yaml or docs/api/ directory. Use tools like swagger-jsdoc (Node) or FastAPI's automatic spec generation.",
+    effort: "medium",
+    impact: "low",
+    commands: ["cat openapi.yaml", "ls docs/api/"],
+  },
+  "dependency-updates": {
+    what: "No automated dependency update configuration was found (Dependabot, Renovate, etc.).",
+    why: "Manual dependency management means security patches sit unapplied for weeks. Automated updates keep the attack surface minimal with no human effort.",
+    how: "Add .github/dependabot.yml or a renovate.json to get automated PRs for dependency updates. Configure auto-merge for patch-level updates.",
+    effort: "low",
+    impact: "medium",
+    commands: ["cat .github/dependabot.yml"],
+  },
+  "codeowners": {
+    what: "No CODEOWNERS file was found.",
+    why: "Without CODEOWNERS, pull requests are reviewed by whoever is available rather than whoever is responsible. Security-critical changes can slip through without expert review.",
+    how: "Add a CODEOWNERS file that maps paths to responsible teams or individuals. GitHub and GitLab enforce these as required reviewers.",
+    effort: "low",
+    impact: "low",
+    commands: ["cat CODEOWNERS", "cat .github/CODEOWNERS"],
+  },
+  // ── Agentic ───────────────────────────────────────────────────────────────
+  "agent-skill-catalog": {
+    what: "No agent skill catalog or reusable prompt assets were found.",
+    why: "Without a skill catalog, every agent session reinvents the wheel. Repeated tasks accumulate inconsistent implementations and drift from established patterns.",
+    how: "Create a skills/ or .github/skills/ directory with versioned prompt templates for recurring workflows (code review, deployment, debugging).",
+    effort: "medium",
+    impact: "medium",
+    commands: ["ls .github/skills/", "ls skills/"],
+  },
+  "agent-orchestration": {
+    what: "No multi-agent orchestration configuration was found.",
+    why: "Uncoordinated agents operating on the same codebase produce conflicts, duplicate work, and contradictory changes. Orchestration defines ownership boundaries and handoff protocols.",
+    how: "Document agent roles, ownership boundaries, and handoff protocols in AGENTS.md. Define which agent handles which file types or task categories.",
+    effort: "medium",
+    impact: "medium",
+    commands: ["cat AGENTS.md"],
+  },
+  "safety-rules": {
+    what: "Agent instructions do not contain explicit safety guardrails.",
+    why: "Without safety rules, agents make unconstrained decisions under time pressure. Explicit no-go rules prevent the most damaging classes of automated mistakes.",
+    how: "Add a Safety section to AGENTS.md or copilot-instructions.md listing: prohibited actions (no force push, no prod DB writes without review), required review triggers, and escalation paths.",
+    effort: "low",
+    impact: "high",
+    commands: ["grep -i 'safety\\|prohibit\\|never\\|must not' AGENTS.md"],
+  },
+  "model-pinned": {
+    what: "No AI model version is pinned in configuration or agent instructions.",
+    why: "Model providers silently upgrade models. An unpinned model may behave differently after an upgrade, causing evaluation regressions that are hard to diagnose.",
+    how: "Pin the exact model version in your API calls (e.g. `gpt-4o-2024-08-06`, not `gpt-4o`) and document it in agent instructions.",
+    effort: "low",
+    impact: "medium",
+    commands: ["grep -r 'model:' .github/copilot-instructions.md AGENTS.md"],
+  },
+  "tool-whitelist": {
+    what: "No allowed-tools list or function-call whitelist was found in agent instructions.",
+    why: "Agents with unconstrained tool access can call destructive functions (delete, format, deploy to prod) without human approval. Explicit whitelists define the blast radius.",
+    how: "Add an `Allowed tools` section to AGENTS.md listing every tool the agent is permitted to use. Treat any unlisted tool as requiring human approval.",
+    effort: "low",
+    impact: "medium",
+    commands: ["grep -i 'tool\\|function\\|whitelist\\|allowed' AGENTS.md"],
+  },
+};
+
 function buildWorkflowResults(corpus, scan, previousRun) {
   const previous = indexById(previousRun?.workflowResults ?? []);
 
@@ -324,7 +603,8 @@ function buildWorkflowResults(corpus, scan, previousRun) {
       evidence = { traceCount: 1, errorEvents: 0 };
     }
 
-    return { id: workflow.id, status, evidence };
+    const explanation = status === "fail" ? (EXPLAIN_MAP[workflow.id] ?? null) : null;
+    return { id: workflow.id, status, evidence, ...(explanation ? { explanation } : {}) };
   });
 }
 

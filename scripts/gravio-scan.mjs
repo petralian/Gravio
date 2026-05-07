@@ -666,11 +666,15 @@ async function checkAndUpdate(serverBase) {
 
 function buildEncryptedRunEnvelope(run, options) {
   const now = new Date().toISOString();
+  const failedChecks = Array.isArray(run?.workflowResults)
+    ? run.workflowResults.filter((w) => w.status === "fail").map((w) => w.id)
+    : [];
   const publicSummary = {
     runId: run?.runId ?? "run",
     createdAt: run?.createdAt ?? now,
     overallScore: Number.isFinite(run?.summary?.overallScore) ? Number(run.summary.overallScore) : null,
     scorecard: run?.scorecard ?? null,
+    failedChecks,
   };
 
   if (options.key) {
