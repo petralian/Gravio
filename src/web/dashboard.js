@@ -943,6 +943,24 @@ async function init() {
     bindEvents();
     await loadProjects();
 
+    // Phase 4: billing banner (non-blocking)
+    fetch("/api/billing/status").then(async (r) => {
+      if (!r.ok) return;
+      const d = await r.json();
+      const BANNERS = {
+        past_due: { cls: "db-billing-banner-warn",   msg: "⚠ Your last payment failed. Please update your payment method to avoid losing access. Go to Settings → Billing." },
+        unpaid:   { cls: "db-billing-banner-danger", msg: "✕ Your subscription is unpaid after multiple failed attempts. Update your payment method in Settings → Billing." },
+        expired:  { cls: "db-billing-banner-danger", msg: "✕ Your subscription has expired. Renew via Settings → Billing." },
+      };
+      const el = document.getElementById("db-billing-banner");
+      const entry = BANNERS[String(d.status ?? "").toLowerCase()];
+      if (el && entry) {
+        el.className = `db-billing-banner ${entry.cls}`;
+        el.textContent = entry.msg;
+        el.removeAttribute("hidden");
+      }
+    }).catch(() => {});
+
     const requestedProject = getRequestedProjectFromUrl();
     if (requestedProject) {
       const hasProject = state.projects.some((p) => p.project_id === requestedProject);

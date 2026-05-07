@@ -2952,6 +2952,80 @@ button#evaluate-btn:hover {
 .st-btn-resume { border-color: rgba(52,211,153,.35) !important; color: #34d399 !important; }
 .st-btn-resume:hover { background: rgba(52,211,153,.08) !important; }
 
+/* Billing subsection (payment method + invoice history) */
+.st-billing-subsection {
+  margin-top: 18px;
+  border-top: 1px solid var(--border);
+  padding-top: 14px;
+}
+.st-billing-subh {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  margin-bottom: 10px;
+}
+
+/* Payment method row */
+.st-payment-row {
+  font-size: 13px;
+  font-family: var(--font-mono);
+  color: var(--text-1);
+  margin-bottom: 8px;
+}
+.st-update-payment-btn { font-size: 12px; }
+
+/* Invoice table */
+.st-invoices-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.st-invoices-table th {
+  text-align: left;
+  color: var(--text-3);
+  font-weight: 500;
+  padding: 4px 10px 8px 0;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.st-invoices-table td {
+  padding: 8px 10px 8px 0;
+  border-bottom: 1px solid rgba(255,255,255,.04);
+  vertical-align: middle;
+}
+.st-inv-date   { color: var(--text-2); white-space: nowrap; }
+.st-inv-amount { font-family: var(--font-mono); color: var(--text-1); font-weight: 600; }
+.st-inv-reason { color: var(--text-3); }
+.st-inv-status { display: inline-block; padding: 1px 7px; border-radius: 999px; font-size: 11px; font-weight: 600; }
+.st-inv-paid      { background: rgba(52,211,153,.12); color: #34d399; border: 1px solid rgba(52,211,153,.2); }
+.st-inv-pending   { background: rgba(251,191,36,.12); color: #f59e0b; border: 1px solid rgba(251,191,36,.2); }
+.st-inv-void      { background: var(--surface-3); color: var(--text-3); border: 1px solid var(--border); }
+.st-inv-refunded  { background: rgba(156,163,175,.1); color: var(--text-3); border: 1px solid var(--border); }
+.st-inv-receipt   { color: var(--neon); font-size: 11px; text-decoration: none; white-space: nowrap; }
+.st-inv-receipt:hover { text-decoration: underline; }
+.st-inv-receipt-none { color: var(--text-3); }
+
+/* Billing status banners (Phase 4) — used on dashboard.html and settings.html */
+.db-billing-banner {
+  padding: 12px 16px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 500;
+  margin-bottom: 18px;
+}
+.db-billing-banner-warn {
+  background: rgba(251,191,36,.08);
+  border: 1px solid rgba(251,191,36,.25);
+  color: #f59e0b;
+}
+.db-billing-banner-danger {
+  background: rgba(248,113,113,.08);
+  border: 1px solid rgba(248,113,113,.25);
+  color: #f87171;
+}
+
 /* ─── ADD-PROJECT CARD ─── */
 .db-proj-card-new {
   border-style: dashed;

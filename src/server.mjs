@@ -1080,6 +1080,63 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // ── GET /api/billing/invoices ─────────────────────────────────────────────
+  if (req.method === "GET" && req.url === "/api/billing/invoices") {
+    const user = getAuthUser(req);
+    if (!user) {
+      res.writeHead(401, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Not authenticated" }));
+      return;
+    }
+    const uid = user.uid ?? user.id;
+    const billing = stmts.getBillingForUser.get(uid);
+    const subscriptionId = billing?.lemon_subscription_id ?? null;
+    const apiKey = process.env.LEMON_API_KEY;
+
+    if (!subscriptionId || !apiKey) {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ invoices: [], paymentMethod: null }));
+      return;
+    }
+
+    const [subResult, invoiceResult] = await Promise.all([
+      lemonApiRequest(apiKey, "GET", `/v1/subscriptions/${encodeURIComponent(subscriptionId)}`),
+      lemonApiRequest(apiKey, "GET", `/v1/subscription-invoices?filter[subscription_id]=${encodeURIComponent(subscriptionId)}&sort=-created_at&page[size]=12`),
+    ]);
+
+    let paymentMethod = null;
+    if (subResult.ok) {
+      const attrs = subResult.body?.data?.attributes ?? {};
+      paymentMethod = {
+        brand: attrs.card_brand ?? null,
+        lastFour: attrs.card_last_four ?? null,
+        processor: attrs.payment_processor ?? null,
+        updateUrl: attrs.urls?.update_payment_method ?? null,
+      };
+    }
+
+    let invoices = [];
+    if (invoiceResult.ok && Array.isArray(invoiceResult.body?.data)) {
+      invoices = invoiceResult.body.data.map((inv) => {
+        const a = inv.attributes ?? {};
+        return {
+          id: inv.id,
+          date: a.created_at ?? null,
+          total: a.total_formatted ?? null,
+          status: a.status ?? null,
+          statusFormatted: a.status_formatted ?? null,
+          billingReason: a.billing_reason ?? null,
+          invoiceUrl: a.urls?.invoice_url ?? null,
+          refunded: Boolean(a.refunded),
+        };
+      });
+    }
+
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ invoices, paymentMethod }));
+    return;
+  }
+
   // ── POST /api/billing/(cancel|resume|seats) — customer billing actions ──
   const billingActionMatch = req.method === "POST" && /^\/api\/billing\/(cancel|resume|seats)$/.exec(req.url);
   if (billingActionMatch) {

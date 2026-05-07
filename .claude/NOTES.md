@@ -202,7 +202,9 @@ node gravio.mjs --logout --target . # remove local .gravio/auth.json
   - `POST /api/billing/resume`
   - `POST /api/billing/seats`
 - Billing mutation routes enforce ownership by retrieving the Lemon subscription first and matching authenticated user email or stored Lemon customer ID before mutating.
-- Settings (`/settings`) now includes a Billing section that displays plan/status/seats/renewal and a manage-billing portal action.
+- `GET /api/billing/invoices` fetches subscription invoices (up to 12, newest first) and payment method info in parallel from Lemon API. Returns `{ paymentMethod: { brand, lastFour, processor, updateUrl }, invoices: [...] }`. Returns `{ invoices: [], paymentMethod: null }` if no subscription ID exists in DB.
+- Settings (`/settings`) now includes a Billing section with plan badge, status pill, seats adjuster (team only), cancel/resume two-step actions, payment method display, and invoice history table.
+- Phase 4 billing status banners: `db-billing-banner` on both `/dashboard` and `/settings` for `past_due`, `unpaid`, `expired` states. Dashboard loads banner non-blocking after init; settings banner rendered in `renderBillingCard()`.
 
 ---
 

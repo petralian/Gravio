@@ -65,6 +65,7 @@
             and cancellations in the Lemon customer portal.
           </p>
         </div>
+        <div class="db-billing-banner" id="st-billing-banner" hidden></div>
         <div class="db-form-card">
           <div class="st-billing-grid">
             <div class="st-billing-item"><span class="st-billing-k">Plan</span><span class="st-billing-v" id="st-billing-plan"></span></div>
@@ -95,6 +96,33 @@
               <button class="m-btn m-btn-outline m-btn-sm" id="st-cancel-no" type="button">Keep plan</button>
             </div>
           </div>
+          <!-- Payment method -->
+          <div class="st-billing-subsection" id="st-payment-method-wrap" hidden>
+            <h3 class="st-billing-subh">Payment method</h3>
+            <div class="st-payment-row" id="st-payment-method"></div>
+            <a class="m-btn m-btn-outline m-btn-sm st-update-payment-btn" id="st-update-payment" href="#" target="_blank" rel="noopener noreferrer" hidden>Update payment method</a>
+          </div>
+          <!-- Invoice history -->
+          <div class="st-billing-subsection" id="st-invoices-wrap" hidden>
+            <h3 class="st-billing-subh">Invoice history</h3>
+            <div class="db-empty-state" id="st-invoices-empty" hidden>
+              <p class="db-empty-title">No invoices yet</p>
+              <p class="db-empty-sub">Invoices will appear here after your first payment.</p>
+            </div>
+            <table class="st-invoices-table" id="st-invoices-table" hidden>
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Amount</th>
+                  <th>Type</th>
+                  <th>Status</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="st-invoices-body"></tbody>
+            </table>
+          </div>
+          <p class="db-error" id="st-invoices-error" hidden></p>
           <p class="db-error" id="st-billing-error" hidden></p>
         </div>
       </section>

@@ -108,6 +108,9 @@ function renderBillingCard(data) {
 
   // Always hide the confirm bar on re-render
   $("st-cancel-confirm").setAttribute("hidden", "");
+
+  // Phase 4: billing banner
+  renderBillingBanner($("st-billing-banner"), status);
 }
 
 async function loadBillingStatus() {
@@ -216,6 +219,111 @@ async function onAdjustSeats() {
     btn.disabled = false;
     btn.textContent = "Update seats";
   }
+}
+
+// ─── Billing banner (Phase 4) ───
+
+const BILLING_BANNERS = {
+  past_due: { cls: "db-billing-banner-warn", msg: "⚠ Your last payment failed. Please update your payment method to avoid losing access." },
+  unpaid:   { cls: "db-billing-banner-danger", msg: "✕ Your subscription is unpaid after multiple failed payment attempts. Update your payment method to restore access." },
+  expired:  { cls: "db-billing-banner-danger", msg: "✕ Your subscription has expired. Renew via the customer portal to restore access." },
+};
+
+function renderBillingBanner(el, status) {
+  if (!el) return;
+  const entry = BILLING_BANNERS[String(status ?? "").toLowerCase()];
+  if (!entry) { el.setAttribute("hidden", ""); return; }
+  el.className = `db-billing-banner ${entry.cls}`;
+  el.textContent = entry.msg;
+  el.removeAttribute("hidden");
+}
+
+// ─── Invoice history (Phase 3b) ───
+
+function cardBrandLabel(brand) {
+  if (!brand) return "";
+  return { visa: "Visa", mastercard: "Mastercard", amex: "Amex", discover: "Discover", jcb: "JCB", diners: "Diners", unionpay: "UnionPay" }[brand.toLowerCase()] ?? brand;
+}
+
+function invoiceBillingReasonLabel(reason) {
+  return { initial: "Initial", renewal: "Renewal", updated: "Updated" }[reason] ?? (reason ?? "-");
+}
+
+function fmtInvoiceDate(iso) {
+  if (!iso) return "-";
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? "-" : d.toLocaleDateString([], { dateStyle: "medium" });
+}
+
+function invoiceStatusHtml(status) {
+  const s = String(status ?? "").toLowerCase();
+  const cls = { paid: "st-inv-paid", pending: "st-inv-pending", void: "st-inv-void", refunded: "st-inv-refunded", partial_refund: "st-inv-refunded" }[s] ?? "";
+  const label = { paid: "Paid", pending: "Pending", void: "Void", refunded: "Refunded", partial_refund: "Partial refund" }[s] ?? (status ?? "-");
+  return `<span class="st-inv-status ${cls}">${label}</span>`;
+}
+
+async function loadBillingInvoices() {
+  const invoicesError = $("st-invoices-error");
+  if (invoicesError) invoicesError.setAttribute("hidden", "");
+
+  let data;
+  try {
+    const res = await fetch("/api/billing/invoices");
+    data = await res.json();
+    if (!res.ok) {
+      if (invoicesError) { invoicesError.textContent = data.error ?? "Failed to load invoices."; invoicesError.removeAttribute("hidden"); }
+      return;
+    }
+  } catch {
+    if (invoicesError) { invoicesError.textContent = "Network error loading invoices."; invoicesError.removeAttribute("hidden"); }
+    return;
+  }
+
+  // Payment method
+  const pm = data.paymentMethod;
+  const pmWrap = $("st-payment-method-wrap");
+  if (pm && (pm.brand || pm.lastFour || pm.processor)) {
+    const pmEl = $("st-payment-method");
+    const brand = cardBrandLabel(pm.brand);
+    const last4 = pm.lastFour ? `•••• ${pm.lastFour}` : "";
+    pmEl.textContent = [brand, last4].filter(Boolean).join("  ") || (pm.processor ?? "");
+    if (pm.updateUrl) {
+      const updateBtn = $("st-update-payment");
+      updateBtn?.setAttribute("href", pm.updateUrl);
+      updateBtn?.removeAttribute("hidden");
+    }
+    pmWrap?.removeAttribute("hidden");
+  }
+
+  // Invoices
+  const invoiceWrap = $("st-invoices-wrap");
+  const invoiceTable = $("st-invoices-table");
+  const invoiceEmpty = $("st-invoices-empty");
+  const invoiceBody  = $("st-invoices-body");
+
+  if (!Array.isArray(data.invoices) || data.invoices.length === 0) {
+    invoiceWrap?.removeAttribute("hidden");
+    invoiceEmpty?.removeAttribute("hidden");
+    invoiceTable?.setAttribute("hidden", "");
+    return;
+  }
+
+  invoiceBody.innerHTML = data.invoices.map((inv) => {
+    const receiptCell = inv.invoiceUrl
+      ? `<a class="st-inv-receipt" href="${esc(inv.invoiceUrl)}" target="_blank" rel="noopener noreferrer">PDF</a>`
+      : `<span class="st-inv-receipt st-inv-receipt-none">—</span>`;
+    return `<tr>
+      <td class="st-inv-date">${fmtInvoiceDate(inv.date)}</td>
+      <td class="st-inv-amount">${esc(inv.total ?? "-")}</td>
+      <td class="st-inv-reason">${invoiceBillingReasonLabel(inv.billingReason)}</td>
+      <td>${invoiceStatusHtml(inv.status)}</td>
+      <td>${receiptCell}</td>
+    </tr>`;
+  }).join("");
+
+  invoiceWrap?.removeAttribute("hidden");
+  invoiceTable?.removeAttribute("hidden");
+  invoiceEmpty?.setAttribute("hidden", "");
 }
 
 // ─── API Keys ───
@@ -444,7 +552,7 @@ async function init() {
     }
 
     await loadBillingStatus();
-    await loadApiKeys();
+    await Promise.all([loadApiKeys(), loadBillingInvoices()]);
 
     $("st-gen-key")?.addEventListener("click", onGenerateKey);
     $("st-keys-list")?.addEventListener("click", onRevokeKeyClick);
