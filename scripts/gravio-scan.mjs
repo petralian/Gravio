@@ -362,96 +362,70 @@ function isPipStep(step) {
   return false;
 }
 
-function resolveNativeCmd(cmd) {
-  // On Windows, script-based package managers need the .cmd extension to run without shell: true.
-  if (process.platform !== "win32") return cmd;
-  const scriptCmds = ["npm", "yarn", "pnpm", "npx"];
-  return scriptCmds.includes(cmd) ? `${cmd}.cmd` : cmd;
-}
-
 /**
- * Returns the first executable path for `cmd` that exists on disk,
- * searching well-known install locations for Windows (nvm, volta, fnm,
- * system) and Unix (nvm, homebrew, system). Falls back to the plain
- * `resolveNativeCmd` result (PATH-based lookup) if nothing is found.
+ * Returns the best available path for a package manager command.
+ *
+ * Strategy (in priority order):
+ * 1. Same directory as the running `node` binary — npm always ships next to
+ *    node, so if `node gravio.mjs` worked, npm.cmd is right there. This is
+ *    the only method that is 100% reliable across nvm, volta, fnm, system
+ *    installs, and portable Node.js on every OS.
+ * 2. Well-known version-manager paths (nvm-windows, volta, fnm, homebrew).
+ * 3. Plain name — rely on PATH as a last resort.
  */
 function findExecutable(cmd) {
   const isNpmLike = ["npm", "yarn", "pnpm", "npx"].includes(cmd);
-  if (!isNpmLike) return resolveNativeCmd(cmd);
+  if (!isNpmLike) {
+    // Non-npm commands: just add .cmd on Windows
+    return process.platform === "win32" ? `${cmd}.cmd` : cmd;
+  }
+
+  const suffix = process.platform === "win32" ? ".cmd" : "";
+
+  // ── 1. Same dir as the running node binary (most reliable) ──────────────
+  const nodeDir = path.dirname(process.execPath);
+  const nextToNode = path.join(nodeDir, `${cmd}${suffix}`);
+  if (existsSync(nextToNode)) return nextToNode;
 
   if (process.platform === "win32") {
     const home = process.env.USERPROFILE ?? "C:\\Users\\User";
     const candidates = [
-      // nvm-windows installs node here
+      // nvm-windows
       path.join(process.env.NVM_HOME ?? path.join(home, "AppData\\Roaming\\nvm"), `${cmd}.cmd`),
       // volta
       path.join(process.env.VOLTA_HOME ?? path.join(home, "AppData\\Local\\Volta"), "bin", `${cmd}.cmd`),
       // fnm
       path.join(process.env.FNM_DIR ?? path.join(home, ".fnm"), "aliases", "default", `${cmd}.cmd`),
-      // standard system Node paths
+      // system installs
       `C:\\Program Files\\nodejs\\${cmd}.cmd`,
       `C:\\Program Files (x86)\\nodejs\\${cmd}.cmd`,
-      // plain PATH-resolved .cmd
-      `${cmd}.cmd`,
     ];
     for (const c of candidates) {
       if (existsSync(c)) return c;
     }
-    return `${cmd}.cmd`; // let spawn try via PATH
+    return `${cmd}.cmd`; // fall back to PATH
   }
 
-  // Unix / macOS
+  // ── Unix / macOS ─────────────────────────────────────────────────────────
   const home = process.env.HOME ?? "/root";
   const candidates = [
-    // nvm
     path.join(home, `.nvm/versions/node/${process.version}/bin/${cmd}`),
-    // volta
     path.join(process.env.VOLTA_HOME ?? path.join(home, ".volta"), `bin/${cmd}`),
-    // homebrew (Apple Silicon)
     `/opt/homebrew/bin/${cmd}`,
     `/usr/local/bin/${cmd}`,
     `/usr/bin/${cmd}`,
-    cmd, // PATH
   ];
   for (const c of candidates) {
     if (existsSync(c)) return c;
   }
-  return cmd;
+  return cmd; // fall back to PATH
 }
 
-/**
- * Spawn a child process, automatically falling back to `shell: true` on
- * Windows if the first attempt fails with EINVAL or ENOENT. This handles
- * the common case where nvm/volta/fnm installs a .cmd shim that can't be
- * launched via spawn without a shell on certain Windows configurations.
- */
-function spawnWithFallback(resolvedCmd, args, options) {
-  return new Promise((resolve) => {
-    const child = spawn(resolvedCmd, args, { ...options, shell: false });
-    let usedShell = false;
-
-    const onError = (err) => {
-      if (!usedShell && (err.code === "EINVAL" || err.code === "ENOENT") && process.platform === "win32") {
-        usedShell = true;
-        // Strip .cmd — when shell: true is set, the plain name works better
-        const plainCmd = resolvedCmd.endsWith(".cmd") ? resolvedCmd.slice(0, -4) : resolvedCmd;
-        const shellChild = spawn(plainCmd, args, { ...options, shell: true });
-        shellChild.on("error", (e2) => resolve({ child: null, error: e2 }));
-        shellChild.on("close", (code) => resolve({ child: shellChild, code, error: null }));
-        if (options.stdio === "inherit") return;
-        // Re-pipe streams if caller is collecting output
-        shellChild.stdout?.on("data", (d) => child.stdout?.emit("data", d));
-        shellChild.stderr?.on("data", (d) => child.stderr?.emit("data", d));
-      } else {
-        resolve({ child, code: null, error: err });
-      }
-    };
-
-    child.on("error", onError);
-    child.on("close", (code) => {
-      if (!usedShell) resolve({ child, code, error: null });
-    });
-  });
+function resolveNativeCmd(cmd) {
+  // Legacy helper kept for pip/generic commands. npm-like commands should use findExecutable.
+  if (process.platform !== "win32") return cmd;
+  const scriptCmds = ["npm", "yarn", "pnpm", "npx"];
+  return scriptCmds.includes(cmd) ? `${cmd}.cmd` : cmd;
 }
 
 function writeSetupProgress(pct, label) {
@@ -621,6 +595,64 @@ function runInstallStep(targetDir, step, { setupVerbose = false, retryCount = 0,
   });
 }
 
+/**
+ * Collect safe setup diagnostics (no tokens, no API keys, no file contents).
+ * Returns a plain-text block suitable for support.
+ */
+function collectSetupDiagnostics(targetDir, failedStep, errorMessage) {
+  const lines = [];
+  lines.push(`Gravio CLI setup diagnostics`);
+  lines.push(`Generated: ${new Date().toISOString()}`);
+  lines.push(`CLI version: ${CLI_VERSION}`);
+  lines.push(`Node.js: ${process.version} (${process.platform} ${process.arch})`);
+  lines.push(`node binary: ${process.execPath}`);
+
+  // npm location check — redacted if it reveals a username
+  const npmExe = findExecutable("npm");
+  const npmSafe = npmExe.replace(/[A-Z]:\\Users\\[^\\]+\\/i, "C:\\Users\\<user>\\").replace(/\/home\/[^/]+\//g, "/home/<user>/");
+  lines.push(`npm resolved to: ${npmSafe}`);
+  lines.push(`npm exists on disk: ${existsSync(npmExe)}`);
+
+  // npm --version probe (safe — just shows a version number or error code)
+  try {
+    const probe = spawnSync(npmExe, ["--version"], { stdio: "pipe", shell: process.platform === "win32", timeout: 5000 });
+    lines.push(`npm --version: ${probe.stdout?.toString().trim() || `(exit ${probe.status}, ${probe.error?.code ?? "no error"})`}`);
+  } catch (e) {
+    lines.push(`npm --version: threw ${e.code ?? e.message}`);
+  }
+
+  // Package manager files present
+  const dir = path.resolve(targetDir);
+  const checks = ["package.json", "package-lock.json", "yarn.lock", "pnpm-lock.yaml", "requirements.txt", "Pipfile", "node_modules/.package-lock.json"];
+  for (const f of checks) {
+    lines.push(`${f}: ${existsSync(path.join(dir, f)) ? "found" : "not found"}`);
+  }
+
+  // Failed step info
+  if (failedStep) lines.push(`Failed step: ${failedStep.cmd} ${failedStep.args.join(" ")}`);
+  if (errorMessage) lines.push(`Error: ${errorMessage}`);
+
+  // PATH — show only the count of entries, not actual values (may contain usernames)
+  const pathEntries = (process.env.PATH ?? process.env.Path ?? "").split(path.delimiter).filter(Boolean);
+  lines.push(`PATH entries: ${pathEntries.length}`);
+
+  return lines.join("\n");
+}
+
+function printSetupFailureReport(targetDir, failedStep, errorMessage) {
+  const report = collectSetupDiagnostics(targetDir, failedStep, errorMessage);
+  const c = { red: "\x1b[91m", bold: "\x1b[1m", reset: "\x1b[0m", dim: "\x1b[2m", yellow: "\x1b[93m", cyan: "\x1b[96m" };
+
+  process.stderr.write(`\n  ${c.yellow}${c.bold}Need help? Send this report to hello@gravio.dev${c.reset}\n`);
+  process.stderr.write(`  ${c.dim}All entries are safe — no tokens, keys, or file contents are included.${c.reset}\n\n`);
+  process.stderr.write(`  ${c.dim}${"─".repeat(56)}${c.reset}\n`);
+  for (const line of report.split("\n")) {
+    process.stderr.write(`  ${c.dim}${line}${c.reset}\n`);
+  }
+  process.stderr.write(`  ${c.dim}${"─".repeat(56)}${c.reset}\n\n`);
+  process.stderr.write(`  ${c.cyan}Copy the block above and email it to: hello@gravio.dev${c.reset}\n\n`);
+}
+
 async function runSetup(targetDir, { silentNoWork = false, setupVerbose = false } = {}) {
   assertNodeSupported();
   
@@ -640,7 +672,7 @@ async function runSetup(targetDir, { silentNoWork = false, setupVerbose = false 
       process.stderr.write(`     npm is not available. Tried: ${npmExe}\n`);
       process.stderr.write(`     Fix: Open a fresh terminal after installing Node.js, then re-run.\n`);
       process.stderr.write(`     Download Node.js: https://nodejs.org/en/download\n`);
-      process.stderr.write(`     Workaround: Run 'npm install' manually in this folder, then re-run.\n\n`);
+      printSetupFailureReport(targetDir, null, `npm not available: ${npmExe}`);
       return false;
     }
   }
@@ -662,7 +694,8 @@ async function runSetup(targetDir, { silentNoWork = false, setupVerbose = false 
       process.stdout.write("     Why uninstall messages happen: pip reconciles conflicting versions to match requirements.txt.\n");
     }
     if (!await runInstallStep(targetDir, step, { setupVerbose })) {
-      process.stderr.write(`\n  \x1b[91m\x1b[1m✖  Setup failed\x1b[0m while running ${step.cmd}.\n\n`);
+      process.stderr.write(`\n  \x1b[91m\x1b[1m✖  Setup failed\x1b[0m while running ${step.cmd}.\n`);
+      printSetupFailureReport(targetDir, step, `${step.cmd} exited with non-zero status`);
       return false;
     }
   }
