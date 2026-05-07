@@ -1,6 +1,6 @@
 {
   "name": "agent-scorecard-platform",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "type": "module",
   "description": "Standalone AI agent quality scorecard platform — scan, score, and improve AI-assisted development workflows",
   "scripts": {

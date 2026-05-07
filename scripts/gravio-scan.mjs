@@ -428,6 +428,15 @@ function resolveNativeCmd(cmd) {
   return scriptCmds.includes(cmd) ? `${cmd}.cmd` : cmd;
 }
 
+/**
+ * On Windows, paths containing spaces must be quoted when passed as the command
+ * to spawnSync/spawn with shell:true — Node joins [cmd, ...args] without quoting.
+ * This ensures cmd.exe parses the path as a single token.
+ */
+function winShellSafeCmd(cmd) {
+  return process.platform === "win32" && cmd.includes(" ") ? `"${cmd}"` : cmd;
+}
+
 function writeSetupProgress(pct, label) {
   if (!process.stdout.isTTY) return;
   const barW   = 30;
@@ -491,11 +500,13 @@ function runInstallStep(targetDir, step, { setupVerbose = false, retryCount = 0,
         writeSetupProgress(pct, `Installing packages... (${elapsed}s)`);
       }, 1000);
 
-      // First attempt: spawn without shell (clean environment)
-      const child = spawn(resolvedCmd, step.args, {
+      // First attempt: on Windows .cmd files MUST run through a shell (they are batch scripts).
+      // Quote the path if it contains spaces so cmd.exe treats it as a single token.
+      const needsShell = process.platform === "win32" && resolvedCmd.endsWith(".cmd");
+      const child = spawn(winShellSafeCmd(resolvedCmd), step.args, {
         cwd: path.resolve(targetDir),
         stdio: ["ignore", "pipe", "pipe"],
-        shell: false,
+        shell: needsShell,
       });
 
       const npmNoise = /^(npm warn|added \d|audited \d|found \d|up to date|changed \d)/i;
@@ -586,10 +597,10 @@ function runInstallStep(targetDir, step, { setupVerbose = false, retryCount = 0,
     }
 
     // npm / yarn / pnpm — verbose mode (setupVerbose:true): pass raw output through.
-    const res = spawnSync(resolvedCmd, step.args, {
+    const res = spawnSync(winShellSafeCmd(resolvedCmd), step.args, {
       cwd: path.resolve(targetDir),
       stdio: "inherit",
-      shell: process.platform === "win32", // shell:true on Windows for max compatibility
+      shell: process.platform === "win32" && resolvedCmd.endsWith(".cmd"),
     });
     resolve(res.status === 0);
   });
@@ -615,7 +626,7 @@ function collectSetupDiagnostics(targetDir, failedStep, errorMessage) {
 
   // npm --version probe (safe — just shows a version number or error code)
   try {
-    const probe = spawnSync(npmExe, ["--version"], { stdio: "pipe", shell: process.platform === "win32", timeout: 5000 });
+    const probe = spawnSync(winShellSafeCmd(npmExe), ["--version"], { stdio: "pipe", shell: process.platform === "win32", timeout: 5000 });
     lines.push(`npm --version: ${probe.stdout?.toString().trim() || `(exit ${probe.status}, ${probe.error?.code ?? "no error"})`}`);
   } catch (e) {
     lines.push(`npm --version: threw ${e.code ?? e.message}`);
@@ -666,7 +677,7 @@ async function runSetup(targetDir, { silentNoWork = false, setupVerbose = false 
   // Only check npm availability if npm-based installs are planned
   if (plan.some((s) => ["npm", "yarn", "pnpm"].includes(s.cmd))) {
     const npmExe = findExecutable("npm");
-    const preflightCheck = spawnSync(npmExe, ["--version"], { stdio: "pipe", shell: process.platform === "win32" });
+    const preflightCheck = spawnSync(winShellSafeCmd(npmExe), ["--version"], { stdio: "pipe", shell: process.platform === "win32" });
     if (preflightCheck.status !== 0) {
       process.stderr.write(`\n  \x1b[91m\x1b[1m✖  Preflight failed\x1b[0m\n`);
       process.stderr.write(`     npm is not available. Tried: ${npmExe}\n`);
