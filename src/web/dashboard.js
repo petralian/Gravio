@@ -91,6 +91,38 @@ function getE2EEKeys() {
   }
 }
 
+/**
+ * Auto-decrypt scans if they're encrypted envelopes and we have saved keys.
+ * Returns the processed scans (decrypted or original).
+ */
+async function processScansForDecryption(scans) {
+  if (!Array.isArray(scans) || scans.length === 0) return scans;
+
+  const processed = [];
+  for (const scan of scans) {
+    // Check if this scan is an encrypted envelope
+    if (scan?.ciphertext && scan?.keyMode) {
+      try {
+        const decrypted = await tryDecryptRun(scan);
+        if (decrypted) {
+          // Use decrypted data but preserve server-metadata
+          processed.push({ ...decrypted, id: scan.id, publishedAt: scan.publishedAt });
+        } else {
+          // Decryption failed; use publicSummary if available
+          processed.push(scan);
+        }
+      } catch (err) {
+        console.warn(`Failed to decrypt scan ${scan.id}:`, err);
+        processed.push(scan);
+      }
+    } else {
+      // Not encrypted, pass through
+      processed.push(scan);
+    }
+  }
+  return processed;
+}
+
 const state = {
   user: null,
   projects: [],
@@ -1467,6 +1499,12 @@ async function openProject(projectId) {
     return;
   }
   const payload = await res.json();
+  
+  // Auto-decrypt any encrypted scans with saved keys
+  if (Array.isArray(payload.scans)) {
+    payload.scans = await processScansForDecryption(payload.scans);
+  }
+  
   renderWorkspace(projectId, payload);
   setProjectInUrl(projectId);
   loadAndRenderScoreChart(projectId);
