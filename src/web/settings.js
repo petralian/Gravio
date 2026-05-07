@@ -230,6 +230,54 @@ async function loadOptionalE2EE() {
   out.value = JSON.stringify(decrypted, null, 2);
 }
 
+// ─── Password change ───
+
+function showPwError(msg) {
+  const el = $("st-pw-error");
+  el.textContent = msg;
+  el.removeAttribute("hidden");
+  $("st-pw-success").setAttribute("hidden", "");
+}
+
+function showPwSuccess() {
+  $("st-pw-success").removeAttribute("hidden");
+  $("st-pw-error").setAttribute("hidden", "");
+  $("st-pw-current").value = "";
+  $("st-pw-new").value = "";
+  $("st-pw-confirm").value = "";
+}
+
+async function onPasswordSave() {
+  $("st-pw-error").setAttribute("hidden", "");
+  $("st-pw-success").setAttribute("hidden", "");
+
+  const currentPassword = $("st-pw-current")?.value ?? "";
+  const newPassword = $("st-pw-new").value;
+  const confirmPassword = $("st-pw-confirm").value;
+
+  if (!newPassword) { showPwError("New password is required."); return; }
+  if (newPassword !== confirmPassword) { showPwError("New passwords do not match."); return; }
+
+  const btn = $("st-pw-save");
+  btn.disabled = true;
+  btn.textContent = "Saving…";
+  try {
+    const res = await fetch("/auth/password/change", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ currentPassword: currentPassword || undefined, newPassword }),
+    });
+    const data = await res.json();
+    if (!res.ok) { showPwError(data.error ?? "Failed to update password."); return; }
+    showPwSuccess();
+  } catch {
+    showPwError("Network error — please try again.");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Update password";
+  }
+}
+
 // ─── Init ───
 
 async function init() {
@@ -245,11 +293,17 @@ async function init() {
       $("st-e2ee-section")?.removeAttribute("hidden");
     }
 
+    // Hide current-password field for SSO-only users
+    if (user.authProvider) {
+      $("st-pw-current-wrap")?.setAttribute("hidden", "");
+    }
+
     await loadBillingStatus();
     await loadApiKeys();
 
     $("st-gen-key")?.addEventListener("click", onGenerateKey);
     $("st-keys-list")?.addEventListener("click", onRevokeKeyClick);
+    $("st-pw-save")?.addEventListener("click", onPasswordSave);
 
     $("st-copy-key")?.addEventListener("click", async () => {
       const val = $("st-new-key-value").textContent;

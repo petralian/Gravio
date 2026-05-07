@@ -86,9 +86,47 @@ function showSsoCallbackErrorIfPresent() {
     sso_email_unverified: "Google account email must be verified.",
     sso_signin_denied: "Sign-in was denied for this account.",
     sso_unexpected_error: "Unexpected Google sign-in error. Please try again.",
+    magic_link_invalid: "That sign-in link is invalid or has expired. Request a new one below.",
   };
-  showError("login-error", map[code] ?? "Google sign-in failed. Please try again.");
+  showError("login-error", map[code] ?? "Sign-in failed. Please try again.");
 }
+
+/* ─── magic link ─── */
+document.getElementById("form-magic-link").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const emailEl = document.getElementById("magic-email");
+  const email = emailEl.value.trim();
+  document.getElementById("magic-error").setAttribute("hidden", "");
+  document.getElementById("magic-success").setAttribute("hidden", "");
+
+  if (!email) {
+    document.getElementById("magic-error").textContent = "Enter your email address.";
+    document.getElementById("magic-error").removeAttribute("hidden");
+    return;
+  }
+
+  const btn = document.getElementById("magic-submit");
+  btn.disabled = true;
+  btn.textContent = "Sending…";
+
+  const next = new URLSearchParams(location.search).get("next") ?? "/dashboard";
+  try {
+    await fetch("/auth/magic-link/request", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, next }),
+    });
+    // Always show success (server never leaks email existence)
+    document.getElementById("magic-success").removeAttribute("hidden");
+    emailEl.value = "";
+  } catch {
+    document.getElementById("magic-error").textContent = "Network error — please try again.";
+    document.getElementById("magic-error").removeAttribute("hidden");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Send sign-in link";
+  }
+});
 
 /* ─── redirect after auth ─── */
 function redirectAfterAuth(role) {

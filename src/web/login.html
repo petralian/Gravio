@@ -44,6 +44,20 @@
           <button class="m-btn m-btn-neon auth-submit" type="submit" id="login-submit">Sign in →</button>
           <a href="/auth/sso/google/start" class="m-btn m-btn-outline auth-submit" id="login-sso-google" hidden>Continue with Google</a>
         </form>
+
+        <!-- Magic link toggle -->
+        <div class="auth-divider"><span>or</span></div>
+        <div id="magic-link-section">
+          <form class="auth-form" id="form-magic-link" novalidate>
+            <div class="auth-field">
+              <label for="magic-email">Email a sign-in link</label>
+              <input type="email" id="magic-email" name="email" autocomplete="email" placeholder="you@example.com" />
+            </div>
+            <p class="auth-error" id="magic-error" hidden></p>
+            <p class="auth-help" id="magic-success" hidden>Check your email &mdash; a sign-in link is on its way.</p>
+            <button class="m-btn m-btn-outline auth-submit" type="submit" id="magic-submit">Send sign-in link</button>
+          </form>
+        </div>
       </div>
 
       <!-- Register panel -->

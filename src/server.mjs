@@ -15,6 +15,8 @@ import {
   generateApiKey, validateApiKey,
   setSessionCookie, clearSessionCookie, parseSessionCookie,
   loginOrCreateSsoUser,
+  generateMagicLink, consumeMagicLink, sendMagicLinkEmail,
+  changePassword,
 } from "./core/auth.mjs";
 import { stmts } from "./core/db.mjs";
 
@@ -530,16 +532,31 @@ function buildReadyChecklist(dimensionPlan, overallScore) {
 
 function recommendationsFromRun(runData, limitedDetails) {
   if (limitedDetails) {
+    const scorecard = runData?.publicSummary?.scorecard ?? {};
+    const dimPreviews = DIM_ORDER.map((dim) => {
+      const current = normalizeScore(scorecard?.[dim]);
+      const target = READY_TO_SHIP_TARGET[dim] ?? 80;
+      const gap = current === null ? target : Math.max(0, target - current);
+      const guide = DIMENSION_GUIDE[dim];
+      return {
+        dimension: dim,
+        label: toTitleCaseDimension(dim),
+        current,
+        target,
+        status: statusFromGap(gap),
+        topAction: guide?.actions?.[0] ?? "Improve this dimension.",
+      };
+    }).sort((a, b) => b.gap - a.gap);
+
+    const hasScorecard = DIM_ORDER.some((d) => scorecard?.[d] !== undefined);
     return {
       version: 2,
       tier: "limited",
       headline: "Detailed remediation is available on Pro and Team.",
-      summary: "Your free-tier report shows trend and score only. Upgrade to unlock per-dimension action plans and ready-to-ship checklists.",
-      quickActions: [
-        "Run scans weekly and watch trend direction.",
-        "Prioritize the two lowest dimensions first.",
-        "Upgrade to Pro/Team for detailed remediation guidance.",
-      ],
+      summary: hasScorecard
+        ? `Your scan detected ${dimPreviews.filter((d) => d.status !== "ready").length} dimension${dimPreviews.filter((d) => d.status !== "ready").length === 1 ? "" : "s"} needing attention. Upgrade for the full action plan.`
+        : "Your free-tier report shows trend and score only. Upgrade to unlock per-dimension action plans and ready-to-ship checklists.",
+      dimPreviews: hasScorecard ? dimPreviews : [],
       actionPlan: [],
       dimensionPlan: [],
       readyChecklist: [],
@@ -774,6 +791,71 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // ── POST /auth/magic-link/request ──────────────────────────────────────
+  // Always responds 200 regardless of whether the email exists (prevents enumeration).
+  if (req.method === "POST" && req.url === "/auth/magic-link/request") {
+    try {
+      const body = JSON.parse(await readBody(req));
+      const next = (typeof body?.next === "string" && body.next.startsWith("/")) ? body.next : "/dashboard";
+      const appUrl = IS_PROD ? `https://${process.env.CANONICAL_HOST ?? "gravio.dev"}` : `http://localhost:${PORT}`;
+      const result = generateMagicLink(body?.email);
+      if (result) {
+        const magicUrl = `${appUrl}/auth/magic-link/verify?token=${encodeURIComponent(result.token)}&next=${encodeURIComponent(next)}`;
+        await sendMagicLinkEmail(result.user.email, magicUrl);
+      }
+    } catch {
+      // Fall through — always 200
+    }
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ ok: true }));
+    return;
+  }
+
+  // ── GET /auth/magic-link/verify ─────────────────────────────────────────
+  if (req.method === "GET" && pathOnly === "/auth/magic-link/verify") {
+    const requestUrl = new URL(req.url, "http://localhost");
+    const token = requestUrl.searchParams.get("token") ?? "";
+    const next = String(requestUrl.searchParams.get("next") ?? "").startsWith("/")
+      ? requestUrl.searchParams.get("next")
+      : "/dashboard";
+    const user = consumeMagicLink(token);
+    if (!user) {
+      res.writeHead(302, { Location: "/login?authError=magic_link_invalid" });
+      res.end();
+      return;
+    }
+    const sessionToken = createSession(user.id);
+    setSessionCookie(res, sessionToken);
+    res.writeHead(302, { Location: next });
+    res.end();
+    return;
+  }
+
+  // ── POST /auth/password/change ──────────────────────────────────────────
+  if (req.method === "POST" && req.url === "/auth/password/change") {
+    const user = getAuthUser(req);
+    if (!user) {
+      res.writeHead(401, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Not authenticated" }));
+      return;
+    }
+    try {
+      const { currentPassword, newPassword } = JSON.parse(await readBody(req));
+      const result = await changePassword(user.uid ?? user.id, currentPassword, newPassword);
+      if (!result.ok) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: result.error }));
+        return;
+      }
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ ok: true }));
+    } catch (err) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: err.message }));
+    }
+    return;
+  }
+
   // ── POST /auth/register ─────────────────────────────────────────────────
   if (req.method === "POST" && req.url === "/auth/register") {
     try {
@@ -961,7 +1043,15 @@ const server = http.createServer(async (req, res) => {
       return;
     }
     res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ id: user.uid ?? user.id, email: user.email, role: user.role, plan: user.plan ?? "free" }));
+    const userId = user.uid ?? user.id;
+    const fullUser = stmts.getUserById.get(userId);
+    res.end(JSON.stringify({
+      id: userId,
+      email: user.email,
+      role: user.role,
+      plan: user.plan ?? "free",
+      authProvider: fullUser?.auth_provider ?? null,
+    }));
     return;
   }
 
@@ -1430,9 +1520,22 @@ const server = http.createServer(async (req, res) => {
       }
 
       const uid = user.uid ?? user.id;
-      stmts.insertRun.run(projectId, uid, JSON.stringify(run));
+
+      // Free tier: enforce lifetime scan limit of 3 per email (survives deletions)
       if (!isPaid(user)) {
-        // Free tier is cloud-only and keeps only the latest 3 cloud records.
+        const freshUser = stmts.getUserById.get(uid);
+        const lifetimeCount = Number(freshUser?.scans_published ?? 0);
+        if (lifetimeCount >= 3) {
+          res.writeHead(403, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: "Free tier limit reached (3 lifetime scans). Upgrade to Pro or Team to continue scanning." }));
+          return;
+        }
+      }
+
+      stmts.insertRun.run(projectId, uid, JSON.stringify(run));
+      stmts.incrementScansPublished.run(uid);
+      if (!isPaid(user)) {
+        // Free tier keeps only the latest 3 visible records.
         stmts.trimRunsForFreeUser.run(uid, uid);
       }
       res.writeHead(200, { "Content-Type": "application/json" });
@@ -1485,7 +1588,7 @@ const server = http.createServer(async (req, res) => {
           overallScore: summary.overallScore,
           rating: summary.rating,
         },
-        recommendations: recommendationsFromRun(limited ? null : parsed, limited),
+        recommendations: recommendationsFromRun(parsed, limited),
       };
     });
 

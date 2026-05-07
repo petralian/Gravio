@@ -91,6 +91,16 @@ db.exec(`
     processed_at TEXT   NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
     UNIQUE(provider, event_key)
   );
+
+  CREATE TABLE IF NOT EXISTS magic_links (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    token_hash TEXT    NOT NULL UNIQUE,
+    email      TEXT    NOT NULL,
+    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    expires_at TEXT    NOT NULL,
+    used_at    TEXT,
+    created_at TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
+  );
 `);
 
 // ─── Migrations (idempotent — run on every start) ───────────────────────────
@@ -180,6 +190,21 @@ try {
 } catch {
   // Table already exists — ignore
 }
+try {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS magic_links (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      token_hash TEXT    NOT NULL UNIQUE,
+      email      TEXT    NOT NULL,
+      user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      expires_at TEXT    NOT NULL,
+      used_at    TEXT,
+      created_at TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
+    )
+  `);
+} catch {
+  // Table already exists — ignore
+}
 
 // Migration: older schema enforced one run per (project_id, user_id) via UNIQUE.
 // New model stores scan history rows, so drop that unique constraint safely.
@@ -204,6 +229,12 @@ try {
   }
 } catch {
   // If migration fails unexpectedly, keep startup non-fatal; tests will catch regressions.
+}
+
+try {
+  db.exec(`ALTER TABLE users ADD COLUMN scans_published INTEGER NOT NULL DEFAULT 0`);
+} catch {
+  // Column already exists — ignore
 }
 
 // Promote first registered user (or ADMIN_EMAIL) to admin if no admin exists yet
@@ -342,6 +373,9 @@ export const stmts = {
          LIMIT 3
        )`,
   ),
+  incrementScansPublished: db.prepare(
+    `UPDATE users SET scans_published = scans_published + 1 WHERE id=?`,
+  ),
   runCountPerUser: db.prepare(
     `SELECT user_id, COUNT(*) as run_count FROM runs GROUP BY user_id`,
   ),
@@ -351,6 +385,22 @@ export const stmts = {
     `INSERT OR IGNORE INTO webhook_events (provider, event_key, event_name, object_id, payload)
      VALUES (?, ?, ?, ?, ?)`,
   ),
+
+  // magic links (one-time sign-in tokens)
+  createMagicLink: db.prepare(
+    `INSERT INTO magic_links (token_hash, email, user_id, expires_at) VALUES (?, ?, ?, ?)`,
+  ),
+  getMagicLinkByToken: db.prepare(
+    `SELECT * FROM magic_links
+     WHERE token_hash=? AND expires_at > strftime('%Y-%m-%dT%H:%M:%SZ','now')`,
+  ),
+  consumeMagicLink: db.prepare(
+    `UPDATE magic_links SET used_at=strftime('%Y-%m-%dT%H:%M:%SZ','now')
+     WHERE token_hash=? AND used_at IS NULL`,
+  ),
+
+  // password management
+  updatePasswordHash: db.prepare(`UPDATE users SET password_hash=? WHERE id=?`),
 };
 
 export { db, ensureAdminRole };

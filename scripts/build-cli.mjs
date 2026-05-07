@@ -18,6 +18,7 @@ import { build } from "esbuild";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import fs from "node:fs";
+import JavaScriptObfuscator from "javascript-obfuscator";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
@@ -56,3 +57,29 @@ await build({
 
 const stats = fs.statSync(OUT_FILE);
 console.log(`✓ Wrote ${path.relative(ROOT, OUT_FILE)} (${(stats.size / 1024).toFixed(1)} KB)`);
+
+// ── Obfuscate the bundled output ──────────────────────────────────────────
+// Applies control-flow flattening + string array encoding to make the
+// filesystem-scan logic significantly harder to read or copy.
+console.log("  Obfuscating...");
+const source = fs.readFileSync(OUT_FILE, "utf8");
+const result = JavaScriptObfuscator.obfuscate(source, {
+  compact: true,
+  controlFlowFlattening: true,
+  controlFlowFlatteningThreshold: 0.5,
+  deadCodeInjection: false,          // keeps bundle size reasonable
+  stringArray: true,
+  stringArrayEncoding: ["base64"],
+  stringArrayThreshold: 0.75,
+  stringArrayRotate: true,
+  stringArrayShuffle: true,
+  splitStrings: true,
+  splitStringsChunkLength: 8,
+  unicodeEscapeSequence: false,       // avoids huge size blowup
+  renameGlobals: false,               // don't break Node global access
+  sourceMap: false,
+  target: "node",
+});
+fs.writeFileSync(OUT_FILE, result.getObfuscatedCode(), "utf8");
+const obfStats = fs.statSync(OUT_FILE);
+console.log(`✓ Obfuscated ${path.relative(ROOT, OUT_FILE)} (${(obfStats.size / 1024).toFixed(1)} KB)`);

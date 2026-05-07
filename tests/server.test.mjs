@@ -287,6 +287,91 @@ describe("Auth — register / login / logout / me", () => {
   });
 });
 
+describe("Magic link — request + verify", () => {
+  const email = `magic-${Date.now()}@gravio.test`;
+  const password = "MagicPass1!xY";
+
+  it("setup: register user for magic link tests", async () => {
+    const res = await httpPost(`http://localhost:${TEST_PORT}/auth/register`, { email, password });
+    assert.strictEqual(res.status, 200);
+  });
+
+  it("POST /auth/magic-link/request returns 200 for existing email", async () => {
+    const res = await httpPost(`http://localhost:${TEST_PORT}/auth/magic-link/request`, { email });
+    assert.strictEqual(res.status, 200);
+    const data = JSON.parse(res.body);
+    assert.strictEqual(data.ok, true);
+  });
+
+  it("POST /auth/magic-link/request returns 200 for non-existent email (no enumeration)", async () => {
+    const res = await httpPost(`http://localhost:${TEST_PORT}/auth/magic-link/request`, {
+      email: `nobody-${Date.now()}@gravio.test`,
+    });
+    assert.strictEqual(res.status, 200);
+    const data = JSON.parse(res.body);
+    assert.strictEqual(data.ok, true);
+  });
+
+  it("GET /auth/magic-link/verify redirects to /login?authError=magic_link_invalid for bad token", async () => {
+    const res = await httpGet(`http://localhost:${TEST_PORT}/auth/magic-link/verify?token=badtoken123`);
+    assert.strictEqual(res.status, 302);
+    assert.ok(res.headers.location?.includes("magic_link_invalid"), "Should redirect to login with error");
+  });
+});
+
+describe("Password change — POST /auth/password/change", () => {
+  const email = `pwchange-${Date.now()}@gravio.test`;
+  const password = "PwChange1!XYZ";
+  let cookie;
+
+  it("setup: register user for password change tests", async () => {
+    cookie = await registerAndGetCookie(email, password);
+    assert.ok(cookie);
+  });
+
+  it("rejects unauthenticated request", async () => {
+    const res = await httpPost(`http://localhost:${TEST_PORT}/auth/password/change`, {
+      currentPassword: password,
+      newPassword: "NewPass2@XYZ",
+    });
+    assert.strictEqual(res.status, 401);
+  });
+
+  it("rejects wrong current password", async () => {
+    const res = await httpPost(
+      `http://localhost:${TEST_PORT}/auth/password/change`,
+      { currentPassword: "WrongPass!9X", newPassword: "NewPass2@XYZ" },
+      { Cookie: cookie },
+    );
+    assert.strictEqual(res.status, 400);
+    const data = JSON.parse(res.body);
+    assert.ok(String(data.error ?? "").toLowerCase().includes("current password"));
+  });
+
+  it("rejects weak new password", async () => {
+    const res = await httpPost(
+      `http://localhost:${TEST_PORT}/auth/password/change`,
+      { currentPassword: password, newPassword: "short" },
+      { Cookie: cookie },
+    );
+    assert.strictEqual(res.status, 400);
+    const data = JSON.parse(res.body);
+    assert.ok(String(data.error ?? "").toLowerCase().includes("password"));
+  });
+
+  it("changes password successfully", async () => {
+    const newPassword = "NeWPaSs2@ABcd";
+    const res = await httpPost(
+      `http://localhost:${TEST_PORT}/auth/password/change`,
+      { currentPassword: password, newPassword },
+      { Cookie: cookie },
+    );
+    assert.strictEqual(res.status, 200);
+    const data = JSON.parse(res.body);
+    assert.strictEqual(data.ok, true);
+  });
+});
+
 describe("API keys", () => {
   const email = `apikey-${Date.now()}@gravio.test`;
   let cookie;
@@ -551,7 +636,7 @@ describe("POST /api/publish + GET /api/runs/:projectId (authenticated)", () => {
     assert.strictEqual(res.status, 400);
   });
 
-  it("free tier keeps only latest 3 cloud records", async () => {
+  it("free tier enforces lifetime limit of 3 scans per email", async () => {
     const limitCookie = await registerAndGetCookie(`limit-${Date.now()}@gravio.test`, "Str0ng!Alpha99");
     const keyRes = await httpPost(`http://localhost:${TEST_PORT}/api/keys`, { label: "limit" }, { Cookie: limitCookie });
     const limitKey = JSON.parse(keyRes.body).key;
@@ -565,18 +650,21 @@ describe("POST /api/publish + GET /api/runs/:projectId (authenticated)", () => {
       assert.strictEqual(okRes.status, 200);
     }
 
+    // 4th scan must be blocked — lifetime limit is 3, even across different projects
     const fourth = await httpPost(
       `http://localhost:${TEST_PORT}/api/publish`,
       { projectId: "limit-proj-4", run: { runId: "limit-proj-4" } },
       { Authorization: `Bearer ${limitKey}` },
     );
-    assert.strictEqual(fourth.status, 200);
+    assert.strictEqual(fourth.status, 403, "4th scan should be blocked by lifetime limit");
+    const fourthBody = JSON.parse(fourth.body);
+    assert.ok(fourthBody.error?.includes("Free tier limit"), `error message should mention limit: ${fourthBody.error}`);
 
+    // Records should still be at 3 (the blocked scan was not inserted)
     const list = await httpGet(`http://localhost:${TEST_PORT}/api/runs/list`, { Cookie: limitCookie });
     assert.strictEqual(list.status, 200);
     const data = JSON.parse(list.body);
-    assert.strictEqual(data.runs.length, 3, "free tier should retain only latest 3 records");
-    assert.ok(data.runs.some((r) => r.project_id === "limit-proj-4"));
+    assert.strictEqual(data.runs.length, 3, "free tier should retain only 3 records");
   });
 
   it("free tier receives generic rating only from /api/runs/:projectId", async () => {

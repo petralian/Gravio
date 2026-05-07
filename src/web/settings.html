@@ -28,6 +28,34 @@
 
     <div class="db-settings-sections">
 
+      <!-- Password -->
+      <section class="db-settings-section" id="st-password-section">
+        <div class="db-settings-section-head">
+          <h2 class="db-settings-h2">Password</h2>
+          <p class="db-settings-desc">
+            Change your account password. If you signed up with Google SSO you can set a password here without entering your current one.
+          </p>
+        </div>
+        <div class="db-form-card">
+          <div class="db-field" id="st-pw-current-wrap">
+            <label for="st-pw-current">Current password</label>
+            <input type="password" id="st-pw-current" autocomplete="current-password" placeholder="Your current password" />
+          </div>
+          <div class="db-field">
+            <label for="st-pw-new">New password</label>
+            <input type="password" id="st-pw-new" autocomplete="new-password" placeholder="Min. 12 chars, mixed case, number, symbol" />
+            <p class="auth-help">Use at least 12 characters with uppercase, lowercase, number, and symbol.</p>
+          </div>
+          <div class="db-field">
+            <label for="st-pw-confirm">Confirm new password</label>
+            <input type="password" id="st-pw-confirm" autocomplete="new-password" placeholder="Repeat new password" />
+          </div>
+          <button class="m-btn m-btn-neon" id="st-pw-save" type="button">Update password</button>
+          <p class="db-error" id="st-pw-error" hidden></p>
+          <p class="db-success" id="st-pw-success" hidden>Password updated successfully.</p>
+        </div>
+      </section>
+
       <!-- Billing -->
       <section class="db-settings-section" id="st-billing-section">
         <div class="db-settings-section-head">

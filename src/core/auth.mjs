@@ -14,6 +14,7 @@
 
 import { randomBytes, scrypt, timingSafeEqual, createHash } from "node:crypto";
 import { promisify } from "node:util";
+import https from "node:https";
 import { stmts, ensureAdminRole } from "./db.mjs";
 
 const scryptAsync = promisify(scrypt);
@@ -288,4 +289,133 @@ export async function loginOrCreateSsoUser({ provider, subject, email }) {
   const user = stmts.getUserById.get(created.id);
   const token = createSession(user.id);
   return { ok: true, user, token };
+}
+
+// ─── Magic links ───────────────────────────────────────────────────────────────
+
+const MAGIC_LINK_TTL_MS = 15 * 60 * 1000; // 15 minutes
+
+/**
+ * Generate a one-time sign-in token for an existing user.
+ * Returns { token, user } or null if the email is not found / inactive.
+ * Always returns null silently to prevent email enumeration in the caller.
+ */
+export function generateMagicLink(email) {
+  const normalizedEmail = String(email ?? "").trim().toLowerCase();
+  const user = stmts.getUserByEmail.get(normalizedEmail);
+  if (!user || !user.is_active) return null;
+
+  const token = randomBytes(32).toString("base64url");
+  const hash = sha256Hex(token);
+  const expiresAt = new Date(Date.now() + MAGIC_LINK_TTL_MS)
+    .toISOString()
+    .replace(/\.\d{3}Z$/, "Z");
+  stmts.createMagicLink.run(hash, normalizedEmail, user.id, expiresAt);
+  return { token, user };
+}
+
+/**
+ * Consume a magic link token. Returns the user row on success, or null.
+ * Marks the token as used atomically — second call always returns null.
+ */
+export function consumeMagicLink(token) {
+  if (!token || typeof token !== "string") return null;
+  try {
+    const hash = sha256Hex(token);
+    const link = stmts.getMagicLinkByToken.get(hash);
+    if (!link || link.used_at) return null;
+    const { changes } = stmts.consumeMagicLink.run(hash);
+    if (changes === 0) return null; // lost race
+    const user = stmts.getUserById.get(link.user_id);
+    if (!user || !user.is_active) return null;
+    return user;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Send a magic sign-in link via Resend (https://resend.com).
+ * Falls back to console.log in dev when RESEND_API_KEY is not set.
+ */
+export async function sendMagicLinkEmail(to, magicUrl) {
+  const apiKey = process.env.RESEND_API_KEY;
+  const from = process.env.EMAIL_FROM || "Gravio <noreply@gravio.dev>";
+  const html = `
+    <div style="font-family:Inter,sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;background:#0d0d0f;color:#e2e8f0;border-radius:12px">
+      <p style="font-size:24px;font-weight:700;color:#00e5ff;margin:0 0 24px">Gravio</p>
+      <p style="margin:0 0 16px;font-size:15px">Click the button below to sign in. This link expires in 15 minutes and can only be used once.</p>
+      <a href="${magicUrl}" style="display:inline-block;padding:12px 24px;background:#00e5ff;color:#0d0d0f;font-weight:700;border-radius:6px;text-decoration:none;font-size:15px">Sign in to Gravio</a>
+      <p style="margin:24px 0 0;font-size:12px;color:#94a3b8">If you didn't request this, ignore this email. The link expires in 15 minutes.</p>
+    </div>
+  `;
+
+  if (!apiKey) {
+    console.log(`[DEV EMAIL] Magic link for ${to}:\n${magicUrl}`);
+    return { ok: true, dev: true };
+  }
+
+  return new Promise((resolve) => {
+    const body = JSON.stringify({
+      from,
+      to: [to],
+      subject: "Your Gravio sign-in link",
+      html,
+    });
+    const opts = {
+      hostname: "api.resend.com",
+      path: "/emails",
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+        "Content-Length": Buffer.byteLength(body),
+      },
+    };
+    const req = https.request(opts, (r) => {
+      let d = "";
+      r.on("data", (c) => (d += c));
+      r.on("end", () => {
+        if (r.statusCode >= 200 && r.statusCode < 300) {
+          resolve({ ok: true });
+        } else {
+          console.error(`[EMAIL] Resend error ${r.statusCode}: ${d}`);
+          resolve({ ok: false });
+        }
+      });
+    });
+    req.on("error", (err) => {
+      console.error("[EMAIL] Email send error:", err.message);
+      resolve({ ok: false });
+    });
+    req.end(body);
+  });
+}
+
+// ─── Password change ───────────────────────────────────────────────────────────
+
+/**
+ * Change a user's password (authenticated flow).
+ * - Password users: must provide current password.
+ * - SSO-only users (auth_provider set): may set a password without current password,
+ *   since their session already proves identity.
+ */
+export async function changePassword(userId, currentPassword, newPassword) {
+  const user = stmts.getUserById.get(userId);
+  if (!user) return { ok: false, error: "User not found" };
+
+  if (!user.auth_provider) {
+    // Pure password account — verify current password
+    if (!currentPassword) return { ok: false, error: "Current password is required" };
+    const valid = await verifyPassword(currentPassword, user.password_hash);
+    if (!valid) return { ok: false, error: "Current password is incorrect" };
+  }
+  // SSO-linked accounts skip current-password check (session proves identity)
+
+  const check = validatePasswordStrength(user.email, newPassword);
+  if (!check.ok) return { ok: false, error: check.error };
+
+  const hash = await hashPassword(newPassword);
+  stmts.updatePasswordHash.run(hash, userId);
+  return { ok: true };
 }

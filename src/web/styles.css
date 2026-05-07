@@ -829,6 +829,21 @@ body.auth-page {
   color: var(--text-3);
   margin: 0;
 }
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 20px 0 4px;
+  color: var(--text-3);
+  font-size: 12px;
+}
+.auth-divider::before,
+.auth-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
 .auth-error {
   font-size: 13px;
   color: #ff4466;
@@ -1869,6 +1884,15 @@ button#evaluate-btn:hover {
   padding: 12px 16px;
   line-height: 1.5;
 }
+.db-success {
+  font-size: 14px;
+  color: #00e5a0;
+  background: rgba(0,229,160,0.08);
+  border: 1px solid rgba(0,229,160,0.2);
+  border-radius: 8px;
+  padding: 12px 16px;
+  line-height: 1.5;
+}
 .db-submit { align-self: flex-start; }
 
 .db-project-detail {
@@ -2670,6 +2694,78 @@ button#evaluate-btn:hover {
   line-height: 1.5;
 }
 
+/* Free-tier limited recommendations */
+.db-rec-hero-limited {
+  background: linear-gradient(135deg, rgba(255,186,0,0.06), rgba(0,229,255,0.06));
+  border-color: rgba(255,186,0,0.2);
+}
+
+.db-dim-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(175px, 1fr));
+  gap: 10px;
+}
+
+.db-dim-preview-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: rgba(255,255,255,0.015);
+  padding: 12px;
+  position: relative;
+}
+
+.db-dim-preview-score {
+  color: var(--text-1);
+  font-family: var(--font-mono);
+  font-size: 18px;
+  font-weight: 700;
+  margin: 6px 0 4px;
+}
+
+.db-dim-preview-action {
+  color: var(--text-3);
+  font-size: 12px;
+  line-height: 1.5;
+  margin-bottom: 10px;
+}
+
+.db-dim-preview-lock {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-3);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 2px 6px;
+}
+
+.db-rec-upgrade-cta {
+  border-color: rgba(0,229,255,0.2) !important;
+  background: linear-gradient(135deg, rgba(0,229,255,0.05), rgba(59,130,246,0.05)) !important;
+}
+
+.db-upgrade-box {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.db-upgrade-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-1);
+}
+
+.db-upgrade-body {
+  font-size: 13px;
+  color: var(--text-2);
+  line-height: 1.6;
+  max-width: 540px;
+}
+
 .db-ready-list {
   list-style: none;
   display: flex;
@@ -2816,7 +2912,6 @@ button#evaluate-btn:hover {
 }
 
 .db-runscans-details {
-  border-bottom: 1px solid var(--border);
   padding: 16px 0;
 }
 .db-runscans-details-summary {

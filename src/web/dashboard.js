@@ -609,8 +609,50 @@ function renderWorkspaceRecs(scans) {
   }
 
   if (recs && typeof recs === "object" && !Array.isArray(recs) && Number(recs.version) >= 2) {
+    const statusClass = (status) => {
+      const s = String(status ?? "").toLowerCase();
+      if (s === "ready") return "db-dim-ready";
+      if (s === "near") return "db-dim-near";
+      if (s === "at-risk") return "db-dim-risk";
+      return "db-dim-critical";
+    };
+
+    // ── Limited (free) tier: show per-dimension teasers + upgrade CTA ──
+    if (recs.tier === "limited") {
+      const dimPreviews = Array.isArray(recs.dimPreviews) ? recs.dimPreviews : [];
+      recList.innerHTML = `
+        <li class="db-rec-hero db-rec-hero-limited">
+          <p class="db-rec-hero-title">${esc(recs.headline ?? "Upgrade for full remediation")}</p>
+          <p class="db-rec-hero-text">${esc(recs.summary ?? "")}</p>
+        </li>
+        ${dimPreviews.length ? `
+          <li class="db-rec-block">
+            <p class="db-rec-block-title">Dimension snapshot</p>
+            <div class="db-dim-preview-grid">
+              ${dimPreviews.map((dim) => `
+                <article class="db-dim-preview-card">
+                  <div class="db-dim-head">
+                    <span class="db-dim-name">${esc(dim.label ?? dim.dimension)}</span>
+                    <span class="db-dim-status ${statusClass(dim.status)}">${esc(dim.status ?? "unknown")}</span>
+                  </div>
+                  <p class="db-dim-preview-score">${dim.current !== null ? `${dim.current}/100` : "—"}</p>
+                  <p class="db-dim-preview-action">${esc(dim.topAction)}</p>
+                  <span class="db-dim-preview-lock" aria-label="Full guidance requires upgrade">Full plan locked</span>
+                </article>`).join("")}
+            </div>
+          </li>` : ""}
+        <li class="db-rec-block db-rec-upgrade-cta">
+          <div class="db-upgrade-box">
+            <p class="db-upgrade-title">Unlock full remediation guidance</p>
+            <p class="db-upgrade-body">Pro and Team plans include per-dimension action plans, priority rankings, fix commands, and a ready-to-ship checklist.</p>
+            <a href="/settings" class="m-btn m-btn-neon m-btn-sm">View upgrade options →</a>
+          </div>
+        </li>
+      `;
+      return;
+    }
+
     const quickActions = Array.isArray(recs.quickActions) ? recs.quickActions : [];
-    const topIssues = Array.isArray(recs.topIssues) ? recs.topIssues : [];
     const actionPlan = Array.isArray(recs.actionPlan) ? recs.actionPlan : [];
     const dimensionPlan = Array.isArray(recs.dimensionPlan) ? recs.dimensionPlan : [];
     const readyChecklist = Array.isArray(recs.readyChecklist) ? recs.readyChecklist : [];
@@ -623,28 +665,7 @@ function renderWorkspaceRecs(scans) {
       return "db-priority-low";
     };
 
-    const statusClass = (status) => {
-      const s = String(status ?? "").toLowerCase();
-      if (s === "ready") return "db-dim-ready";
-      if (s === "near") return "db-dim-near";
-      if (s === "at-risk") return "db-dim-risk";
-      return "db-dim-critical";
-    };
-
     recList.innerHTML = `
-      ${topIssues.length ? `
-        <li class="db-roi-strip">
-          <p class="db-roi-strip-title">Top priorities</p>
-          <div class="db-roi-items">
-            ${topIssues.map((item) => `
-              <div class="db-roi-item">
-                <span class="db-priority-chip ${priorityClass(item.priority)}">${esc(item.priority ?? "medium")}</span>
-                <span class="db-roi-dim">${esc(item.dimension ?? "general")}</span>
-                <span class="db-roi-title">${esc(item.title ?? "")}</span>
-                ${item.lift ? `<span class="db-roi-lift">+${item.lift}pts</span>` : ""}
-              </div>`).join("")}
-          </div>
-        </li>` : ""}
       <li class="db-rec-hero">
         <p class="db-rec-hero-title">${esc(recs.headline ?? "Remediation plan")}</p>
         <p class="db-rec-hero-text">${esc(recs.summary ?? "")}</p>
