@@ -2449,6 +2449,46 @@ button#evaluate-btn:hover {
 
 /* ── Recommendations tab ── */
 .db-recs-list { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+
+/* ── ROI top-priority strip ── */
+.db-roi-strip {
+  background: linear-gradient(135deg, rgba(255,186,0,0.07), rgba(255,77,77,0.06));
+  border: 1px solid rgba(255,186,0,0.24);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+}
+.db-roi-strip-title {
+  color: var(--text-1);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+.db-roi-items { display: flex; flex-direction: column; gap: 8px; }
+.db-roi-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.db-roi-dim {
+  font-size: 11px;
+  color: var(--text-3);
+  text-transform: capitalize;
+}
+.db-roi-title {
+  font-size: 13px;
+  color: var(--text-2);
+  flex: 1;
+  min-width: 0;
+}
+.db-roi-lift {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--neon-green, #00ff88);
+  white-space: nowrap;
+}
 .db-rec-item {
   display: flex;
   align-items: flex-start;

@@ -118,7 +118,7 @@ function spinnerStop(icon, msg) {
 // ─── Dimension config ─────────────────────────────────────────────────────────
 const DIM_ORDER = ["safety", "reliability", "evaluation", "observability", "governance", "agentic"];
 const DIM_META  = {
-  safety:        { label: "Safety",        icon: "🛡️", weight: "25%" },
+  safety:        { label: "Safety",        icon: "�", weight: "25%" },
   reliability:   { label: "Reliability",   icon: "⚡️", weight: "20%" },
   evaluation:    { label: "Evaluation",    icon: "🧪", weight: "15%" },
   observability: { label: "Observability", icon: "📡", weight: "10%" },
@@ -641,10 +641,7 @@ export function printScanReport({ run, scan, version = "?" }) {
   console.log();
   console.log(hr());
 
-  // ── Next Steps / Recommendations ───────────────────────────────────────────
-  printRecommendations(catalog);
-
-  // ── Dashboard CTA — remediation detail lives server-side ───────────────────
+  // ── Dashboard CTA — remediation detail lives server-side ———————————————————————
   console.log();
   if (totalIssues > 0) {
     const critLine = criticalFails > 0

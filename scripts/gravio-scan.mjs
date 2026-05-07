@@ -331,6 +331,22 @@ function isPipStep(step) {
   return false;
 }
 
+function resolveNativeCmd(cmd) {
+  // On Windows, script-based package managers need the .cmd extension to run without shell: true.
+  if (process.platform !== "win32") return cmd;
+  const scriptCmds = ["npm", "yarn", "pnpm", "npx"];
+  return scriptCmds.includes(cmd) ? `${cmd}.cmd` : cmd;
+}
+
+function writeSetupProgress(pct, label) {
+  if (!process.stdout.isTTY) return;
+  const barW   = 30;
+  const filled = Math.round((pct / 100) * barW);
+  const b      = `\x1b[96m${"\u2588".repeat(filled)}\x1b[0m\x1b[2m${"\u2591".repeat(barW - filled)}\x1b[0m`;
+  const pctStr = `\x1b[2m${String(pct).padStart(3, " ")}%\x1b[0m`;
+  process.stdout.write(`\r  ${b}  ${pctStr}  \x1b[90m${label.padEnd(36, " ")}\x1b[0m`);
+}
+
 function printSetupStage(index, total, title, reason) {
   process.stdout.write(`\n  ${index}. ${title}\n`);
   if (reason) process.stdout.write(`     Why: ${reason}\n`);
@@ -343,11 +359,79 @@ function runInstallStep(targetDir, step, { setupVerbose = false } = {}) {
     process.stdout.write(`     Running: ${pretty}\n`);
 
     const pipFiltered = isPipStep(step) && !setupVerbose;
-    if (!pipFiltered) {
-      const res = spawnSync(step.cmd, step.args, {
+    const isNpmLike = ["npm", "yarn", "pnpm"].includes(step.cmd);
+
+    if (!pipFiltered && !isNpmLike) {
+      // Generic fallback — resolveNativeCmd handles Windows .cmd extension without shell: true.
+      const res = spawnSync(resolveNativeCmd(step.cmd), step.args, {
         cwd: path.resolve(targetDir),
         stdio: "inherit",
-        shell: process.platform === "win32",
+      });
+      resolve(res.status === 0);
+      return;
+    }
+
+    if (isNpmLike && !setupVerbose) {
+      process.stdout.write("     Note: deprecation notices and audit warnings are suppressed. Use --setup-verbose to see all output.\n");
+      const resolvedCmd = resolveNativeCmd(step.cmd);
+      const child = spawn(resolvedCmd, step.args, {
+        cwd: path.resolve(targetDir),
+        stdio: ["ignore", "pipe", "pipe"],
+      });
+
+      let elapsed = 0;
+      writeSetupProgress(0, "Starting install...");
+      const progressTimer = setInterval(() => {
+        elapsed += 1;
+        // Logistic curve: smooth approach up to ~88%, leaves room to jump to 100% on done.
+        const pct = Math.min(88, Math.round(100 * (1 - Math.exp(-elapsed / 25))));
+        writeSetupProgress(pct, `Installing packages... (${elapsed}s)`);
+      }, 1000);
+
+      const npmNoise = /^(npm warn|added \d|audited \d|found \d|up to date|changed \d)/i;
+      const consumeNpmStream = (stream) => {
+        let pending = "";
+        stream.setEncoding("utf8");
+        stream.on("data", (chunk) => {
+          pending += chunk;
+          const lines = pending.split(/\r?\n/);
+          pending = lines.pop() ?? "";
+          for (const line of lines) {
+            const text = line.trim();
+            if (!text || npmNoise.test(text)) continue;
+            if (/^npm error|^error /i.test(text)) {
+              if (process.stdout.isTTY) process.stdout.write("\n");
+              process.stdout.write(`       ${text}\n`);
+            }
+          }
+        });
+        stream.on("end", () => {
+          const text = pending.trim();
+          if (text && /^npm error|^error /i.test(text)) {
+            if (process.stdout.isTTY) process.stdout.write("\n");
+            process.stdout.write(`       ${text}\n`);
+          }
+        });
+      };
+
+      consumeNpmStream(child.stdout);
+      consumeNpmStream(child.stderr);
+
+      child.on("close", (code) => {
+        clearInterval(progressTimer);
+        writeSetupProgress(100, "Complete");
+        process.stdout.write("\n");
+        resolve(code === 0);
+      });
+      return;
+    }
+
+    if (isNpmLike) {
+      // setupVerbose=true: pass raw output through.
+      const resolvedCmd = resolveNativeCmd(step.cmd);
+      const res = spawnSync(resolvedCmd, step.args, {
+        cwd: path.resolve(targetDir),
+        stdio: "inherit",
       });
       resolve(res.status === 0);
       return;

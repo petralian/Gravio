@@ -556,6 +556,14 @@ function recommendationsFromRun(runData, limitedDetails) {
     ? "Ready to ship"
     : `${failed} gate${failed === 1 ? "" : "s"} remaining`;
 
+  const urgentItems = actionPlan.filter((item) => item.priority === "critical" || item.priority === "high").slice(0, 3);
+  const topIssues = urgentItems.map((item) => ({
+    title: item.title,
+    dimension: item.dimension,
+    priority: item.priority,
+    lift: item.expectedLift,
+  }));
+
   return {
     version: 2,
     tier: "full",
@@ -563,11 +571,10 @@ function recommendationsFromRun(runData, limitedDetails) {
     summary: Number.isFinite(overallScore)
       ? `Current overall score is ${Math.round(overallScore)}/100. Close the highest gaps first to reach ready-to-ship status.`
       : "Score detected, but overall score summary is unavailable. Focus on closing dimension gaps below.",
-    quickActions: [
-      "Fix all critical/high items before medium items.",
-      "After each fix batch, run one scan and compare score deltas.",
-      "Promote new quality checks into CI so score gains remain stable.",
-    ],
+    quickActions: urgentItems.length > 0
+      ? urgentItems.map((item) => item.title)
+      : ["Run scans weekly and watch trend direction.", "Prioritize the two lowest dimensions first.", "Compare score deltas after each fix batch."],
+    topIssues,
     actionPlan,
     dimensionPlan,
     readyChecklist,

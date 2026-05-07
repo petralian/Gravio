@@ -610,6 +610,7 @@ function renderWorkspaceRecs(scans) {
 
   if (recs && typeof recs === "object" && !Array.isArray(recs) && Number(recs.version) >= 2) {
     const quickActions = Array.isArray(recs.quickActions) ? recs.quickActions : [];
+    const topIssues = Array.isArray(recs.topIssues) ? recs.topIssues : [];
     const actionPlan = Array.isArray(recs.actionPlan) ? recs.actionPlan : [];
     const dimensionPlan = Array.isArray(recs.dimensionPlan) ? recs.dimensionPlan : [];
     const readyChecklist = Array.isArray(recs.readyChecklist) ? recs.readyChecklist : [];
@@ -631,6 +632,19 @@ function renderWorkspaceRecs(scans) {
     };
 
     recList.innerHTML = `
+      ${topIssues.length ? `
+        <li class="db-roi-strip">
+          <p class="db-roi-strip-title">Top priorities</p>
+          <div class="db-roi-items">
+            ${topIssues.map((item) => `
+              <div class="db-roi-item">
+                <span class="db-priority-chip ${priorityClass(item.priority)}">${esc(item.priority ?? "medium")}</span>
+                <span class="db-roi-dim">${esc(item.dimension ?? "general")}</span>
+                <span class="db-roi-title">${esc(item.title ?? "")}</span>
+                ${item.lift ? `<span class="db-roi-lift">+${item.lift}pts</span>` : ""}
+              </div>`).join("")}
+          </div>
+        </li>` : ""}
       <li class="db-rec-hero">
         <p class="db-rec-hero-title">${esc(recs.headline ?? "Remediation plan")}</p>
         <p class="db-rec-hero-text">${esc(recs.summary ?? "")}</p>
