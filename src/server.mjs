@@ -3082,6 +3082,11 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  if (req.method === "GET" && urlPath === "/why-gravio") {
+    serveStatic(res, path.join(WEB_DIR, "why-gravio.html"));
+    return;
+  }
+
   if (req.method === "GET" && urlPath === "/dp") {
     serveStatic(res, path.join(WEB_DIR, "admin.html"));
     return;
