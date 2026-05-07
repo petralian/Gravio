@@ -964,6 +964,48 @@ body.admin-page { padding-top: 0; }
 .adm-loading, .adm-empty, .adm-error { color: var(--text-3); font-size: 14px; padding: 20px 16px !important; text-align: center; }
 .adm-error { color: #ff4466; }
 .adm-row-disabled td { opacity: 0.45; }
+.adm-row-warn td { background: rgba(255,179,71,0.04); }
+.adm-small { font-size: 11px; }
+
+/* Billing diagnostics panel */
+.adm-billing-summary {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 28px;
+  flex-wrap: wrap;
+}
+.adm-billing-stat {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 24px;
+  min-width: 90px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.adm-billing-val { font-size: 28px; font-weight: 700; color: var(--text-1); }
+.adm-billing-lbl { font-size: 12px; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.06em; }
+.adm-billing-subh { font-size: 15px; font-weight: 600; color: var(--text-2); margin: 24px 0 12px; }
+.adm-billing-note { font-weight: 400; color: var(--text-3); font-size: 13px; }
+
+.adm-plan-pill {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.06em;
+  text-transform: uppercase; border-radius: 5px; padding: 3px 8px;
+}
+.adm-plan-free { background: rgba(255,255,255,0.06); color: var(--text-2); }
+.adm-plan-pro  { background: rgba(0,229,255,0.12); color: var(--accent); }
+.adm-plan-team { background: rgba(183,126,255,0.15); color: #b77eff; }
+
+.adm-bstatus { font-size: 11px; font-weight: 600; border-radius: 5px; padding: 3px 8px; }
+.adm-bstatus-active   { background: rgba(0,255,136,0.1); color: var(--neon-green); }
+.adm-bstatus-cancelled{ background: rgba(255,179,71,0.12); color: #ffb347; }
+.adm-bstatus-past_due { background: rgba(255,68,102,0.12); color: #ff4466; }
+.adm-bstatus-unpaid   { background: rgba(255,68,102,0.12); color: #ff4466; }
+.adm-bstatus-expired  { background: rgba(255,68,102,0.12); color: #ff4466; }
+.adm-bstatus-none     { background: rgba(255,255,255,0.06); color: var(--text-3); }
+.adm-bstatus-paused   { background: rgba(255,255,255,0.06); color: var(--text-3); }
 
 .adm-role-badge {
   font-size: 11px;

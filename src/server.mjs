@@ -628,6 +628,132 @@ function summarizeScans(scans) {
   };
 }
 
+function normalizeActionItems(value) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => String(item ?? "").trim())
+    .filter((item) => item.length > 0)
+    .slice(0, 20);
+}
+
+function parseActionItemsJson(raw) {
+  if (!raw) return [];
+  try {
+    return normalizeActionItems(JSON.parse(raw));
+  } catch {
+    return [];
+  }
+}
+
+function recommendationsChecklistStats(recs) {
+  const list = Array.isArray(recs?.readyChecklist) ? recs.readyChecklist : [];
+  if (list.length === 0) return { done: null, total: null };
+  const done = list.filter((item) => Boolean(item?.passed)).length;
+  return { done, total: list.length };
+}
+
+function toCsvCell(value) {
+  const str = String(value ?? "");
+  if (!/[",\n]/.test(str)) return str;
+  return `"${str.replace(/"/g, '""')}"`;
+}
+
+function buildScansCsv(projectId, records) {
+  const header = [
+    "projectId",
+    "scanId",
+    "runId",
+    "publishedAt",
+    "score",
+    "rating",
+    "deltaFromPrevious",
+    "checklistDone",
+    "checklistTotal",
+    "contextNote",
+    "actions",
+  ];
+  const lines = [header.join(",")];
+  for (const row of records) {
+    const actions = Array.isArray(row.context?.actions) ? row.context.actions.join(" | ") : "";
+    lines.push([
+      projectId,
+      row.id,
+      row.runId,
+      row.publishedAt,
+      row.overallScore ?? "",
+      row.rating ?? "",
+      row.deltaFromPrevious ?? "",
+      row.checklistDone ?? "",
+      row.checklistTotal ?? "",
+      row.context?.note ?? "",
+      actions,
+    ].map(toCsvCell).join(","));
+  }
+  return lines.join("\n");
+}
+
+function buildManagerReportMarkdown(projectId, records) {
+  const latest = records[0] ?? null;
+  const first = records[records.length - 1] ?? null;
+  const latestScore = Number.isFinite(latest?.overallScore) ? latest.overallScore : null;
+  const firstScore = Number.isFinite(first?.overallScore) ? first.overallScore : null;
+  const totalDelta = (latestScore !== null && firstScore !== null)
+    ? Number((latestScore - firstScore).toFixed(2))
+    : null;
+
+  const lines = [];
+  lines.push(`# Gravio Improvement Report — ${projectId}`);
+  lines.push("");
+  lines.push(`Generated: ${new Date().toISOString()}`);
+  lines.push(`Total scans: ${records.length}`);
+  if (latestScore !== null) lines.push(`Latest score: ${Math.round(latestScore)}/100 (${latest?.rating ?? "Unknown"})`);
+  if (totalDelta !== null) lines.push(`Score change (first → latest): ${totalDelta >= 0 ? "+" : ""}${totalDelta}`);
+  lines.push("");
+  lines.push("## Scan Timeline");
+  lines.push("");
+
+  for (const row of records) {
+    const published = row.publishedAt ?? "unknown";
+    const score = Number.isFinite(row.overallScore) ? Math.round(row.overallScore) : "—";
+    const delta = Number.isFinite(row.deltaFromPrevious)
+      ? ` (${row.deltaFromPrevious >= 0 ? "+" : ""}${row.deltaFromPrevious} vs previous)`
+      : "";
+    lines.push(`### ${row.runId ?? "run"} — ${published}`);
+    lines.push(`- Score: ${score} (${row.rating ?? "Unknown"})${delta}`);
+    if (row.checklistTotal !== null) {
+      lines.push(`- Ready checklist: ${row.checklistDone}/${row.checklistTotal} complete`);
+    }
+    if (row.context?.note) {
+      lines.push(`- Context note: ${row.context.note}`);
+    }
+    if (Array.isArray(row.context?.actions) && row.context.actions.length > 0) {
+      lines.push("- Actions taken:");
+      for (const action of row.context.actions) {
+        lines.push(`  - ${action}`);
+      }
+    }
+    lines.push("");
+  }
+
+  return lines.join("\n");
+}
+
+function buildScanRecordsForExport(scans) {
+  return scans.map((scan, index) => {
+    const previous = scans[index + 1] ?? null;
+    const deltaFromPrevious = Number.isFinite(scan.overallScore) && Number.isFinite(previous?.overallScore)
+      ? Number((scan.overallScore - previous.overallScore).toFixed(2))
+      : null;
+    const checklist = recommendationsChecklistStats(scan.recommendations);
+    return {
+      ...scan,
+      deltaFromPrevious,
+      checklistDone: checklist.done,
+      checklistTotal: checklist.total,
+    };
+  });
+}
+
 /**
  * Compute streak data from scan_history rows (ordered by scanned_at DESC).
  * Streak = consecutive ISO calendar weeks with at least one scan.
@@ -1754,6 +1880,15 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    const contexts = new Map(
+      stmts.listScanContextsForProject.all(uid, projectId)
+        .map((row) => [Number(row.scan_id), {
+          note: row.context_note ?? "",
+          actions: parseActionItemsJson(row.action_items),
+          updatedAt: row.updated_at,
+        }]),
+    );
+
     const scans = rows.map((row) => {
       const parsed = safeJsonParse(row.ciphertext);
       const summary = extractScoreSummary(parsed);
@@ -1770,6 +1905,7 @@ const server = http.createServer(async (req, res) => {
           rating: summary.rating,
         },
         recommendations: recommendationsFromRun(parsed, limited),
+        context: contexts.get(Number(row.id)) ?? { note: "", actions: [], updatedAt: null },
       };
     });
 
@@ -1781,6 +1917,214 @@ const server = http.createServer(async (req, res) => {
       scans,
       stats: aggregate,
     }));
+    return;
+  }
+
+  // ── API: POST /api/scans/context ───────────────────────────────────────
+  if (req.method === "POST" && req.url === "/api/scans/context") {
+    const user = getAuthUser(req);
+    if (!user) {
+      res.writeHead(401, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Not authenticated" }));
+      return;
+    }
+
+    let body;
+    try {
+      body = JSON.parse(await readBody(req));
+    } catch {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Invalid JSON" }));
+      return;
+    }
+
+    const uid = user.uid ?? user.id;
+    const scanId = Number(body?.scanId);
+    const projectId = String(body?.projectId ?? "").trim();
+    const note = String(body?.note ?? "").trim().slice(0, 4000);
+    const actions = normalizeActionItems(body?.actions);
+
+    if (!Number.isInteger(scanId) || scanId <= 0) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "scanId must be a positive integer" }));
+      return;
+    }
+    if (!isValidProjectId(projectId)) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Invalid projectId" }));
+      return;
+    }
+
+    const scan = stmts.getScanByIdForUserProject.get(scanId, uid, projectId);
+    if (!scan) {
+      res.writeHead(404, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Scan not found" }));
+      return;
+    }
+
+    stmts.upsertScanContext.run(uid, scanId, projectId, note || null, JSON.stringify(actions));
+    const updated = stmts.listScanContextsForProject
+      .all(uid, projectId)
+      .find((row) => Number(row.scan_id) === scanId);
+
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({
+      ok: true,
+      context: {
+        note: updated?.context_note ?? "",
+        actions: parseActionItemsJson(updated?.action_items),
+        updatedAt: updated?.updated_at ?? null,
+      },
+    }));
+    return;
+  }
+
+  // ── API: GET /api/projects/:id/export/scans(.csv) ──────────────────────
+  const scansExportMatch = req.method === "GET" && /^\/api\/projects\/([^/?]+)\/export\/scans(?:\.csv)?(?:\?.*)?$/.exec(req.url);
+  if (scansExportMatch) {
+    const user = getAuthUser(req);
+    if (!user) {
+      res.writeHead(401, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Not authenticated" }));
+      return;
+    }
+    const projectId = decodeURIComponent(scansExportMatch[1]);
+    if (!isValidProjectId(projectId)) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Invalid projectId" }));
+      return;
+    }
+
+    const uid = user.uid ?? user.id;
+    const limited = !isPaidOrAdmin(user);
+    const rows = stmts.listProjectScansForUser.all(projectId, uid);
+    if (!rows.length) {
+      res.writeHead(404, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Project not found" }));
+      return;
+    }
+
+    const contexts = new Map(
+      stmts.listScanContextsForProject.all(uid, projectId)
+        .map((row) => [Number(row.scan_id), {
+          note: row.context_note ?? "",
+          actions: parseActionItemsJson(row.action_items),
+          updatedAt: row.updated_at,
+        }]),
+    );
+
+    const scans = rows.map((row) => {
+      const parsed = safeJsonParse(row.ciphertext);
+      const summary = extractScoreSummary(parsed);
+      return {
+        id: row.id,
+        projectId: row.project_id,
+        publishedAt: row.published_at,
+        runId: summary.runId,
+        overallScore: summary.overallScore,
+        rating: summary.rating,
+        recommendations: recommendationsFromRun(parsed, limited),
+        context: contexts.get(Number(row.id)) ?? { note: "", actions: [], updatedAt: null },
+      };
+    });
+
+    const records = buildScanRecordsForExport(scans);
+    const requestUrl = new URL(req.url, "http://localhost");
+    const format = String(requestUrl.searchParams.get("format") ?? "json").toLowerCase();
+
+    if (format === "csv" || req.url.includes(".csv")) {
+      const csv = buildScansCsv(projectId, records);
+      const fileName = `gravio-scans-${projectId}.csv`;
+      res.writeHead(200, {
+        "Content-Type": "text/csv; charset=utf-8",
+        "Content-Disposition": `attachment; filename=\"${fileName}\"`,
+      });
+      res.end(csv);
+      return;
+    }
+
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ projectId, generatedAt: new Date().toISOString(), scans: records }));
+    return;
+  }
+
+  // ── API: GET /api/projects/:id/export/report(.md) ──────────────────────
+  const reportExportMatch = req.method === "GET" && /^\/api\/projects\/([^/?]+)\/export\/report(?:\.md)?(?:\?.*)?$/.exec(req.url);
+  if (reportExportMatch) {
+    const user = getAuthUser(req);
+    if (!user) {
+      res.writeHead(401, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Not authenticated" }));
+      return;
+    }
+    const projectId = decodeURIComponent(reportExportMatch[1]);
+    if (!isValidProjectId(projectId)) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Invalid projectId" }));
+      return;
+    }
+
+    const uid = user.uid ?? user.id;
+    const limited = !isPaidOrAdmin(user);
+    const rows = stmts.listProjectScansForUser.all(projectId, uid);
+    if (!rows.length) {
+      res.writeHead(404, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Project not found" }));
+      return;
+    }
+
+    const contexts = new Map(
+      stmts.listScanContextsForProject.all(uid, projectId)
+        .map((row) => [Number(row.scan_id), {
+          note: row.context_note ?? "",
+          actions: parseActionItemsJson(row.action_items),
+          updatedAt: row.updated_at,
+        }]),
+    );
+
+    const scans = rows.map((row) => {
+      const parsed = safeJsonParse(row.ciphertext);
+      const summary = extractScoreSummary(parsed);
+      return {
+        id: row.id,
+        projectId: row.project_id,
+        publishedAt: row.published_at,
+        runId: summary.runId,
+        overallScore: summary.overallScore,
+        rating: summary.rating,
+        recommendations: recommendationsFromRun(parsed, limited),
+        context: contexts.get(Number(row.id)) ?? { note: "", actions: [], updatedAt: null },
+      };
+    });
+
+    const records = buildScanRecordsForExport(scans);
+    const requestUrl = new URL(req.url, "http://localhost");
+    const format = String(requestUrl.searchParams.get("format") ?? "md").toLowerCase();
+
+    if (format === "json") {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({
+        projectId,
+        generatedAt: new Date().toISOString(),
+        report: {
+          latestScore: records[0]?.overallScore ?? null,
+          latestRating: records[0]?.rating ?? null,
+          scoreDeltaFromFirst: Number.isFinite(records[0]?.overallScore) && Number.isFinite(records[records.length - 1]?.overallScore)
+            ? Number((records[0].overallScore - records[records.length - 1].overallScore).toFixed(2))
+            : null,
+          scans: records,
+        },
+      }));
+      return;
+    }
+
+    const markdown = buildManagerReportMarkdown(projectId, records);
+    const fileName = `gravio-report-${projectId}.md`;
+    res.writeHead(200, {
+      "Content-Type": "text/markdown; charset=utf-8",
+      "Content-Disposition": `attachment; filename=\"${fileName}\"`,
+    });
+    res.end(markdown);
     return;
   }
 
@@ -1923,6 +2267,41 @@ const server = http.createServer(async (req, res) => {
     else if (action === "delete") stmts.deleteUser.run(targetId);
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ ok: true }));
+    return;
+  }
+
+  // ── Admin: GET /api/admin/billing/diagnostics ────────────────────────────
+  if (req.method === "GET" && req.url === "/api/admin/billing/diagnostics") {
+    const user = getAuthUser(req);
+    if (!user || user.role !== "admin") {
+      res.writeHead(403, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Forbidden" }));
+      return;
+    }
+
+    const billingUsers = stmts.listBillingUsers.all();
+    const recentEvents = stmts.listWebhookEvents.all();
+
+    // Plan distribution summary
+    const planCounts = { free: 0, pro: 0, team: 0 };
+    for (const u of billingUsers) planCounts[u.plan] = (planCounts[u.plan] ?? 0) + 1;
+
+    // Drift detection: plan says paid but billing_status suggests otherwise
+    const driftUsers = billingUsers.filter((u) => {
+      if (u.plan === "free") return false;
+      // Paid plan but no subscription linked
+      if (!u.lemon_subscription_id) return true;
+      // Paid plan but billing status is expired or none
+      if (["expired", "none"].includes(u.billing_status)) return true;
+      return false;
+    });
+
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({
+      summary: { total: billingUsers.length, planCounts },
+      driftUsers,
+      recentEvents,
+    }));
     return;
   }
 

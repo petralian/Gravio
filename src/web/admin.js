@@ -8,6 +8,7 @@
     const me = await res.json();
     if (me.role !== "admin") { location.href = "/dashboard"; return; }
     loadAdminData();
+    loadBillingDiagnostics();
   } catch {
     location.href = "/login?next=/dp";
   }
@@ -144,5 +145,55 @@ async function loadAdminData() {
   } catch (err) {
     document.getElementById("adm-users-body").innerHTML =
       `<tr><td colspan="8" class="adm-error">${esc(err.message)}</td></tr>`;
+  }
+}
+
+/* ─── billing diagnostics ─── */
+async function loadBillingDiagnostics() {
+  try {
+    const res = await fetch("/api/admin/billing/diagnostics");
+    if (!res.ok) throw new Error("Failed to load billing diagnostics");
+    const { summary, driftUsers, recentEvents } = await res.json();
+
+    // Plan summary
+    document.getElementById("bstat-free").textContent  = summary.planCounts.free  ?? 0;
+    document.getElementById("bstat-pro").textContent   = summary.planCounts.pro   ?? 0;
+    document.getElementById("bstat-team").textContent  = summary.planCounts.team  ?? 0;
+
+    // Drift table
+    const driftBody = document.getElementById("adm-drift-body");
+    if (driftUsers.length === 0) {
+      driftBody.innerHTML = `<tr><td colspan="6" class="adm-empty">No drift detected — all paid plans have linked subscriptions.</td></tr>`;
+    } else {
+      driftBody.innerHTML = driftUsers.map((u) => `
+        <tr class="adm-row-warn">
+          <td class="adm-mono">${u.id}</td>
+          <td>${esc(u.email)}</td>
+          <td><span class="adm-plan-pill adm-plan-${esc(u.plan)}">${esc(u.plan)}</span></td>
+          <td><span class="adm-bstatus adm-bstatus-${esc(u.billing_status || 'none')}">${esc(u.billing_status || 'none')}</span></td>
+          <td class="adm-mono adm-small">${esc(u.lemon_subscription_id || '—')}</td>
+          <td class="adm-mono">${fmtDate(u.billing_renews_at)}</td>
+        </tr>
+      `).join("");
+    }
+
+    // Webhook audit log
+    const webhookBody = document.getElementById("adm-webhook-body");
+    if (recentEvents.length === 0) {
+      webhookBody.innerHTML = `<tr><td colspan="5" class="adm-empty">No webhook events received yet.</td></tr>`;
+    } else {
+      webhookBody.innerHTML = recentEvents.map((e) => `
+        <tr>
+          <td class="adm-mono">${e.id}</td>
+          <td>${esc(e.provider)}</td>
+          <td class="adm-mono adm-small">${esc(e.event_name || '—')}</td>
+          <td class="adm-mono adm-small">${esc(e.object_id || '—')}</td>
+          <td class="adm-mono">${fmtDate(e.processed_at)}</td>
+        </tr>
+      `).join("");
+    }
+  } catch (err) {
+    document.getElementById("adm-drift-body").innerHTML =
+      `<tr><td colspan="6" class="adm-error">${esc(err.message)}</td></tr>`;
   }
 }

@@ -85,6 +85,44 @@
       </div>
     </section>
 
+    <!-- Billing diagnostics -->
+    <section class="adm-section" id="adm-billing-section">
+      <h2 class="adm-section-h2">Billing diagnostics</h2>
+
+      <!-- Plan summary -->
+      <div class="adm-billing-summary" id="adm-billing-summary">
+        <div class="adm-billing-stat"><span class="adm-billing-val" id="bstat-free">—</span><span class="adm-billing-lbl">Free</span></div>
+        <div class="adm-billing-stat"><span class="adm-billing-val" id="bstat-pro">—</span><span class="adm-billing-lbl">Pro</span></div>
+        <div class="adm-billing-stat"><span class="adm-billing-val" id="bstat-team">—</span><span class="adm-billing-lbl">Team</span></div>
+      </div>
+
+      <!-- Drift alerts -->
+      <h3 class="adm-billing-subh">Plan drift alerts</h3>
+      <div class="adm-table-wrap">
+        <table class="adm-table" id="adm-drift-table">
+          <thead>
+            <tr><th>ID</th><th>Email</th><th>Plan</th><th>Billing status</th><th>Subscription ID</th><th>Renews at</th></tr>
+          </thead>
+          <tbody id="adm-drift-body">
+            <tr><td colspan="6" class="adm-loading">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Webhook audit log -->
+      <h3 class="adm-billing-subh">Webhook audit log <span class="adm-billing-note">(last 100)</span></h3>
+      <div class="adm-table-wrap">
+        <table class="adm-table" id="adm-webhook-table">
+          <thead>
+            <tr><th>ID</th><th>Provider</th><th>Event</th><th>Object ID</th><th>Received at</th></tr>
+          </thead>
+          <tbody id="adm-webhook-body">
+            <tr><td colspan="5" class="adm-loading">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
   </main>
 
   <script src="admin.js"></script>

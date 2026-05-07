@@ -264,6 +264,33 @@ try {
   // Index already exists — ignore
 }
 
+try {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS scan_contexts (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id       INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      scan_id       INTEGER NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
+      project_id    TEXT    NOT NULL,
+      context_note  TEXT,
+      action_items  TEXT,
+      created_at    TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
+      updated_at    TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
+      UNIQUE(user_id, scan_id)
+    )
+  `);
+} catch {
+  // Table already exists — ignore
+}
+
+try {
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS scan_contexts_user_project_updated
+      ON scan_contexts(user_id, project_id, updated_at DESC)
+  `);
+} catch {
+  // Index already exists — ignore
+}
+
 // Promote first registered user (or ADMIN_EMAIL) to admin if no admin exists yet
 function ensureAdminRole() {
   const adminCount = db.prepare(`SELECT COUNT(*) as c FROM users WHERE role='admin'`).get().c;
@@ -385,6 +412,11 @@ export const stmts = {
   deleteScanByIdForUserProject: db.prepare(
     `DELETE FROM runs WHERE id=? AND user_id=? AND project_id=?`,
   ),
+  getScanByIdForUserProject: db.prepare(
+    `SELECT id, project_id, published_at
+     FROM runs
+     WHERE id=? AND user_id=? AND project_id=?`,
+  ),
   listAllRuns: db.prepare(
     `SELECT r.project_id, r.published_at, u.email
      FROM runs r JOIN users u ON r.user_id=u.id
@@ -407,10 +439,24 @@ export const stmts = {
     `SELECT user_id, COUNT(*) as run_count FROM runs GROUP BY user_id`,
   ),
 
-  // webhook idempotency
+  // webhook idempotency + audit log
   insertWebhookEvent: db.prepare(
     `INSERT OR IGNORE INTO webhook_events (provider, event_key, event_name, object_id, payload)
      VALUES (?, ?, ?, ?, ?)`,
+  ),
+  listWebhookEvents: db.prepare(
+    `SELECT id, provider, event_name, object_id, processed_at
+     FROM webhook_events
+     ORDER BY processed_at DESC
+     LIMIT 100`,
+  ),
+
+  // billing diagnostics
+  listBillingUsers: db.prepare(
+    `SELECT id, email, plan, billing_provider, lemon_customer_id, lemon_subscription_id,
+            billing_status, billing_seats, billing_renews_at, billing_cancelled
+     FROM users
+     ORDER BY id ASC`,
   ),
 
   // magic links (one-time sign-in tokens)
@@ -446,6 +492,20 @@ export const stmts = {
      WHERE user_id=? AND project_id=?
      ORDER BY scanned_at DESC
      LIMIT 60`,
+  ),
+  listScanContextsForProject: db.prepare(
+    `SELECT scan_id, context_note, action_items, updated_at
+     FROM scan_contexts
+     WHERE user_id=? AND project_id=?`,
+  ),
+  upsertScanContext: db.prepare(
+    `INSERT INTO scan_contexts (user_id, scan_id, project_id, context_note, action_items)
+     VALUES (?, ?, ?, ?, ?)
+     ON CONFLICT(user_id, scan_id)
+     DO UPDATE SET
+       context_note=excluded.context_note,
+       action_items=excluded.action_items,
+       updated_at=strftime('%Y-%m-%dT%H:%M:%SZ','now')`,
   ),
 };
 
