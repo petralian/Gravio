@@ -56,9 +56,9 @@
           <span class="m-terminal-title">gravio local scan</span>
         </div>
         <div class="m-terminal-body">
-<pre class="m-terminal-pre"><span class="t-prompt">$</span> <span class="t-cmd">npm run scorecard:scan</span>
+<pre class="m-terminal-pre"><span class="t-prompt">$</span> <span class="t-cmd">node gravio.mjs --once --target .</span>
 
-  <span class="t-comment">Gravio v1.0                     2026-05-05</span>
+  <span class="t-comment">Gravio v1.0                     2026-05-08</span>
   <span class="t-comment">────────────────────────────────────────</span>
   <span class="t-comment">Scanning</span>  <span class="t-path">/Users/dev/my-saas-app</span>
 
@@ -69,12 +69,14 @@
   <span class="t-pass">[✓]</span> <span class="t-label">Git hygiene       </span>  <span class="t-value">clean</span>
 
   <span class="t-comment">────────────────────────────────────────</span>
-  <span class="t-label">Safety      </span><span class="t-bar-full">████████████</span>  <span class="t-score-hi">100</span>
-  <span class="t-label">Reliability </span><span class="t-bar-full">███████████░</span>   <span class="t-score-hi">95</span>
-  <span class="t-label">Governance  </span><span class="t-bar-mid">██████████░░</span>   <span class="t-score-mid">88</span>
-  <span class="t-label">Evaluation  </span><span class="t-bar-full">███████████░</span>   <span class="t-score-hi">91</span>
+  <span class="t-label">Safety       </span><span class="t-bar-full">████████████</span>  <span class="t-score-hi">100</span>
+  <span class="t-label">Reliability  </span><span class="t-bar-full">███████████░</span>   <span class="t-score-hi">95</span>
+  <span class="t-label">Evaluation   </span><span class="t-bar-full">███████████░</span>   <span class="t-score-hi">91</span>
+  <span class="t-label">Governance   </span><span class="t-bar-mid">██████████░░</span>   <span class="t-score-mid">88</span>
+  <span class="t-label">Observability</span><span class="t-bar-mid">█████████░░░</span>   <span class="t-score-mid">84</span>
+  <span class="t-label">Agentic      </span><span class="t-bar-full">███████████░</span>   <span class="t-score-hi">92</span>
   <span class="t-comment">────────────────────────────────────────</span>
-  <span class="t-comment">Score:</span> <span class="t-score-final">96.2 / 100</span>  <span class="t-comment">·</span>  <span class="t-pass-badge">PASS</span>  <span class="t-comment">·  0 critical risks</span>
+  <span class="t-comment">Score:</span> <span class="t-score-final">94.8 / 100</span>  <span class="t-comment">·</span>  <span class="t-pass-badge">PASS</span>  <span class="t-comment">·  0 critical risks</span>
 
   <span class="t-pass">[✓]</span> <span class="t-comment">Publishing result...</span>
   <span class="t-pass">[✓]</span> <span class="t-comment">Published to </span><span class="t-path">gravio.dev/dashboard</span><span class="t-cursor">█</span></pre>
@@ -108,22 +110,22 @@
         <div class="m-step-card">
           <p class="m-step-num">01</p>
           <div class="m-step-icon">⬇</div>
-          <h3>Create your free account</h3>
-          <p>Sign up in seconds at gravio.dev/onboarding. No credit card needed — your dashboard is ready the moment you register.</p>
+          <h3>Register &amp; download the CLI</h3>
+          <p>Create your free account at gravio.dev/onboarding. No credit card needed. Download the single-file Gravio CLI — works on macOS, Windows, and Linux.</p>
         </div>
         <div class="m-step-connector" aria-hidden="true"></div>
         <div class="m-step-card">
           <p class="m-step-num">02</p>
           <div class="m-step-icon">⚡</div>
-          <h3>Scan automatically</h3>
-          <p>The Gravio scanner watches your project and scores codebase best practices across safety, reliability, evaluation, observability, governance, and agentic readiness.</p>
+          <h3>Authorize &amp; scan</h3>
+          <p>Run one authorize command to bind your API key to the project folder, then run <code>--once</code> whenever you want a scan. The scanner reads only file structure and git metadata — no source code leaves your machine.</p>
         </div>
         <div class="m-step-connector" aria-hidden="true"></div>
         <div class="m-step-card">
           <p class="m-step-num">03</p>
           <div class="m-step-icon">🔐</div>
           <h3>Read your results</h3>
-          <p>Free shows generic cloud ratings while Pro/Team unlock detailed remediation guidance. Your dashboard is secured by your account.</p>
+          <p>Scores publish to your encrypted cloud dashboard instantly. Free tier stores your latest 3 results. Pro and Team unlock trend history, fix guidance, and priority alerts.</p>
         </div>
       </div>
     </section>
@@ -186,7 +188,7 @@
       <div class="m-section-header">
         <p class="m-eyebrow">PRICING</p>
         <h2 class="m-section-h2">Start free. Scale when you need it.</h2>
-        <p class="m-section-sub">Register once and run unlimited cloud scans. Free stores your latest 3 cloud results.</p>
+        <p class="m-section-sub">Register once and run unlimited cloud scans. Free stores your latest 3 cloud results. Paid plans include a <a href="/refund.html" style="color:var(--neon-cyan);text-underline-offset:2px">full refund within 24 hours</a> of subscribing.</p>
       </div>
       <div class="m-pricing-grid">
 
@@ -266,12 +268,12 @@
       <div class="m-install-inner">
         <div class="m-install-copy">
           <p class="m-eyebrow">ZERO CONFIG</p>
-          <h2 class="m-section-h2">Register first,<br/>then launch your first 3 scans.</h2>
-          <p class="m-section-sub">Start free in guided onboarding: create account, choose project name, run scan, publish results to your dashboard.</p>
+          <h2 class="m-section-h2">One file. One command.<br/>Results in minutes.</h2>
+          <p class="m-section-sub">Create your account, download the CLI, authorize your folder once — then run <code>--once</code> any time you want a score. Your first scan auto-creates the project in your dashboard.</p>
           <div class="m-install-feats">
             <div class="m-install-feat"><span class="t-pass">✓</span> macOS · Windows · Linux</div>
-            <div class="m-install-feat"><span class="t-pass">✓</span> Beginner-friendly onboarding</div>
-            <div class="m-install-feat"><span class="t-pass">✓</span> Signed binaries · Reproducible builds</div>
+            <div class="m-install-feat"><span class="t-pass">✓</span> Single-file CLI — no install needed</div>
+            <div class="m-install-feat"><span class="t-pass">✓</span> First scan auto-creates your project</div>
             <div class="m-install-feat"><span class="t-pass">✓</span> Works in any git-tracked project</div>
           </div>
         </div>
@@ -285,13 +287,14 @@
             <span class="m-terminal-title">Terminal</span>
           </div>
           <div class="m-terminal-body">
-<pre class="m-terminal-pre"><span class="t-comment"># Register first</span>
-<span class="t-comment"># Visit: https://gravio.dev/onboarding</span>
+<pre class="m-terminal-pre"><span class="t-comment"># 1. Register at https://gravio.dev/onboarding</span>
+<span class="t-comment"># 2. Download the CLI</span>
+<span class="t-prompt">$</span> <span class="t-cmd">curl -fsSL https://gravio.dev/cli/gravio.mjs -o gravio.mjs</span>
 
-<span class="t-comment"># Authorize this folder once</span>
-<span class="t-prompt">$</span> <span class="t-cmd">node gravio.mjs --authorize --project my-first-project --api-key gv_xxx --server https://gravio.dev</span>
+<span class="t-comment"># 3. Authorize this folder once (use your API key from Settings)</span>
+<span class="t-prompt">$</span> <span class="t-cmd">node gravio.mjs --authorize --project my-app --api-key gv_xxx --server https://gravio.dev</span>
 
-<span class="t-comment"># Run scans anytime (cloud-only, auto-publish)</span>
+<span class="t-comment"># 4. Run a scan any time — first scan creates the project</span>
 <span class="t-prompt">$</span> <span class="t-cmd">node gravio.mjs --once --target .</span><span class="t-cursor">█</span></pre>
           </div>
         </div>
