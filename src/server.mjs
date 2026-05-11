@@ -21,7 +21,7 @@ import {
   sendSubscriptionCancelledEmail,
   sendSubscriptionExpiredEmail,
 } from "./core/auth.mjs";
-import { stmts } from "./core/db.mjs";
+import { stmts, db } from "./core/db.mjs";
 
 const GOOGLE_OAUTH_CLIENT_ID = String(process.env.GOOGLE_OAUTH_CLIENT_ID ?? "").trim();
 const GOOGLE_OAUTH_CLIENT_SECRET = String(process.env.GOOGLE_OAUTH_CLIENT_SECRET ?? "").trim();
@@ -2420,6 +2420,19 @@ const server = http.createServer(async (req, res) => {
 
       // Insert the run
       stmts.insertRun.run(projectId, uid, JSON.stringify(run));
+      const lastInsertId = db.prepare("SELECT last_insert_rowid() as id").get().id;
+      
+      // Get baseline for regression compare
+      let regression = { hasRegression: false, delta: 0, dimensionalDeltas: {}, reason: "No baseline" };
+      let baselineRun = null;
+      if (user.plan === "team") {
+        baselineRun = stmts.getBaseline.get(projectId, uid);
+        if (baselineRun) {
+          regression = compareToBaseline(run, baselineRun);
+        }
+        // Store current run as new baseline
+        stmts.setBaseline.run(projectId, uid, lastInsertId, run.summary?.overallScore ?? 0, JSON.stringify(run.scorecard ?? {}));
+      }
       
       // Evaluate against quality gate (Team feature)
       let gateStatus = { passed: true, breaches: [], reason: "No gate configured" };
@@ -2429,13 +2442,14 @@ const server = http.createServer(async (req, res) => {
           const policy = {
             minimum_score: gatePolicy.minimum_score,
             dimension_thresholds: safeJsonParse(gatePolicy.dimension_thresholds) || {},
+            maximum_regression: gatePolicy.maximum_regression ?? 2.0,
           };
-          gateStatus = gateEvaluate(run, policy);
+          gateStatus = gateEvaluate(run, policy, regression);
         }
       }
       
       // Store gate_status with the run
-      stmts.updateRunGateStatus.run(JSON.stringify(gateStatus));
+      stmts.updateRunGateStatus.run(JSON.stringify(gateStatus), lastInsertId);
       
       stmts.incrementScansPublished.run(uid);
       if (!isPaid(user)) {
@@ -2444,7 +2458,7 @@ const server = http.createServer(async (req, res) => {
       }
 
       res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ ok: true, projectId, gateStatus }));
+      res.end(JSON.stringify({ ok: true, projectId, gateStatus, regression }));
     } catch (err) {
       res.writeHead(400, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ error: err.message }));

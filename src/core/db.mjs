@@ -416,7 +416,7 @@ export const stmts = {
      VALUES (?, ?, ?, strftime('%Y-%m-%dT%H:%M:%SZ','now'))`,
   ),
   updateRunGateStatus: db.prepare(
-    `UPDATE runs SET gate_status=? WHERE id=(SELECT last_insert_rowid())`,
+    `UPDATE runs SET gate_status=? WHERE id=?`,
   ),
   getLatestRun: db.prepare(
     `SELECT * FROM runs

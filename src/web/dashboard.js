@@ -280,6 +280,19 @@ function gateBadgeHtml(gateStatus) {
   return `<span class="db-gate-badge db-gate-fail">✗ ${breachCount} breach${breachCount === 1 ? "" : "es"}</span>`;
 }
 
+function regressionBadgeHtml(regression) {
+  if (!regression || regression.reason === "No baseline") {
+    return `<span class="db-regression-badge db-regression-none">—</span>`;
+  }
+  if (regression.hasRegression) {
+    return `<span class="db-regression-badge db-regression-down">↓ ${Math.abs(regression.delta).toFixed(1)}pt</span>`;
+  }
+  if (regression.delta > 0) {
+    return `<span class="db-regression-badge db-regression-up">↑ +${regression.delta.toFixed(1)}pt</span>`;
+  }
+  return `<span class="db-regression-badge db-regression-none">— stable</span>`;
+}
+
 function trendBadgeHtml(direction, delta) {
   if (!direction || direction === "stable") {
     return `<span class="db-trend-badge db-trend-stable">— stable</span>`;
@@ -964,7 +977,7 @@ function renderWorkspaceScans(scans) {
   const visible = scans === state.currentScans ? getFilteredScans() : scans;
 
   if (!visible.length) {
-    elScanRows.innerHTML = `<tr><td colspan="7" style="color:var(--text-3);padding:16px">${
+    elScanRows.innerHTML = `<tr><td colspan="8" style="color:var(--text-3);padding:16px">${
       state.filterFrom || state.filterTo ? "No scans in selected date range." : "No scans found."
     }</td></tr>`;
     return;
@@ -978,6 +991,7 @@ function renderWorkspaceScans(scans) {
       <td class="${scoreColorClass(s.overallScore ?? 0)}">${formatScore(s.overallScore)}</td>
       <td><span class="db-rating-badge ${ratingBadgeClass(s.rating)}">${esc(s.rating ?? "Unknown")}</span></td>
       <td>${gateBadgeHtml(s.gateStatus)}</td>
+      <td>${regressionBadgeHtml(s.regression)}</td>
       <td><button class="m-btn m-btn-outline m-btn-sm db-scan-view-btn" data-view-scan-id="${s.id}" type="button">View</button></td>
     </tr>`).join("");
 }
