@@ -19,6 +19,31 @@ At the start of every non-trivial session, read universal rules **before** proje
 
 If the `obsidian-brain` server isn't responding: Command Palette → **MCP: Reset Cached Tools**.
 
+### Manual Prompt Integration (Mandatory)
+
+The following Brain manual prompts are now part of the default operating model for Gravio sessions:
+
+- `00_Brain/Manual Prompts/Start of Session.md`
+- `00_Brain/Manual Prompts/End of Session.md`
+- `00_Brain/Manual Prompts/Start of New Project.md`
+
+Apply them as executable checklists, not reference notes:
+
+1. **Start-of-session enforcement:**
+   - Fill session context (`feature/issue`, `why now`, `expected outcome`, scope size).
+   - Read project context notes first (`Home.md`, `Operations/Session Summaries.md`, related `Features/*`, related `Architecture/*`).
+   - Record pre-scan findings under `## Obsidian Pre-Scan` in the current session note before implementation.
+   - If the request is ambiguous, ask focused scope questions before edits.
+2. **End-of-session enforcement:**
+   - Validate todo completion status.
+   - Run `git status --short`; if uncommitted changes exist, do not close the session as complete.
+   - Run `npm test`; if tests fail, do not close the session as complete.
+   - Update touched Feature notes, finalize session note, and append session summary.
+3. **New-project enforcement:**
+   - For any new-repo scaffolding request, execute the full `Start of New Project` sequence including MCP wiring for both project vault and Brain (`.vscode/mcp.json` with both servers).
+   - Preserve Part B of these instructions verbatim when cloning instruction baselines to new projects.
+   - Ensure permanent memory artifacts are created for the new project (`/memories/<Project>.md` and `/memories/repo/<Project>.md`).
+
 ---
 
 ## TOP RULE: Session Memory Loop (Obsidian)
@@ -169,6 +194,8 @@ npm run verify            # all of the above
 ```
 
 Baseline: **70 tests, 0 failures**. A deploy with red tests is forbidden.
+
+Session closure gate: if `git status --short` is not clean or `npm test` is failing, do not mark session closed.
 
 ## Update triggers — `.claude/NOTES.md`
 

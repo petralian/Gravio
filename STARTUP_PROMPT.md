@@ -1,48 +1,75 @@
-# Agent Scorecard — First Prompt For Any New AI Chat
+# Gravio — Session Bootstrap Prompt (Start / End / New Project)
 
-Copy/paste this as your very first message in a new chat:
+Copy/paste this as your first message in any new Gravio chat.
 
 ---
 
-You are continuing the Agent Scorecard Platform project from the existing repository at D:/VS Code Projects/Agent Scorecard.
+You are continuing the Gravio project from this repository at D:/VS Code Projects/Gravio.
 
-Session continuity is mandatory before coding:
-1) Read .claude/NOTES.md fully.
-2) Read .claude/NEXT_SESSION.md fully.
-3) Read these repo memory files: /memories/repo/index.md, /memories/repo/open-loops.md, /memories/repo/known-gotchas.md.
-4) Read Obsidian continuity note: C:/Obsidian/obsidian/40_VSCode/Gravio/Operations/Session Summaries.md (tail 60 lines).
-5) Output a 4-line kickoff summary: objective, constraints, risks, immediate next action.
+Apply these three protocols as mandatory checklists:
 
-Current objective:
-- Build Scanner Daemon v1: watch a target project folder and auto-generate evidence JSON for agent-quality/runs/latest.json.
+1) Start of Session (guided bootstrap)
+2) End of Session (closure protocol)
+3) Start of New Project (full scaffold) when and only when the user asks to initialize a brand-new repo
 
-Hard constraints:
-- Do not read secret values from .env files; only verify whether .env files are committed or exposed.
-- Keep Node.js ESM style consistent.
-- Preserve existing scripts and scoring contracts unless explicitly changed.
-- Validate with tests + gate before marking done.
+Start-of-session steps before coding:
+1. Fill session context:
+  - Feature/issue:
+  - Why now:
+  - Expected outcome:
+  - Scope estimate: 1 file / 3-5 files / major refactor
+2. Read continuity sources in this order:
+  - Obsidian `Home.md`
+  - Obsidian `Operations/Session Summaries.md`
+  - Related feature and architecture notes
+  - `.claude/NOTES.md`
+  - `.claude/NEXT_SESSION.md`
+3. Create/update today's session note at `Operations/Sessions/YYYY-MM-DD <Topic>.md` with:
+  - goals checklist
+  - current git state + blockers + last deployed commit
+  - `## Obsidian Pre-Scan` findings
+  - roadmap with ✅ / ⚠️ / 🔲 statuses
+4. If request is ambiguous, ask 2-3 focused clarification questions before editing.
+5. If changing 3+ files, present a file-by-file plan and wait for confirmation.
 
-Execution plan requirements:
-- List files to change before edits.
-- Implement only scoped changes.
-- Run verification after edits:
+Execution standards:
+- Read full relevant files before edits.
+- Track work in a todo list and complete one item at a time.
+- Keep scope tight; avoid unrelated refactors.
+- Verification baseline after edits:
   - npm test
   - npm run scorecard:check
-- Update .claude/NEXT_SESSION.md with new open loops and exact next 1-3 steps.
-- Append a short session entry to Obsidian at Operations/Session Summaries.md via the mcp_gravio-obsidi_obsidian_append tool.
+  - npm run secret-scan (for release-sensitive changes)
 
-Deliverables for this session:
-- Working scanner daemon MVP command and code.
-- Updated tests for daemon behavior.
-- Updated docs for setup/usage.
-- Clear handoff block for next chat.
+End-of-session closure gate (must pass all):
+1. All todos resolved or explicitly carried forward.
+2. `git status --short` clean (or user explicitly approves keeping changes uncommitted).
+3. `npm test` passing.
+4. Obsidian updates complete:
+  - touched Feature notes updated
+  - session note finalized (commit hash, suggested-not-implemented items, next session start)
+  - summary appended to `Operations/Session Summaries.md`
+5. Respond with the standard session footer block from `.github/copilot-instructions.md`.
 
-Start by confirming what already exists, then proceed immediately.
+Refusal triggers for declaring closure:
+- Uncommitted changes exist and user has not decided commit/discard.
+- Tests are failing.
+- Obsidian MCP unavailable and retry not attempted at session end.
+
+New-project trigger:
+- If user asks to create a new project, execute the full scaffold flow including:
+  - project identity capture
+  - copied/adapted `.vscode/`, `.claude/`, and `copilot-instructions.md`
+  - `.vscode/mcp.json` with both project vault + `00_Brain`
+  - tooling verification + initial commit/tag
+  - permanent memory files for user and repo scopes
+
+Start by auditing what already exists, report gaps, then implement missing pieces end-to-end.
 
 ---
 
 ## Quick Use
 
-- Open new chat from project root.
-- Paste the prompt above unchanged.
-- If task is not scanner daemon work, replace only the "Current objective" and "Deliverables" sections.
+- Open new chat from repository root.
+- Paste this prompt unchanged.
+- Replace only the objective-specific details when needed.
