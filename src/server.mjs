@@ -111,6 +111,8 @@ function isPaid(user) {
 }
 
 const PRO_MAX_PROJECTS = 10;
+const ONBOARDING_KEY_LABEL = "onboarding";
+const ONBOARDING_KEYS_TO_KEEP = 2;
 
 /** Returns true if user has reached their project limit for a new project_id. */
 function isAtProjectLimit(user, uid, projectId) {
@@ -2020,10 +2022,10 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // ── POST /api/keys/onboarding — rotate user-bound onboarding CLI key ────
-  // Returns a freshly-minted key (plaintext, shown once) auto-filled into
-  // the authorize command on the onboarding page. Deletes any prior key
-  // labelled "onboarding" for this user so the list stays clean.
+  // ── POST /api/keys/onboarding — mint onboarding CLI key ────────────────
+  // Returns a freshly-minted key (plaintext, shown once) for onboarding.
+  // Keep one prior onboarding key valid so recently copied commands do not
+  // break if the user opens onboarding/dashboard again right away.
   if (req.method === "POST" && req.url === "/api/keys/onboarding") {
     const user = getAuthUser(req);
     if (!user) {
@@ -2033,9 +2035,12 @@ const server = http.createServer(async (req, res) => {
     }
     const uid = user.uid ?? user.id;
     const existingKeys = stmts.listApiKeys.all(uid);
-    const prior = existingKeys.find((k) => k.label === "onboarding");
-    if (prior) stmts.deleteApiKey.run(prior.id, uid);
-    const key = generateApiKey(uid, "onboarding");
+    const onboardingKeys = existingKeys.filter((k) => k.label === ONBOARDING_KEY_LABEL);
+    const key = generateApiKey(uid, ONBOARDING_KEY_LABEL);
+    const staleKeys = onboardingKeys.slice(ONBOARDING_KEYS_TO_KEEP - 1);
+    for (const stale of staleKeys) {
+      stmts.deleteApiKey.run(stale.id, uid);
+    }
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ ok: true, key }));
     return;

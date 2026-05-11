@@ -440,6 +440,8 @@ describe("API keys", () => {
 describe("POST /api/keys/onboarding", () => {
   const email = `onboarding-${Date.now()}@gravio.test`;
   let cookie;
+  let firstKey;
+  let secondKey;
 
   it("setup: register user", async () => {
     cookie = await registerAndGetCookie(email, "Str0ng!Alpha99");
@@ -457,19 +459,23 @@ describe("POST /api/keys/onboarding", () => {
     const data = JSON.parse(res.body);
     assert.ok(data.key.startsWith("gv_"), "Key must start with gv_");
     assert.strictEqual(data.ok, true);
+    firstKey = data.key;
   });
 
-  it("rotating the key (second call) returns a fresh key and keeps only one onboarding key", async () => {
-    const r1 = await httpPost(`http://localhost:${TEST_PORT}/api/keys/onboarding`, {}, { Cookie: cookie });
+  it("rotating the key keeps the previous onboarding key valid and caps onboarding keys", async () => {
     const r2 = await httpPost(`http://localhost:${TEST_PORT}/api/keys/onboarding`, {}, { Cookie: cookie });
-    const key1 = JSON.parse(r1.body).key;
-    const key2 = JSON.parse(r2.body).key;
-    assert.notStrictEqual(key1, key2, "Second call must produce a different key");
+    secondKey = JSON.parse(r2.body).key;
+    assert.notStrictEqual(firstKey, secondKey, "Second call must produce a different key");
+
+    const oldKeyAuth = await httpGet(`http://localhost:${TEST_PORT}/api/me`, { Authorization: `Bearer ${firstKey}` });
+    assert.strictEqual(oldKeyAuth.status, 200, "Previous onboarding key should remain valid during grace window");
+    const newKeyAuth = await httpGet(`http://localhost:${TEST_PORT}/api/me`, { Authorization: `Bearer ${secondKey}` });
+    assert.strictEqual(newKeyAuth.status, 200, "Newest onboarding key should be valid");
 
     const list = await httpGet(`http://localhost:${TEST_PORT}/api/keys`, { Cookie: cookie });
     const keys = JSON.parse(list.body).keys;
     const onboardingKeys = keys.filter((k) => k.label === "onboarding");
-    assert.strictEqual(onboardingKeys.length, 1, "Only one onboarding key should exist after rotation");
+    assert.strictEqual(onboardingKeys.length, 2, "Only two onboarding keys should be retained");
   });
 });
 

@@ -936,14 +936,28 @@ async function ensureAuth(targetDir, server, maybeToken) {
   const envToken = TOKEN_ENV_VARS
     .map((name) => String(process.env[name] ?? "").trim())
     .find(Boolean);
-  const apiKey = String(maybeToken ?? envToken ?? existing?.apiKey ?? "").trim();
-  if (!apiKey) {
+  const candidates = [
+    String(maybeToken ?? "").trim(),
+    String(envToken ?? "").trim(),
+    String(existing?.apiKey ?? "").trim(),
+  ].filter(Boolean);
+  const uniqueCandidates = [...new Set(candidates)];
+
+  if (!uniqueCandidates.length) {
     throw new Error("Missing API key. Sign in on onboarding, set GRAVIO_TOKEN, then run: node gravio.mjs");
   }
 
   const meUrl = new URL("/api/me", server).toString();
-  const me = await httpGet(meUrl, { Authorization: `Bearer ${apiKey}` });
-  if (me.status !== 200) {
+  let apiKey = null;
+  for (const candidate of uniqueCandidates) {
+    const me = await httpGet(meUrl, { Authorization: `Bearer ${candidate}` });
+    if (me.status === 200) {
+      apiKey = candidate;
+      break;
+    }
+  }
+
+  if (!apiKey) {
     const linked = loadProjectState(targetDir);
     const projectId = isValidProjectId(linked?.projectId) ? linked.projectId : null;
     const commandsUrl = projectId

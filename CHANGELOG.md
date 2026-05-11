@@ -13,7 +13,7 @@ All notable changes to this project will be documented in this file.
 - Google SSO support with OAuth2 + PKCE routes: `GET /auth/sso/providers`, `GET /auth/sso/google/start`, and `GET /auth/sso/google/callback`.
 - New conversion-focused sales page at `/why-gravio.html` explaining AI coding oversight risks, Gravio value props, external trust references, and FAQ schema for improved GEO/AIO discoverability.
 - Interactive proof-metrics module on `/why-gravio.html` using Chart.js (open source) with source-linked risk, adoption, and business-impact datasets.
-- `POST /api/keys/onboarding` — authenticated endpoint that mints a fresh user-bound CLI key (label "onboarding"), deleting any prior key with that label, so the onboarding page always has a real token to auto-fill.
+- `POST /api/keys/onboarding` — authenticated endpoint that mints a fresh user-bound CLI key (label "onboarding") while keeping one prior onboarding key valid as a grace window so recent copied commands do not break.
 - `GET /api/projects/list` for CLI relink discovery and project identity management.
 - `POST /api/projects/rename` to rename project IDs per user.
 - `POST /api/projects/merge` to combine one project into another selected destination.
@@ -41,6 +41,8 @@ All notable changes to this project will be documented in this file.
 ### Fixed
 - Safety dimension row in CLI terminal output was misaligned with other dimension rows due to `🛡️` having inconsistent terminal width; replaced with `🔒`.
 - Recommendations section was already absent from CLI terminal output (confirmed); no regression.
+- Repeat-scan auth regression where opening onboarding/dashboard could rotate onboarding keys and invalidate a just-copied token before the next scan.
+- CLI auth source precedence now falls back across explicit token, env token, and saved local token so a stale env var does not hard-fail when a valid local key exists.
 
 ### Changed
 - CLI distribution build no longer applies JavaScript obfuscation; `src/web/cli/gravio.mjs` is now generated as a transparent esbuild bundle (minified only).
