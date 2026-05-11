@@ -15,6 +15,8 @@ At the start of every non-trivial session, read universal rules **before** proje
 1. **Brain first** — read via the `obsidian-brain` MCP server:
    - `00_Brain/AI Agent Methodology.md` — note taxonomy, session loop, anti-patterns
    - `00_Brain/Conventions/Deploy Playbook.md` — session-end footer template
+   - **Path safety (mandatory):** for `mcp_obsidian-brai_*` reads, always pass absolute paths rooted at `C:\Obsidian\obsidian\00_Brain\...`.
+   - Never pass relative `00_Brain/...` paths to `mcp_obsidian-brai_*`; relative paths may be resolved against the workspace and trigger access-denied errors.
 2. Then follow the Session Memory Loop below.
 
 If the `obsidian-brain` server isn't responding: Command Palette → **MCP: Reset Cached Tools**.
