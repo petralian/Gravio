@@ -24,7 +24,6 @@
     "better-sqlite3": "^12.9.0"
   },
   "devDependencies": {
-    "esbuild": "^0.24.0",
-    "javascript-obfuscator": "^5.4.2"
+    "esbuild": "^0.24.0"
   }
 }

@@ -4,7 +4,7 @@
  *
  * Simplified Gravio CLI:
  *   node gravio.mjs                     # setup/auth/link/scan/publish
- *   node gravio.mjs --token gv_xxx      # first-time connect + run
+ *   GRAVIO_TOKEN=gv_xxx node gravio.mjs # first-time connect + run (recommended)
  *   node gravio.mjs link --project id   # relink folder to an existing project
  *   node gravio.mjs rename new-id       # rename current project id
  *   node gravio.mjs merge --to target   # merge current project into target
@@ -28,6 +28,7 @@ const CLI_VERSION = typeof GRAVIO_CLI_VERSION !== "undefined" ? GRAVIO_CLI_VERSI
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
 const DEFAULT_SERVER = "https://gravio.dev";
+const TOKEN_ENV_VARS = ["GRAVIO_TOKEN", "GRAVIO_API_KEY"];
 
 function readVersion() {
   try {
@@ -925,9 +926,12 @@ function buildEncryptedRunEnvelope(run, options) {
 
 async function ensureAuth(targetDir, server, maybeToken) {
   const existing = loadAuthConfig(targetDir);
-  const apiKey = String(maybeToken ?? existing?.apiKey ?? "").trim();
+  const envToken = TOKEN_ENV_VARS
+    .map((name) => String(process.env[name] ?? "").trim())
+    .find(Boolean);
+  const apiKey = String(maybeToken ?? envToken ?? existing?.apiKey ?? "").trim();
   if (!apiKey) {
-    throw new Error("Missing API key. Sign in on onboarding and use: node gravio.mjs --token <gv_...>");
+    throw new Error("Missing API key. Sign in on onboarding, set GRAVIO_TOKEN, then run: node gravio.mjs");
   }
 
   const meUrl = new URL("/api/me", server).toString();
@@ -997,6 +1001,10 @@ async function handleRun(args) {
 
   const existingAuth = loadAuthConfig(args.target);
   const server = String(args.server ?? existingAuth?.server ?? DEFAULT_SERVER).trim();
+
+  if (args.token) {
+    process.stderr.write("\n  \x1b[93mWarning:\x1b[0m --token exposes secrets in shell history. Prefer GRAVIO_TOKEN env var.\n");
+  }
 
   const { apiKey } = await ensureAuth(args.target, server, args.token);
   const projectId = ensureProjectLink(args.target, args.project);
@@ -1106,6 +1114,9 @@ async function handleRun(args) {
 async function handleLink(args) {
   const existingAuth = loadAuthConfig(args.target);
   const server = String(args.server ?? existingAuth?.server ?? DEFAULT_SERVER).trim();
+  if (args.token) {
+    process.stderr.write("\n  \x1b[93mWarning:\x1b[0m --token exposes secrets in shell history. Prefer GRAVIO_TOKEN env var.\n");
+  }
   const { apiKey } = await ensureAuth(args.target, server, args.token);
 
   const requested = normalizeProjectId(args.project);
@@ -1134,6 +1145,9 @@ async function handleLink(args) {
 async function handleRename(args) {
   const existingAuth = loadAuthConfig(args.target);
   const server = String(args.server ?? existingAuth?.server ?? DEFAULT_SERVER).trim();
+  if (args.token) {
+    process.stderr.write("\n  \x1b[93mWarning:\x1b[0m --token exposes secrets in shell history. Prefer GRAVIO_TOKEN env var.\n");
+  }
   const { apiKey } = await ensureAuth(args.target, server, args.token);
 
   const linkedProjectId = ensureProjectLink(args.target, args.project);
@@ -1164,6 +1178,9 @@ async function handleRename(args) {
 async function handleMerge(args) {
   const existingAuth = loadAuthConfig(args.target);
   const server = String(args.server ?? existingAuth?.server ?? DEFAULT_SERVER).trim();
+  if (args.token) {
+    process.stderr.write("\n  \x1b[93mWarning:\x1b[0m --token exposes secrets in shell history. Prefer GRAVIO_TOKEN env var.\n");
+  }
   const { apiKey } = await ensureAuth(args.target, server, args.token);
 
   const linkedProjectId = ensureProjectLink(args.target, args.project);
@@ -1222,7 +1239,7 @@ async function handleDoctor(args) {
     }
     process.stdout.write(`\n  Fixes:\n`);
     if (!setup?.completedAt) process.stdout.write(`    $ node gravio.mjs setup\n`);
-    if (!auth?.apiKey) process.stdout.write(`    $ node gravio.mjs --token <gv_...>\n`);
+    if (!auth?.apiKey) process.stdout.write(`    $ set GRAVIO_TOKEN (or $env:GRAVIO_TOKEN / export GRAVIO_TOKEN), then run: node gravio.mjs\n`);
     if (auth?.apiKey && !project?.projectId) process.stdout.write(`    $ node gravio.mjs link --project <id>\n`);
   } else {
     process.stdout.write(`\n  ✅ All checks passed!\n`);
@@ -1240,7 +1257,9 @@ function printHelp() {
 
   ${c.bold}USAGE${c.reset}
     ${c.green}node gravio.mjs${c.reset}                       Scan and publish (uses saved auth)
-    ${c.green}node gravio.mjs --token <gv_...>${c.reset}      First-time setup, auth, link, scan, and publish
+    ${c.green}export GRAVIO_TOKEN=<gv_...> && node gravio.mjs${c.reset}   First-time setup on macOS/Linux
+    ${c.green}$env:GRAVIO_TOKEN='<gv_...>'; node gravio.mjs${c.reset}      First-time setup on PowerShell
+    ${c.dim}node gravio.mjs --token <gv_...>${c.reset}        Legacy fallback (less secure; exposes token in shell history)
 
   ${c.bold}ADVANCED COMMANDS${c.reset}
     ${c.cyan}doctor${c.reset}                                Show setup / auth / link status and repair suggestions
@@ -1328,7 +1347,7 @@ try {
   }
   
   if (msg.includes("auth") || msg.includes("token") || msg.includes("api key")) {
-    process.stderr.write(`    1. Re-authenticate: \x1b[96mnode gravio.mjs --token <gv_YOUR_TOKEN>\x1b[0m\n`);
+    process.stderr.write(`    1. Re-authenticate: \x1b[96mset/export GRAVIO_TOKEN then run node gravio.mjs\x1b[0m\n`);
     process.stderr.write(`    2. Get a fresh token at: \x1b[96mhttps://gravio.dev/onboarding\x1b[0m\n`);
   }
   

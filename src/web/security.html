@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gravio - Security and Data Flow</title>
+  <meta name="description" content="Exact security and data-flow contract for Gravio CLI and cloud publish APIs." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="security-page">
+  <div data-site-header></div>
+
+  <main class="m-container" style="padding-top:40px;padding-bottom:72px;display:grid;gap:24px;">
+    <section class="m-section" style="margin:0;">
+      <p class="m-eyebrow">SECURITY CONTRACT</p>
+      <h1 class="m-section-h2" style="margin-bottom:10px;">What Gravio reads, encrypts, and transmits</h1>
+      <p class="m-section-sub" style="max-width:900px;">
+        This page is the plain-language contract for Gravio CLI behavior. It matches the public manifest at
+        <a href="/cli/manifest.json">/cli/manifest.json</a> and onboarding verification steps.
+      </p>
+    </section>
+
+    <section class="m-section" style="margin:0;">
+      <h2 class="m-section-h2" style="font-size:1.5rem;">Read Locally</h2>
+      <ul class="m-list" style="margin-top:12px;line-height:1.7;color:var(--text-2);">
+        <li>Directory and file structure metadata for scan signals.</li>
+        <li>Git metadata (tracked files and status signals).</li>
+        <li>Project config metadata (manifest files, lock files, CI and docs signals).</li>
+      </ul>
+    </section>
+
+    <section class="m-section" style="margin:0;">
+      <h2 class="m-section-h2" style="font-size:1.5rem;">Never Uploaded as Plaintext</h2>
+      <ul class="m-list" style="margin-top:12px;line-height:1.7;color:var(--text-2);">
+        <li>Raw source code file contents.</li>
+        <li>.env secret values for publish payload construction.</li>
+      </ul>
+    </section>
+
+    <section class="m-section" style="margin:0;">
+      <h2 class="m-section-h2" style="font-size:1.5rem;">Transmitted to Gravio Cloud</h2>
+      <ul class="m-list" style="margin-top:12px;line-height:1.7;color:var(--text-2);">
+        <li>Scan signal summary payload to <code>/api/scan-evaluate</code> over HTTPS.</li>
+        <li>Encrypted run envelope to <code>/api/publish</code> over HTTPS.</li>
+        <li>Optional artifact summary (scores and check ids) to <code>/api/scans/artifact</code> over HTTPS.</li>
+      </ul>
+    </section>
+
+    <section class="m-section" style="margin:0;">
+      <h2 class="m-section-h2" style="font-size:1.5rem;">Encryption Modes</h2>
+      <ul class="m-list" style="margin-top:12px;line-height:1.7;color:var(--text-2);">
+        <li>Client-side AES-256-GCM envelope encryption before publish.</li>
+        <li>API-key-derived key mode (default).</li>
+        <li>Passphrase-derived key mode with PBKDF2 salt.</li>
+        <li>Raw one-time key mode.</li>
+      </ul>
+    </section>
+
+    <section class="m-section" style="margin:0;">
+      <h2 class="m-section-h2" style="font-size:1.5rem;">CLI Integrity and Provenance</h2>
+      <ul class="m-list" style="margin-top:12px;line-height:1.7;color:var(--text-2);">
+        <li>Public manifest endpoint: <a href="/cli/manifest.json">/cli/manifest.json</a></li>
+        <li>Includes source repository url, build timestamp, CLI SHA-256, and behavior guarantees.</li>
+        <li>Detached signature fields are reserved in the manifest schema for future publication.</li>
+      </ul>
+      <div class="m-cta-row" style="margin-top:14px;">
+        <a href="/onboarding" class="m-btn m-btn-neon">See verification steps</a>
+        <a href="/cli/manifest.json" class="m-btn m-btn-outline">Open manifest</a>
+      </div>
+    </section>
+  </main>
+
+  <div data-site-footer></div>
+
+  <script src="site-chrome.js"></script>
+</body>
+</html>

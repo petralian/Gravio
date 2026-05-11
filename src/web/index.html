@@ -291,11 +291,11 @@
 <span class="t-comment"># 2. Download the CLI</span>
 <span class="t-prompt">$</span> <span class="t-cmd">curl -fsSL https://gravio.dev/cli/gravio.mjs -o gravio.mjs</span>
 
-<span class="t-comment"># 3. Authorize this folder once (use your API key from Settings)</span>
-<span class="t-prompt">$</span> <span class="t-cmd">node gravio.mjs --authorize --project my-app --api-key gv_xxx --server https://gravio.dev</span>
+<span class="t-comment"># 3. Set your API key once (PowerShell shown)</span>
+<span class="t-prompt">$</span> <span class="t-cmd">$env:GRAVIO_TOKEN='gv_xxx'</span>
 
-<span class="t-comment"># 4. Run a scan any time — first scan creates the project</span>
-<span class="t-prompt">$</span> <span class="t-cmd">node gravio.mjs --once --target .</span><span class="t-cursor">█</span></pre>
+<span class="t-comment"># 4. Run a scan — first run auto-links project + publishes</span>
+<span class="t-prompt">$</span> <span class="t-cmd">node gravio.mjs</span><span class="t-cursor">█</span></pre>
           </div>
         </div>
       </div>
@@ -312,7 +312,7 @@
           <span class="m-pill">Auth-gated result access</span>
           <span class="m-pill">Optional E2EE (Pro &amp; Team)</span>
           <span class="m-pill">Open-source scanner</span>
-          <span class="m-pill">Signed binaries</span>
+          <span class="m-pill">Published SHA-256 manifest</span>
         </div>
       </div>
     </section>

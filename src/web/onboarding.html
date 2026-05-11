@@ -49,18 +49,40 @@
       </article>
 
       <article class="ob-step-card">
+        <p class="ob-step-num">Verify</p>
+        <h2>Verify checksum and signature metadata</h2>
+        <p>Use the public manifest at <code>/cli/manifest.json</code> to verify the downloaded file integrity before first run.</p>
+        <p class="ob-os-label">Windows (PowerShell checksum check):</p>
+        <pre class="ob-code" id="cmd-verify-win">$manifest = Invoke-RestMethod https://gravio.dev/cli/manifest.json
+$expected = $manifest.cli.sha256.ToLower()
+$actual = (Get-FileHash .\gravio.mjs -Algorithm SHA256).Hash.ToLower()
+if ($actual -eq $expected) { "Checksum OK" } else { throw "Checksum mismatch" }</pre>
+        <button class="m-btn m-btn-outline ob-copy" type="button" data-copy-id="cmd-verify-win">Copy command</button>
+
+        <p class="ob-os-label">macOS / Linux checksum check:</p>
+        <pre class="ob-code" id="cmd-verify-unix">expected=$(curl -fsSL https://gravio.dev/cli/manifest.json | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>console.log(JSON.parse(d).cli.sha256))")
+actual=$(sha256sum gravio.mjs | awk '{print $1}')
+[ "$actual" = "$expected" ] &amp;&amp; echo "Checksum OK" || (echo "Checksum mismatch"; exit 1)</pre>
+        <button class="m-btn m-btn-outline ob-copy" type="button" data-copy-id="cmd-verify-unix">Copy command</button>
+
+        <p class="ob-step-foot">Signature note: manifest includes signature fields. If <code>signature.algorithm</code> is <code>none</code>, detached signature is not yet published. If signature urls are present, verify with OpenSSL:</p>
+        <pre class="ob-code" id="cmd-verify-signature">openssl dgst -sha256 -verify gravio-cli-public.pem -signature gravio.mjs.sig gravio.mjs</pre>
+        <button class="m-btn m-btn-outline ob-copy" type="button" data-copy-id="cmd-verify-signature">Copy command</button>
+      </article>
+
+      <article class="ob-step-card">
         <p class="ob-step-num">Step 2</p>
         <h2>Run one smart command</h2>
         <p>This single command handles setup, auth, project linking, local scan, and cloud publish. It skips steps that are already done.</p>
         <div data-auth-only hidden>
-          <pre class="ob-code" id="cmd-smartstart">node gravio.mjs --token gv_sign_in_to_auto_fill_token</pre>
+          <pre class="ob-code" id="cmd-smartstart">$env:GRAVIO_TOKEN='gv_sign_in_to_auto_fill_token'; node gravio.mjs</pre>
           <button class="m-btn m-btn-outline ob-copy" type="button" data-copy-id="cmd-smartstart" data-auth-only-copy="true">Copy command</button>
         </div>
         <div class="ob-locked-cmd ob-open-auth" data-anon-only hidden role="button" tabindex="0" aria-label="Sign in to unlock command">
           <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true"><rect x="2" y="6" width="9" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.2"/><path d="M4.5 6V4a2 2 0 0 1 4 0v2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
           Sign in to reveal your one-command setup
         </div>
-        <p class="ob-step-foot">Project identity is saved in <code>.gravio/project.json</code>. Future runs use the same project automatically.</p>
+        <p class="ob-step-foot">Uses <code>GRAVIO_TOKEN</code> env var (safer than passing tokens in argv). Project identity is saved in <code>.gravio/project.json</code> for future runs.</p>
       </article>
 
       <article class="ob-step-card">

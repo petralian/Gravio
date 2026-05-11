@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-05-11T04:23:23.873Z",
+  "source": {
+    "repositoryUrl": "https://github.com/your-org/gravio",
+    "buildScript": "scripts/build-cli.mjs"
+  },
+  "cli": {
+    "path": "/cli/gravio.mjs",
+    "version": "0.4.2",
+    "builtAt": "2026-05-11T04:23:23.873Z",
+    "sizeBytes": 70658,
+    "sha256": "a750ba32a14c0363fc976865f80c686b12d42c1e77aa78e324d0fa64d79634a9"
+  },
+  "integrity": {
+    "algorithm": "sha256",
+    "checksumField": "cli.sha256"
+  },
+  "signature": {
+    "algorithm": "none",
+    "detachedSignatureUrl": null,
+    "publicKeyUrl": null,
+    "note": "Detached signatures are not published yet. Verify checksum against this manifest."
+  },
+  "guarantees": {
+    "auth": [
+      "CLI accepts token from GRAVIO_TOKEN/GRAVIO_API_KEY env vars or saved local auth state.",
+      "CLI warns when --token is used because argv may leak into shell history.",
+      "Server validates token via /api/me before scan publish is attempted."
+    ],
+    "dataRead": [
+      "Project file and directory names/structure for configured scan signals.",
+      "Git metadata (tracked files, commit/reference status) needed for quality checks.",
+      "Project config metadata (package manifests, lock files, CI config, docs signals)."
+    ],
+    "dataNotRead": [
+      "CLI does not read .env secret values for upload payload construction.",
+      "CLI does not transmit full source code file contents as part of published run payloads."
+    ],
+    "dataTransmitted": [
+      "Scan signal summary payload to /api/scan-evaluate over HTTPS.",
+      "Encrypted run envelope (AES-256-GCM) to /api/publish over HTTPS.",
+      "Optional scan artifact summary to /api/scans/artifact over HTTPS."
+    ],
+    "encryption": [
+      "Run payload is encrypted client-side before publish.",
+      "Envelope modes include api-key-derived key, passphrase-derived key, or raw one-time key."
+    ]
+  }
+}

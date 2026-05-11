@@ -167,6 +167,37 @@ describe("GET /onboarding", () => {
   });
 });
 
+describe("GET /security", () => {
+  it("returns 200 with security HTML", async () => {
+    const res = await httpGet(`http://localhost:${TEST_PORT}/security`);
+    assert.strictEqual(res.status, 200);
+    assert.ok(res.headers["content-type"]?.includes("text/html"), "Expected HTML content-type");
+    assert.ok(res.body.includes("What Gravio reads, encrypts, and transmits"), "Expected security page headline");
+  });
+});
+
+describe("GET /cli/manifest.json", () => {
+  it("returns trust manifest with valid CLI checksum", async () => {
+    const manifestRes = await httpGet(`http://localhost:${TEST_PORT}/cli/manifest.json`);
+    assert.strictEqual(manifestRes.status, 200);
+    assert.ok(manifestRes.headers["content-type"]?.includes("application/json"), "Expected JSON content-type");
+
+    const manifest = JSON.parse(manifestRes.body);
+    assert.strictEqual(manifest.schemaVersion, 1);
+    assert.strictEqual(typeof manifest.generatedAt, "string");
+    assert.strictEqual(typeof manifest.source?.repositoryUrl, "string");
+    assert.strictEqual(typeof manifest.cli?.sha256, "string");
+    assert.strictEqual(manifest.cli.sha256.length, 64);
+    assert.ok(Array.isArray(manifest.guarantees?.auth), "Expected guarantees.auth array");
+    assert.ok(Array.isArray(manifest.guarantees?.dataTransmitted), "Expected guarantees.dataTransmitted array");
+
+    const cliRes = await httpGet(`http://localhost:${TEST_PORT}/cli/gravio.mjs`);
+    assert.strictEqual(cliRes.status, 200);
+    const cliSha = crypto.createHash("sha256").update(Buffer.from(cliRes.body, "utf8")).digest("hex");
+    assert.strictEqual(cliSha, manifest.cli.sha256, "CLI checksum mismatch");
+  });
+});
+
 describe("GET /dashboard", () => {
   it("returns 200 with dashboard HTML", async () => {
     const res = await httpGet(`http://localhost:${TEST_PORT}/dashboard`);

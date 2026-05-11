@@ -25,7 +25,7 @@ const panelRegister = document.getElementById("ob-panel-register");
 function updateSmartCommand() {
   const tokenPart = onboardingCliToken ?? "gv_sign_in_to_auto_fill_token";
   if (elCmdSmartStart) {
-    elCmdSmartStart.textContent = `node gravio.mjs --token ${tokenPart}`;
+    elCmdSmartStart.textContent = `$env:GRAVIO_TOKEN='${tokenPart}'; node gravio.mjs`;
   }
 }
 
