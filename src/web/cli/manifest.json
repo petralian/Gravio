@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-05-11T04:23:23.873Z",
+  "generatedAt": "2026-05-11T04:32:46.988Z",
   "source": {
     "repositoryUrl": "https://github.com/your-org/gravio",
     "buildScript": "scripts/build-cli.mjs"
@@ -8,9 +8,9 @@
   "cli": {
     "path": "/cli/gravio.mjs",
     "version": "0.4.2",
-    "builtAt": "2026-05-11T04:23:23.873Z",
-    "sizeBytes": 70658,
-    "sha256": "a750ba32a14c0363fc976865f80c686b12d42c1e77aa78e324d0fa64d79634a9"
+    "builtAt": "2026-05-11T04:32:46.988Z",
+    "sizeBytes": 70701,
+    "sha256": "cbe94b61c9af31a14a8f44790b0a1b87ec6141e0deb9c1c7b930d78e8735ac9e"
   },
   "integrity": {
     "algorithm": "sha256",

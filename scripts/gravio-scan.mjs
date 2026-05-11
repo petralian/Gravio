@@ -39,6 +39,13 @@ function readVersion() {
   }
 }
 
+function displayVersion() {
+  if (CLI_VERSION && CLI_VERSION !== "dev") {
+    return CLI_VERSION;
+  }
+  return readVersion();
+}
+
 function parseArgs(argv) {
   const args = {
     command: "run",
@@ -1040,7 +1047,7 @@ async function handleRun(args) {
     process.stdout.write("\n");
   }
 
-  printScanReport({ run, scan, version: readVersion() });
+  printScanReport({ run, scan, version: displayVersion() });
 
   // MoSCoW export if --export flag was set
   if (args.export) {
