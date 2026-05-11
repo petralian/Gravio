@@ -1001,8 +1001,8 @@ function renderWorkspaceRunScans(projectId, hasScans) {
   const pid   = esc(projectId);
   const token = state.cliToken ?? null;
   const tokenCmd = token
-    ? `node gravio.mjs --token ${token}`
-    : `node gravio.mjs --token YOUR_API_KEY`;
+    ? `$env:GRAVIO_TOKEN='${token}'; node gravio.mjs`
+    : `$env:GRAVIO_TOKEN='YOUR_API_KEY'; node gravio.mjs`;
   const tokenFoot = token
     ? `<p class="db-runscans-foot">Token auto-filled from your session.</p>`
     : `<p class="db-runscans-foot">Need your token? <a href="/settings" class="db-runscans-link">Settings &#8594;</a></p>`;
