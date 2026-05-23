@@ -89,7 +89,7 @@ tests/
 ### Local dev
 
 ```bash
-git clone https://github.com/your-org/gravio.git
+git clone https://github.com/petralian/Gravio.git
 cd gravio
 npm ci
 cp .env.example .env          # fill in SESSION_SECRET at minimum
@@ -229,3 +229,5 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) to get started.
 [MIT](LICENSE) — free to use, fork, and self-host.
 
 Built by the Gravio contributors. Hosted platform at [gravio.dev](https://gravio.dev).
+
+**GitHub:** [github.com/petralian/Gravio](https://github.com/petralian/Gravio)

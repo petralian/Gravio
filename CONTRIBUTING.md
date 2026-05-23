@@ -21,7 +21,7 @@ The highest-value areas right now:
 ## Getting started
 
 ```bash
-git clone https://github.com/your-org/gravio.git
+git clone https://github.com/petralian/Gravio.git
 cd gravio
 npm ci
 cp .env.example .env     # set SESSION_SECRET to any 32+ char string for local dev

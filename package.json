@@ -6,7 +6,7 @@
   "homepage": "https://gravio.dev",
   "repository": {
     "type": "git",
-    "url": "https://github.com/your-org/gravio.git"
+    "url": "https://github.com/petralian/Gravio.git"
   },
   "license": "MIT",
   "scripts": {

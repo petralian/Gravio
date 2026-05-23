@@ -1,14 +1,14 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-05-11T04:48:36.048Z",
+  "generatedAt": "2026-05-23T10:02:09.160Z",
   "source": {
-    "repositoryUrl": "https://github.com/your-org/gravio",
+    "repositoryUrl": "https://github.com/petralian/Gravio.git",
     "buildScript": "scripts/build-cli.mjs"
   },
   "cli": {
     "path": "/cli/gravio.mjs",
     "version": "0.4.2",
-    "builtAt": "2026-05-11T04:48:36.048Z",
+    "builtAt": "2026-05-23T10:02:09.160Z",
     "sizeBytes": 70819,
     "sha256": "67fd7bc62c8ef5b9bad875a95dd49399785826d29d816be3dfbddc7f1e196428"
   },
