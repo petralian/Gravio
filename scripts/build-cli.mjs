@@ -46,7 +46,7 @@ const SOURCE_REPO_URL = (() => {
 })();
 
 const BANNER = `// Gravio CLI — bundled distribution.
-// Source: https://github.com/your-org/gravio · https://gravio.dev
+// Source: ${SOURCE_REPO_URL} · https://gravio.dev
 // Run:    node gravio.mjs --once
 // Build:  esbuild bundle (minified), no obfuscation.
 `;

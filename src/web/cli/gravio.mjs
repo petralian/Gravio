@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Gravio CLI — bundled distribution.
-// Source: https://github.com/your-org/gravio · https://gravio.dev
+// Source: https://github.com/petralian/Gravio.git · https://gravio.dev
 // Run:    node gravio.mjs --once
 // Build:  esbuild bundle (minified), no obfuscation.
 
