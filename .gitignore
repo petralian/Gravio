@@ -15,3 +15,11 @@ data/
 
 # Gravio local CLI auth/config
 .gravio/
+
+# Internal dev notes and session prompts (not for public repo)
+.claude/
+STARTUP_PROMPT.md
+
+# Test output artifacts
+test_output.txt
+test_results.txt

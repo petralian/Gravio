@@ -1813,56 +1813,65 @@ function bindEvents() {
 
 // ─── Init ───
 async function init() {
+  // Auth check — only this failure warrants a login redirect.
+  let me;
   try {
-    const me = await fetch("/api/me");
-    if (!me.ok) {
-      location.href = "/login?next=/dashboard";
-      return;
-    }
-    state.user = await me.json();
-    state.cliToken = await fetchCliToken();
-    bindEvents();
-    await loadProjects();
-
-    // Phase 4: billing banner (non-blocking)
-    fetch("/api/billing/status").then(async (r) => {
-      if (!r.ok) return;
-      const d = await r.json();
-      const BANNERS = {
-        past_due: { cls: "db-billing-banner-warn",   msg: "⚠ Your last payment failed. Please update your payment method to avoid losing access. Go to Settings → Billing." },
-        unpaid:   { cls: "db-billing-banner-danger", msg: "✕ Your subscription is unpaid after multiple failed attempts. Update your payment method in Settings → Billing." },
-        expired:  { cls: "db-billing-banner-danger", msg: "✕ Your subscription has expired. Renew via Settings → Billing." },
-      };
-      const el = document.getElementById("db-billing-banner");
-      const entry = BANNERS[String(d.status ?? "").toLowerCase()];
-      if (el && entry) {
-        el.className = `db-billing-banner ${entry.cls}`;
-        el.textContent = entry.msg;
-        el.removeAttribute("hidden");
-      }
-    }).catch(() => {});
-
-    const requestedProject = getRequestedProjectFromUrl();
-    if (requestedProject) {
-      const hasProject = state.projects.some((p) => p.project_id === requestedProject);
-      if (hasProject) {
-        await openProject(requestedProject);
-        // After project loads, check for requested tab
-        const requestedTab = getRequestedTabFromUrl();
-        if (requestedTab) {
-          switchTab(requestedTab, false);
-        }
-      } else {
-        showError(elPhError, `Project not found: ${requestedProject}`);
-      }
-      return;
-    }
-
-    if (state.projects.length === 1) {
-      await openProject(state.projects[0].project_id);
-    }
+    me = await fetch("/api/me");
   } catch {
     location.href = "/login?next=/dashboard";
+    return;
+  }
+  if (!me.ok) {
+    location.href = "/login?next=/dashboard";
+    return;
+  }
+  state.user = await me.json();
+  state.cliToken = await fetchCliToken();
+  bindEvents();
+
+  try {
+    await loadProjects();
+  } catch {
+    showError(elWsError, "Failed to load projects. Please refresh.");
+    return;
+  }
+
+  // Phase 4: billing banner (non-blocking)
+  fetch("/api/billing/status").then(async (r) => {
+    if (!r.ok) return;
+    const d = await r.json();
+    const BANNERS = {
+      past_due: { cls: "db-billing-banner-warn",   msg: "⚠ Your last payment failed. Please update your payment method to avoid losing access. Go to Settings → Billing." },
+      unpaid:   { cls: "db-billing-banner-danger", msg: "✕ Your subscription is unpaid after multiple failed attempts. Update your payment method in Settings → Billing." },
+      expired:  { cls: "db-billing-banner-danger", msg: "✕ Your subscription has expired. Renew via Settings → Billing." },
+    };
+    const el = document.getElementById("db-billing-banner");
+    const entry = BANNERS[String(d.status ?? "").toLowerCase()];
+    if (el && entry) {
+      el.className = `db-billing-banner ${entry.cls}`;
+      el.textContent = entry.msg;
+      el.removeAttribute("hidden");
+    }
+  }).catch(() => {});
+
+  const requestedProject = getRequestedProjectFromUrl();
+  if (requestedProject) {
+    const hasProject = state.projects.some((p) => p.project_id === requestedProject);
+    if (hasProject) {
+      await openProject(requestedProject);
+      // After project loads, check for requested tab
+      const requestedTab = getRequestedTabFromUrl();
+      if (requestedTab) {
+        switchTab(requestedTab, false);
+      }
+    } else {
+      showError(elPhError, `Project not found: ${requestedProject}`);
+    }
+    return;
+  }
+
+  if (state.projects.length === 1) {
+    await openProject(state.projects[0].project_id);
   }
 }
 

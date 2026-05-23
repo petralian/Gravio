@@ -116,7 +116,8 @@ function renderBillingCard(data) {
 async function loadBillingStatus() {
   clearBillingError();
   const res = await fetch("/api/billing/status");
-  const data = await res.json();
+  let data;
+  try { data = await res.json(); } catch { data = {}; }
   if (!res.ok) {
     showBillingError(data.error ?? "Failed to load billing status.");
     return;
@@ -611,48 +612,52 @@ function onSaveE2EEKey() {
 // ─── Init ───
 
 async function init() {
+  // Auth check — only this failure warrants a login redirect.
+  let me;
   try {
-    const me = await fetch("/api/me");
-    if (!me.ok) {
-      location.href = "/login?next=/settings";
-      return;
-    }
-    const user = await me.json();
-
-    if (user.plan === "team" || user.role === "admin") {
-      $("st-e2ee-section")?.removeAttribute("hidden");
-      renderE2EEKeys();
-    }
-
-    // Hide current-password field for SSO-only users
-    if (user.authProvider) {
-      $("st-pw-current-wrap")?.setAttribute("hidden", "");
-    }
-
-    await loadBillingStatus();
-    await Promise.all([loadApiKeys(), loadBillingInvoices()]);
-
-    $("st-gen-key")?.addEventListener("click", onGenerateKey);
-    $("st-keys-list")?.addEventListener("click", onRevokeKeyClick);
-    $("st-pw-save")?.addEventListener("click", onPasswordSave);
-    $("st-billing-cancel")?.addEventListener("click", onCancelClick);
-    $("st-cancel-yes")?.addEventListener("click", onCancelYes);
-    $("st-cancel-no")?.addEventListener("click", onCancelNo);
-    $("st-billing-resume")?.addEventListener("click", onResumePlan);
-    $("st-seats-save")?.addEventListener("click", onAdjustSeats);
-    $("st-e2ee-save-key")?.addEventListener("click", onSaveE2EEKey);
-
-    $("st-copy-key")?.addEventListener("click", async () => {
-      const val = $("st-new-key-value").textContent;
-      await navigator.clipboard?.writeText(val);
-      $("st-copy-key").textContent = "Copied!";
-      setTimeout(() => { $("st-copy-key").textContent = "Copy"; }, 1600);
-    });
-
-    $("st-e2ee-load")?.addEventListener("click", loadOptionalE2EE);
+    me = await fetch("/api/me");
   } catch {
     location.href = "/login?next=/settings";
+    return;
   }
+  if (!me.ok) {
+    location.href = "/login?next=/settings";
+    return;
+  }
+  const user = await me.json();
+
+  if (user.plan === "team" || user.role === "admin") {
+    $("st-e2ee-section")?.removeAttribute("hidden");
+    renderE2EEKeys();
+  }
+
+  // Hide current-password field for SSO-only users
+  if (user.authProvider) {
+    $("st-pw-current-wrap")?.setAttribute("hidden", "");
+  }
+
+  // Non-auth data — failures show inline errors, never redirect to login.
+  try { await loadBillingStatus(); } catch { showBillingError("Failed to load billing info."); }
+  try { await Promise.all([loadApiKeys(), loadBillingInvoices()]); } catch { /* inline errors handled inside */ }
+
+  $("st-gen-key")?.addEventListener("click", onGenerateKey);
+  $("st-keys-list")?.addEventListener("click", onRevokeKeyClick);
+  $("st-pw-save")?.addEventListener("click", onPasswordSave);
+  $("st-billing-cancel")?.addEventListener("click", onCancelClick);
+  $("st-cancel-yes")?.addEventListener("click", onCancelYes);
+  $("st-cancel-no")?.addEventListener("click", onCancelNo);
+  $("st-billing-resume")?.addEventListener("click", onResumePlan);
+  $("st-seats-save")?.addEventListener("click", onAdjustSeats);
+  $("st-e2ee-save-key")?.addEventListener("click", onSaveE2EEKey);
+
+  $("st-copy-key")?.addEventListener("click", async () => {
+    const val = $("st-new-key-value").textContent;
+    await navigator.clipboard?.writeText(val);
+    $("st-copy-key").textContent = "Copied!";
+    setTimeout(() => { $("st-copy-key").textContent = "Copy"; }, 1600);
+  });
+
+  $("st-e2ee-load")?.addEventListener("click", loadOptionalE2EE);
 }
 
 init();

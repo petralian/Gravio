@@ -1,8 +1,14 @@
 {
-  "name": "agent-scorecard-platform",
+  "name": "gravio",
   "version": "0.4.2",
   "type": "module",
-  "description": "Standalone AI agent quality scorecard platform — scan, score, and improve AI-assisted development workflows",
+  "description": "AI Agent Quality Engine — scan, score, and improve AI-assisted development workflows",
+  "homepage": "https://gravio.dev",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-org/gravio.git"
+  },
+  "license": "MIT",
   "scripts": {
     "start": "node src/server.mjs",
     "test": "node --test tests/evaluate.test.mjs tests/scanner.test.mjs tests/crypto-e2ee.test.mjs tests/server.test.mjs",

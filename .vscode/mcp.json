@@ -10,7 +10,7 @@
       "args": [
         "-y",
         "@modelcontextprotocol/server-filesystem",
-        "C:\\Obsidian\\obsidian\\00_Brain"
+        "D:\\Obsidian\\obsidian"
       ]
     }
   }

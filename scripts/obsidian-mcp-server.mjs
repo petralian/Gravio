@@ -23,7 +23,7 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
 import { dirname, join, resolve, normalize } from "node:path";
 
 // ── Vault root — only paths inside here are accessible ─────────────────────
-const EXPECTED_VAULT_ROOT = normalize(resolve("C:\\Obsidian\\obsidian\\40_VSCode\\Gravio"));
+const EXPECTED_VAULT_ROOT = normalize(resolve("D:\\Obsidian\\obsidian\\40_VSCode\\Gravio"));
 const requestedVaultRoot = process.env.GRAVIO_OBSIDIAN_VAULT_ROOT || EXPECTED_VAULT_ROOT;
 const VAULT_ROOT = normalize(resolve(requestedVaultRoot));
 
